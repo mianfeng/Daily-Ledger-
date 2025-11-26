@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DailyData, Transaction } from '../types';
-import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { exportDailyToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
@@ -53,6 +53,32 @@ export const DailyLedger: React.FC = () => {
       .filter(t => t.type === 'expense' && t.date === todayStr)
       .reduce((acc, t) => acc + t.amount, 0);
   }, [data.transactions]);
+
+  // Month-End Estimation Calculation
+  const estimatedMonthEndBalance = useMemo(() => {
+    // Only calculate if viewing current month/year, otherwise it doesn't make sense for past records
+    const now = new Date();
+    if (currentYear !== now.getFullYear() || currentMonth !== (now.getMonth() + 1)) {
+        return null;
+    }
+
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const currentDay = now.getDate();
+    const remainingDaysInMonth = daysInMonth - currentDay; // Days after today
+    
+    // Logic: 
+    // 1. Allowance left for TODAY (if any)
+    const todayAllowanceLeft = Math.max(0, data.dailyLimit - todaySpent);
+    
+    // 2. Allowance for FUTURE days
+    const futureAllowance = remainingDaysInMonth * data.dailyLimit;
+    
+    // 3. Projected Future Spend (Assuming we max out budget every day from now on)
+    const projectedFutureSpend = todayAllowanceLeft + futureAllowance;
+    
+    // 4. Current Balance - Projected Future Spend
+    return balance - projectedFutureSpend;
+  }, [balance, currentYear, currentMonth, data.dailyLimit, todaySpent]);
 
   const chartData = useMemo(() => {
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -231,27 +257,42 @@ export const DailyLedger: React.FC = () => {
         </div>
 
         {/* Daily Limit */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-100">
-          <h3 className="text-stone-500 font-bold text-sm mb-2">⚡ 今日额度监控</h3>
-          <div className="flex justify-between items-center">
-            <div>
-              <span className="text-2xl font-bold text-stone-800">{todaySpent.toFixed(2)}</span>
-              <span className="text-stone-400 text-sm ml-2">/ 今日已用</span>
-            </div>
-            <div className={`flex items-center gap-1 text-sm font-bold ${todaySpent > data.dailyLimit ? 'text-red-500' : 'text-emerald-600'}`}>
-              {todaySpent > data.dailyLimit ? <AlertTriangle size={16}/> : <CheckCircle size={16}/>}
-              {todaySpent > data.dailyLimit ? '严重超支' : '状态正常'}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-100 relative overflow-hidden">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-stone-500 font-bold text-sm">⚡ 今日额度监控</h3>
+            <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${todaySpent > data.dailyLimit ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
+              {todaySpent > data.dailyLimit ? <AlertTriangle size={12}/> : <CheckCircle size={12}/>}
+              {todaySpent > data.dailyLimit ? '已超支' : '正常'}
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-2 text-sm text-stone-500">
-            <span>设定限额:</span>
+          
+          <div className="flex items-baseline gap-1 mb-3">
+             <span className={`text-2xl font-bold ${todaySpent > data.dailyLimit ? 'text-red-500' : 'text-stone-800'}`}>{todaySpent.toFixed(2)}</span>
+             <span className="text-xs text-stone-400">/ 已用</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-stone-500 mb-2">
+            <span>日限额:</span>
             <input 
               type="number" 
               value={data.dailyLimit} 
               onChange={(e) => setData(prev => ({...prev, dailyLimit: Number(e.target.value)}))}
-              className="w-20 border rounded px-2 py-1 bg-stone-50" 
+              className="w-16 border rounded px-1 py-0.5 bg-stone-50 text-center" 
             />
           </div>
+          
+          {/* Month-End Estimation */}
+          {estimatedMonthEndBalance !== null && (
+            <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
+                <div className="flex items-center gap-1 text-xs text-stone-500">
+                    <TrendingUp size={14} />
+                    <span>月末结余预估</span>
+                </div>
+                <div className={`font-bold text-sm ${estimatedMonthEndBalance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {estimatedMonthEndBalance >= 0 ? '+' : ''}{estimatedMonthEndBalance.toFixed(2)}
+                </div>
+            </div>
+          )}
         </div>
       </div>
 
