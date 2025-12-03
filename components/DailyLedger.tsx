@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DailyData, Transaction } from '../types';
 import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { exportDailyToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
 
@@ -300,13 +300,21 @@ export const DailyLedger: React.FC = () => {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100 h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
+             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
              <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
              <Tooltip 
                 contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
              />
              <ReferenceLine y={data.dailyLimit} stroke="red" strokeDasharray="3 3" />
-             <Line type="monotone" dataKey="amount" stroke="#4A90E2" strokeWidth={2} dot={false} activeDot={{r: 6}} fill="url(#colorUv)" />
+             <Line 
+               type="linear" 
+               dataKey="amount" 
+               stroke="#4A90E2" 
+               strokeWidth={2} 
+               dot={false} 
+               activeDot={{r: 4}} 
+              />
           </LineChart>
         </ResponsiveContainer>
       </div>

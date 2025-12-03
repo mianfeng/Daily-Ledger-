@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CopperData, Transaction } from '../types';
-import { Download, Upload, Settings, Coins, Lock, Archive, PlusCircle, MinusCircle, Table, Trash2 } from 'lucide-react';
+import { Download, Upload, Settings, Coins, Lock, Archive, PlusCircle, Table, Trash2, Wallet } from 'lucide-react';
 import { exportCopperToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
 
@@ -22,6 +22,11 @@ export const CopperShop: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('coinShopData_v5', JSON.stringify(data));
   }, [data]);
+
+  // Calculations
+  const totalAssets = useMemo(() => {
+    return data.balances.liquid + data.balances.reserve + data.balances.collection;
+  }, [data.balances]);
 
   // Monthly Summary Calculation
   const monthlyStats = useMemo(() => {
@@ -94,7 +99,6 @@ export const CopperShop: React.FC = () => {
 
     if (tx.type === 'income') {
       // Reverse income: deduct using CURRENT ratios
-      // Note: Ideally we should use historical ratios, but for simplicity V5 uses current config
       newBalances.liquid -= tx.amount * (data.ratios.liquid / 100);
       newBalances.reserve -= tx.amount * (data.ratios.reserve / 100);
       newBalances.collection -= tx.amount * (data.ratios.collection / 100);
@@ -211,24 +215,45 @@ export const CopperShop: React.FC = () => {
         </div>
       )}
 
-      {/* Jars Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-yellow-600 text-center">
-          <div className="flex justify-center mb-2 text-yellow-600"><Coins size={28} /></div>
-          <h3 className="font-bold text-stone-600">🌊 流动库</h3>
-          <div className="text-2xl font-bold mt-2">¥ {data.balances.liquid.toFixed(2)}</div>
-          <div className="text-xs text-stone-400 mt-1">占比 {data.ratios.liquid}%</div>
+      {/* Total Assets Card */}
+      <div className="bg-gradient-to-r from-amber-700 to-amber-900 p-5 rounded-xl shadow-md text-white flex items-center justify-between">
+         <div className="flex items-center gap-3">
+            <div className="p-3 bg-white/10 rounded-full">
+              <Wallet size={24} className="text-white" />
+            </div>
+            <div>
+               <div className="text-amber-100 text-sm font-medium">资金总和 (Total Assets)</div>
+               <div className="text-3xl font-bold mt-1">¥ {totalAssets.toFixed(2)}</div>
+            </div>
+         </div>
+         <div className="text-amber-200/50 text-6xl opacity-20 rotate-12">
+            <Coins />
+         </div>
+      </div>
+
+      {/* Jars Dashboard (2 Column Layout) */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Liquid Jar - Takes full width of top row */}
+        <div className="col-span-2 bg-white p-6 rounded-xl shadow-md border-t-4 border-yellow-600 flex flex-col items-center justify-center text-center">
+          <div className="flex justify-center mb-2 text-yellow-600"><Coins size={32} /></div>
+          <h3 className="font-bold text-lg text-stone-600">🌊 流动库</h3>
+          <div className="text-3xl font-bold mt-2 text-stone-800">¥ {data.balances.liquid.toFixed(2)}</div>
+          <div className="text-sm text-stone-400 mt-1">占比 {data.ratios.liquid}%</div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-emerald-600 text-center">
-          <div className="flex justify-center mb-2 text-emerald-600"><Lock size={28} /></div>
+
+        {/* Reserve Jar */}
+        <div className="col-span-1 bg-white p-5 rounded-xl shadow-md border-t-4 border-emerald-600 text-center">
+          <div className="flex justify-center mb-2 text-emerald-600"><Lock size={24} /></div>
           <h3 className="font-bold text-stone-600">🔒 存储库</h3>
-          <div className="text-2xl font-bold mt-2">¥ {data.balances.reserve.toFixed(2)}</div>
+          <div className="text-xl font-bold mt-2 text-stone-800">¥ {data.balances.reserve.toFixed(2)}</div>
           <div className="text-xs text-stone-400 mt-1">占比 {data.ratios.reserve}%</div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-amber-900 text-center">
-          <div className="flex justify-center mb-2 text-amber-900"><Archive size={28} /></div>
+
+        {/* Collection Jar */}
+        <div className="col-span-1 bg-white p-5 rounded-xl shadow-md border-t-4 border-amber-900 text-center">
+          <div className="flex justify-center mb-2 text-amber-900"><Archive size={24} /></div>
           <h3 className="font-bold text-stone-600">🧿 收藏库</h3>
-          <div className="text-2xl font-bold mt-2">¥ {data.balances.collection.toFixed(2)}</div>
+          <div className="text-xl font-bold mt-2 text-stone-800">¥ {data.balances.collection.toFixed(2)}</div>
           <div className="text-xs text-stone-400 mt-1">占比 {data.ratios.collection}%</div>
         </div>
       </div>
