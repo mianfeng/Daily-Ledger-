@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DailyData, Transaction } from '../types';
-import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp, Award } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { exportDailyToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
@@ -54,9 +54,27 @@ export const DailyLedger: React.FC = () => {
       .reduce((acc, t) => acc + t.amount, 0);
   }, [data.transactions]);
 
+  // Calculate days that stayed within limit this month
+  const compliantDaysCount = useMemo(() => {
+    const dailySpends = new Map<number, number>();
+    monthTransactions.forEach(t => {
+      if (t.type === 'expense') {
+        const d = parseInt(t.date.split('-')[2]);
+        dailySpends.set(d, (dailySpends.get(d) || 0) + t.amount);
+      }
+    });
+    
+    let count = 0;
+    dailySpends.forEach((amount) => {
+      if (amount <= data.dailyLimit) {
+        count++;
+      }
+    });
+    return count;
+  }, [monthTransactions, data.dailyLimit]);
+
   // Month-End Estimation Calculation
   const estimatedMonthEndBalance = useMemo(() => {
-    // Only calculate if viewing current month/year, otherwise it doesn't make sense for past records
     const now = new Date();
     if (currentYear !== now.getFullYear() || currentMonth !== (now.getMonth() + 1)) {
         return null;
@@ -64,19 +82,12 @@ export const DailyLedger: React.FC = () => {
 
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const currentDay = now.getDate();
-    const remainingDaysInMonth = daysInMonth - currentDay; // Days after today
+    const remainingDaysInMonth = daysInMonth - currentDay; 
     
-    // Logic: 
-    // 1. Allowance left for TODAY (if any)
     const todayAllowanceLeft = Math.max(0, data.dailyLimit - todaySpent);
-    
-    // 2. Allowance for FUTURE days
     const futureAllowance = remainingDaysInMonth * data.dailyLimit;
-    
-    // 3. Projected Future Spend (Assuming we max out budget every day from now on)
     const projectedFutureSpend = todayAllowanceLeft + futureAllowance;
     
-    // 4. Current Balance - Projected Future Spend
     return balance - projectedFutureSpend;
   }, [balance, currentYear, currentMonth, data.dailyLimit, todaySpent]);
 
@@ -110,7 +121,6 @@ export const DailyLedger: React.FC = () => {
 
     setData(prev => ({ ...prev, transactions: [...prev.transactions, newTx] }));
     
-    // Switch view to the transaction date
     const d = new Date(form.date);
     setCurrentYear(d.getFullYear());
     setCurrentMonth(d.getMonth() + 1);
@@ -202,16 +212,15 @@ export const DailyLedger: React.FC = () => {
                 const { bal, hasTx } = calculateMonthBalanceForPicker(pickerYear, m);
                 const isActive = pickerYear === currentYear && m === currentMonth;
                 
-                // Determine badge style
                 let badgeStyle = '';
                 if (isActive) {
                     badgeStyle = 'bg-white/20 text-white';
                 } else if (!hasTx) {
-                    badgeStyle = 'bg-stone-100 text-stone-400'; // Gray for no record
+                    badgeStyle = 'bg-stone-100 text-stone-400';
                 } else if (bal >= 0) {
-                    badgeStyle = 'bg-emerald-100 text-emerald-700'; // Green for positive
+                    badgeStyle = 'bg-emerald-100 text-emerald-700';
                 } else {
-                    badgeStyle = 'bg-red-100 text-red-700'; // Red for negative
+                    badgeStyle = 'bg-red-100 text-red-700';
                 }
 
                 return (
@@ -243,7 +252,13 @@ export const DailyLedger: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Overview */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-100">
-           <h3 className="text-stone-500 font-bold text-sm mb-3">📊 收支概览</h3>
+           <div className="flex justify-between items-center mb-3">
+             <h3 className="text-stone-500 font-bold text-sm">📊 收支概览</h3>
+             <div className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-bold">
+               <Award size={10} />
+               <span>本月达标 {compliantDaysCount} 天</span>
+             </div>
+           </div>
            <div className="flex justify-between items-end">
              <div>
                 <div className="text-xs text-stone-400">总收入</div>
@@ -281,7 +296,6 @@ export const DailyLedger: React.FC = () => {
             />
           </div>
           
-          {/* Month-End Estimation */}
           {estimatedMonthEndBalance !== null && (
             <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
                 <div className="flex items-center gap-1 text-xs text-stone-500">
@@ -359,7 +373,6 @@ export const DailyLedger: React.FC = () => {
         </div>
       </div>
       
-      {/* Export/Import Buttons */}
       <div className="flex gap-4 pt-4 border-t border-stone-200">
          <button 
            onClick={() => exportDailyToExcel(monthTransactions, currentYear, currentMonth)}
