@@ -174,24 +174,21 @@ export const DailyLedger: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in relative pb-20">
+    <div className="space-y-4 animate-fade-in relative pb-20">
       {/* Header & Date Picker */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 border-stone-200 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-3 border-stone-200 gap-4">
         <div>
-           <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-              <div className="bg-blue-600 text-white p-2 rounded-lg"><Calendar size={20} /></div>
+           <h1 className="text-xl font-bold text-stone-800 flex items-center gap-2">
+              <div className="bg-blue-600 text-white p-1.5 rounded-lg"><Calendar size={18} /></div>
               日常账本
            </h1>
-           <p className="text-stone-400 text-sm mt-1 ml-11">
-              本月结余: <span className={`font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{balance >= 0 ? '+' : ''}{balance.toFixed(2)}</span>
-           </p>
         </div>
 
         {/* Optimized Date Picker Button */}
         <div className="relative z-30 w-full md:w-auto">
            <button 
              onClick={() => setShowPicker(!showPicker)}
-             className="w-full md:w-auto flex justify-between md:justify-center items-center gap-3 bg-white border border-stone-200 px-4 py-2.5 rounded-full shadow-sm text-stone-600 hover:bg-stone-50 hover:border-blue-300 transition-all text-sm font-medium"
+             className="w-full md:w-auto flex justify-between md:justify-center items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm text-stone-600 hover:bg-stone-50 hover:border-blue-300 transition-all text-sm font-medium"
            >
               <span>{currentYear}年 {currentMonth}月</span>
               <ChevronDown size={14} className={`transition-transform text-stone-400 ${showPicker ? 'rotate-180' : ''}`} />
@@ -247,144 +244,140 @@ export const DailyLedger: React.FC = () => {
         </div>
       </div>
 
-      {/* Input Form (Optimized Layout) */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
-           {/* Type Toggle - Compact */}
-           <div className="flex bg-stone-100 p-1 rounded-lg w-full md:w-auto">
-              <button
-                onClick={() => setForm({...form, type: 'expense'})}
-                className={`flex-1 md:flex-none px-6 py-1.5 rounded-md text-sm font-bold transition-all ${form.type === 'expense' ? 'bg-white text-red-500 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-              >
-                支出
-              </button>
-              <button
-                onClick={() => setForm({...form, type: 'income'})}
-                className={`flex-1 md:flex-none px-6 py-1.5 rounded-md text-sm font-bold transition-all ${form.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
-              >
-                收入
-              </button>
+      {/* 1. Dashboard Stats (RICH CONTENT, 2 COLUMNS) */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Overview: Income, Expense, Balance + Compliant Days */}
+        <div className="bg-white px-3 py-3 rounded-xl shadow-sm border border-stone-100 flex flex-col justify-between min-h-[100px] relative overflow-hidden">
+           {/* Header */}
+           <div className="flex justify-between items-start z-10">
+             <h3 className="text-stone-400 font-bold text-xs">收支概览</h3>
+             <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-100">
+                <Award size={10} className="text-amber-500"/>
+                <span className="text-[9px] font-bold text-amber-700">达标 {compliantDaysCount} 天</span>
+             </div>
            </div>
 
-           {/* Date Picker - Optimized */}
-           <div className="relative w-full md:w-auto">
-              <input 
-                type="date" 
-                value={form.date} 
-                onChange={e => setForm({...form, date: e.target.value})} 
-                className="w-full md:w-auto pl-9 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
-           </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-3">
-           {/* Amount Input */}
-           <div className="flex-1">
-              <div className="relative group">
-                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 font-bold group-focus-within:text-blue-500 transition-colors">¥</span>
-                 <input 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={form.amount} 
-                    onChange={e => setForm({...form, amount: e.target.value})} 
-                    className="w-full pl-9 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-lg font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all placeholder:text-stone-300"
-                 />
+           {/* Stats Row */}
+           <div className="flex items-center justify-between mt-2 z-10">
+              <div className="flex flex-col">
+                 <span className="text-[10px] text-stone-400 scale-90 origin-left">收入</span>
+                 <span className="font-bold text-emerald-600 text-sm">+{income.toFixed(0)}</span>
+              </div>
+              <div className="h-6 w-px bg-stone-100 mx-1"></div>
+              <div className="flex flex-col">
+                 <span className="text-[10px] text-stone-400 scale-90 origin-left">支出</span>
+                 <span className="font-bold text-red-500 text-sm">-{expense.toFixed(0)}</span>
+              </div>
+              <div className="h-6 w-px bg-stone-100 mx-1"></div>
+              <div className="flex flex-col text-right">
+                 <span className="text-[10px] text-stone-400 scale-90 origin-right">结余</span>
+                 <span className={`font-bold text-sm ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {balance >= 0 ? '+' : ''}{balance.toFixed(0)}
+                 </span>
               </div>
            </div>
+        </div>
+
+        {/* Limit Monitor: Spent/Limit + Estimated Month End */}
+        <div className="bg-white px-3 py-3 rounded-xl shadow-sm border border-stone-100 flex flex-col justify-between min-h-[100px]">
+           {/* Header */}
+           <div className="flex justify-between items-center">
+             <h3 className="text-stone-400 font-bold text-xs">今日额度</h3>
+             <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${todaySpent > data.dailyLimit ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+               {todaySpent > data.dailyLimit ? '已超' : '正常'}
+             </div>
+           </div>
            
-           {/* Desc & Submit */}
-           <div className="flex-[2] flex gap-3">
+           {/* Main Numbers */}
+           <div className="flex items-baseline gap-1 mt-1">
+              <span className={`text-lg font-bold ${todaySpent > data.dailyLimit ? 'text-red-500' : 'text-stone-800'}`}>{todaySpent.toFixed(0)}</span>
+              <span className="text-xs text-stone-300">/</span>
+              <input 
+                 type="number" 
+                 value={data.dailyLimit} 
+                 onChange={(e) => setData(prev => ({...prev, dailyLimit: Number(e.target.value)}))}
+                 className="w-8 text-xs text-stone-400 border-b border-dashed border-stone-200 focus:outline-none focus:border-blue-400 bg-transparent text-center" 
+               />
+           </div>
+
+           {/* Estimated Month End */}
+           <div className="pt-2 mt-1 border-t border-dashed border-stone-100 flex justify-between items-center">
+              <span className="text-[9px] text-stone-400 flex items-center gap-1">
+                 <TrendingUp size={10}/> 月末预估
+              </span>
+              {estimatedMonthEndBalance !== null ? (
+                  <span className={`text-[10px] font-bold ${estimatedMonthEndBalance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                     {estimatedMonthEndBalance >= 0 ? '+' : ''}{estimatedMonthEndBalance.toFixed(0)}
+                  </span>
+              ) : (
+                  <span className="text-[10px] text-stone-300">-</span>
+              )}
+           </div>
+        </div>
+      </div>
+
+      {/* 2. Input Form (Optimized Compact) */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+           {/* Date & Type Group */}
+           <div className="flex gap-2 bg-stone-50 p-1 rounded-lg">
+             <div className="flex bg-white rounded-md shadow-sm border border-stone-100 overflow-hidden shrink-0">
+               <button onClick={() => setForm({...form, type: 'expense'})} className={`px-4 py-2 text-xs font-bold ${form.type === 'expense' ? 'bg-red-50 text-red-500' : 'text-stone-400 hover:bg-stone-50'}`}>支</button>
+               <div className="w-px bg-stone-100"></div>
+               <button onClick={() => setForm({...form, type: 'income'})} className={`px-4 py-2 text-xs font-bold ${form.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'text-stone-400 hover:bg-stone-50'}`}>收</button>
+             </div>
+             
+             <div className="relative flex-1 md:flex-none">
+                <input 
+                  type="date" 
+                  value={form.date} 
+                  onChange={e => setForm({...form, date: e.target.value})} 
+                  className="w-full md:w-32 h-full bg-transparent pl-8 text-xs font-medium text-stone-600 focus:outline-none cursor-pointer"
+                />
+                <Calendar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
+             </div>
+           </div>
+
+           {/* Input Fields */}
+           <div className="flex-1 flex gap-2 items-center bg-stone-50 p-1 rounded-lg px-3">
+              <span className="text-stone-400 text-xs font-bold">¥</span>
+              <input 
+                type="number" 
+                placeholder="0.00" 
+                value={form.amount} 
+                onChange={e => setForm({...form, amount: e.target.value})} 
+                className="w-24 bg-transparent text-sm font-bold text-stone-800 placeholder:text-stone-300 focus:outline-none"
+              />
+              <div className="w-px h-4 bg-stone-200 mx-1"></div>
               <input 
                 type="text" 
-                placeholder="备注 (如: 超市购物)" 
+                placeholder="备注 (如: 早餐)" 
                 value={form.desc} 
                 onChange={e => setForm({...form, desc: e.target.value})} 
-                className="flex-1 px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all placeholder:text-stone-300"
+                className="flex-1 bg-transparent text-xs text-stone-700 placeholder:text-stone-300 focus:outline-none"
               />
-              <button 
-                onClick={handleAddTx} 
-                className="px-5 py-3 bg-stone-800 hover:bg-stone-900 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-200 active:scale-95 whitespace-nowrap"
-              >
-                <Check size={18} />
-                <span className="hidden md:inline">记一笔</span>
-              </button>
            </div>
+           
+           <button 
+              onClick={handleAddTx} 
+              className="bg-stone-800 hover:bg-stone-900 text-white p-2.5 rounded-lg shadow-sm active:scale-95 transition-all flex justify-center"
+            >
+              <Check size={18} />
+           </button>
         </div>
       </div>
 
-      {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Overview */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-100">
-           <div className="flex justify-between items-center mb-3">
-             <h3 className="text-stone-500 font-bold text-sm">📊 收支概览</h3>
-             <div className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-bold">
-               <Award size={10} />
-               <span>本月达标 {compliantDaysCount} 天</span>
-             </div>
-           </div>
-           <div className="flex justify-between items-end">
-             <div>
-                <div className="text-xs text-stone-400">总收入</div>
-                <div className="text-xl font-bold text-emerald-600">+{income.toFixed(2)}</div>
-             </div>
-             <div className="text-right">
-                <div className="text-xs text-stone-400">总支出</div>
-                <div className="text-xl font-bold text-red-500">-{expense.toFixed(2)}</div>
-             </div>
-           </div>
-        </div>
-
-        {/* Daily Limit */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-stone-100 relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-stone-500 font-bold text-sm">⚡ 今日额度监控</h3>
-            <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${todaySpent > data.dailyLimit ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
-              {todaySpent > data.dailyLimit ? <AlertTriangle size={12}/> : <CheckCircle size={12}/>}
-              {todaySpent > data.dailyLimit ? '已超支' : '正常'}
-            </div>
-          </div>
-          
-          <div className="flex items-baseline gap-1 mb-3">
-             <span className={`text-2xl font-bold ${todaySpent > data.dailyLimit ? 'text-red-500' : 'text-stone-800'}`}>{todaySpent.toFixed(2)}</span>
-             <span className="text-xs text-stone-400">/ 已用</span>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-stone-500 mb-2">
-            <span>日限额:</span>
-            <input 
-              type="number" 
-              value={data.dailyLimit} 
-              onChange={(e) => setData(prev => ({...prev, dailyLimit: Number(e.target.value)}))}
-              className="w-16 border rounded px-1 py-0.5 bg-stone-50 text-center" 
-            />
-          </div>
-          
-          {estimatedMonthEndBalance !== null && (
-            <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
-                <div className="flex items-center gap-1 text-xs text-stone-500">
-                    <TrendingUp size={14} />
-                    <span>月末结余预估</span>
-                </div>
-                <div className={`font-bold text-sm ${estimatedMonthEndBalance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {estimatedMonthEndBalance >= 0 ? '+' : ''}{estimatedMonthEndBalance.toFixed(2)}
-                </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100 h-64">
+      {/* 3. Chart */}
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 h-56 relative">
+         <h3 className="absolute top-3 left-3 text-[10px] font-bold text-stone-400 flex items-center gap-1">
+             <TrendingUp size={10}/> 收支趋势
+          </h3>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
+          <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-             <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
-             <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
-             <Tooltip 
-                contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
-             />
+             <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 9}} />
+             <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 9}} />
+             <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
              <ReferenceLine y={data.dailyLimit} stroke="red" strokeDasharray="3 3" />
              <Line 
                type="linear" 
@@ -399,47 +392,47 @@ export const DailyLedger: React.FC = () => {
       </div>
       
       {/* Footer Actions */}
-      <div className="flex gap-4 pt-4 border-t border-stone-200">
+      <div className="flex gap-4 pt-2 border-t border-stone-200">
          <button 
            onClick={() => exportDailyToExcel(monthTransactions, currentYear, currentMonth)}
-           className="flex items-center gap-2 px-4 py-2 text-sm text-stone-600 bg-white border rounded hover:bg-stone-50"
+           className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50"
          >
-           <Download size={16}/> 导出该月Excel
+           <Download size={12}/> 导出
          </button>
-         <label className="flex items-center gap-2 px-4 py-2 text-sm text-stone-600 bg-white border rounded hover:bg-stone-50 cursor-pointer">
-           <Upload size={16}/> 导入Excel
+         <label className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50 cursor-pointer">
+           <Upload size={12}/> 导入
            <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
          </label>
       </div>
 
       {/* List */}
       <div className="">
-        <h3 className="font-bold text-stone-500 text-sm mb-3">本月明细</h3>
+        <h3 className="font-bold text-stone-400 text-[10px] uppercase tracking-wider mb-2">Transaction History</h3>
         <ul className="space-y-2">
           {[...monthTransactions].reverse().map(tx => (
-            <li key={tx.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-stone-100 shadow-sm group hover:border-blue-200 transition-colors">
-               <div className="flex items-center gap-3">
-                  <div className={`w-1 h-8 rounded-full ${tx.type === 'income' ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
+            <li key={tx.id} className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-stone-100 shadow-sm group hover:border-blue-200 transition-colors">
+               <div className="flex items-center gap-2">
+                  <div className={`w-0.5 h-6 rounded-full ${tx.type === 'income' ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
                   <div>
-                    <div className="text-stone-800 font-medium">{tx.desc}</div>
-                    <div className="text-xs text-stone-400">{tx.date}</div>
+                    <div className="text-stone-800 font-medium text-xs">{tx.desc}</div>
+                    <div className="text-[10px] text-stone-400">{tx.date}</div>
                   </div>
                </div>
-               <div className="flex items-center gap-3">
-                   <div className={`font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
+               <div className="flex items-center gap-2">
+                   <div className={`font-bold text-xs ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
                      {tx.type === 'income' ? '+' : '-'}{tx.amount.toFixed(2)}
                    </div>
                    <button 
                       onClick={() => handleDeleteTx(tx.id)}
-                      className="text-stone-300 hover:text-red-500 p-2 rounded-full hover:bg-stone-50 transition-all opacity-0 group-hover:opacity-100"
+                      className="text-stone-300 hover:text-red-500 p-1 rounded-full hover:bg-stone-50 transition-all opacity-0 group-hover:opacity-100"
                       title="删除"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={12} />
                    </button>
                </div>
             </li>
           ))}
-          {monthTransactions.length === 0 && <li className="text-center text-stone-400 text-sm py-4">本月暂无记录</li>}
+          {monthTransactions.length === 0 && <li className="text-center text-stone-400 text-xs py-4">本月暂无记录</li>}
         </ul>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CopperData, Transaction } from '../types';
-import { Download, Upload, Settings, Coins, Lock, Archive, PlusCircle, Table, Trash2, Wallet } from 'lucide-react';
+import { Download, Upload, Settings, Coins, Lock, Archive, PlusCircle, Table, Trash2, Wallet, TrendingUp, ArrowRight, ArrowRightCircle, Calendar } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { exportCopperToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
 
@@ -17,7 +18,13 @@ export const CopperShop: React.FC = () => {
   });
 
   const [showSettings, setShowSettings] = useState(false);
-  const [form, setForm] = useState({ amount: '', desc: '', type: 'income', source: 'liquid' });
+  const [form, setForm] = useState({ 
+    amount: '', 
+    desc: '', 
+    type: 'income', 
+    source: 'liquid',
+    date: new Date().toISOString().split('T')[0] // Added date state
+  });
 
   useEffect(() => {
     localStorage.setItem('coinShopData_v5', JSON.stringify(data));
@@ -44,7 +51,7 @@ export const CopperShop: React.FC = () => {
       }
     });
 
-    // Sort by month descending
+    // Sort by month descending for table
     return Object.entries(stats)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([month, { income, expense }]) => ({
@@ -55,13 +62,19 @@ export const CopperShop: React.FC = () => {
       }));
   }, [data.transactions]);
 
+  // Chart Data (Ascending for Graph)
+  const chartData = useMemo(() => {
+    return [...monthlyStats].reverse();
+  }, [monthlyStats]);
+
   const handleAddTransaction = () => {
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0) return alert("请输入有效金额");
+    if (!form.date) return alert("请选择日期");
 
     const newTx: Transaction = {
       id: Date.now(),
-      date: new Date().toISOString(),
+      date: form.date, // Use selected date
       type: form.type as 'income' | 'expense',
       amount,
       desc: form.desc || (form.type === 'income' ? '生意收入' : '生意支出'),
@@ -154,43 +167,43 @@ export const CopperShop: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in pb-10">
       {/* Header */}
-      <div className="flex justify-between items-center border-b pb-4 border-stone-300">
-        <h1 className="text-2xl font-bold text-amber-900 flex items-center gap-3">
-          <div className="relative w-8 h-8">
+      <div className="flex justify-between items-center border-b pb-3 border-stone-200">
+        <h1 className="text-xl font-bold text-amber-900 flex items-center gap-2">
+          <div className="relative w-6 h-6">
             <div className="absolute inset-0 bg-amber-700 rounded-full"></div>
-            <div className="absolute inset-2 bg-[#F5F5F0] rounded-sm"></div>
+            <div className="absolute inset-1.5 bg-[#F5F5F0] rounded-sm"></div>
           </div>
-          铜钱分账系统
+          铜钱分账
         </h1>
         <button 
           onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-2 px-3 py-1.5 text-stone-600 border border-stone-300 rounded hover:bg-stone-100 transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 border border-stone-300 rounded hover:bg-stone-100 transition-colors"
         >
-          <Settings size={16} /> 比例配置
+          <Settings size={14} /> 比例配置
         </button>
       </div>
 
       {/* Settings Modal (Inline) */}
       {showSettings && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-stone-400">
-          <h3 className="font-bold text-lg mb-4">配置比例 (总和须为100)</h3>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="bg-white p-4 rounded-xl shadow-lg border-t-4 border-stone-400">
+          <h3 className="font-bold text-sm mb-3">配置比例 (总和须为100)</h3>
+          <div className="grid grid-cols-3 gap-3 mb-3">
             <div>
-              <label className="block text-sm text-stone-500 mb-1">流动库 %</label>
-              <input type="number" defaultValue={data.ratios.liquid} id="r1" className="w-full p-2 border rounded" />
+              <label className="block text-xs text-stone-500 mb-1">流动库 %</label>
+              <input type="number" defaultValue={data.ratios.liquid} id="r1" className="w-full p-1.5 border rounded text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-stone-500 mb-1">存储库 %</label>
-              <input type="number" defaultValue={data.ratios.reserve} id="r2" className="w-full p-2 border rounded" />
+              <label className="block text-xs text-stone-500 mb-1">存储库 %</label>
+              <input type="number" defaultValue={data.ratios.reserve} id="r2" className="w-full p-1.5 border rounded text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-stone-500 mb-1">收藏库 %</label>
-              <input type="number" defaultValue={data.ratios.collection} id="r3" className="w-full p-2 border rounded" />
+              <label className="block text-xs text-stone-500 mb-1">收藏库 %</label>
+              <input type="number" defaultValue={data.ratios.collection} id="r3" className="w-full p-1.5 border rounded text-sm" />
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button 
               onClick={() => {
                 const r1 = Number((document.getElementById('r1') as HTMLInputElement).value);
@@ -198,141 +211,192 @@ export const CopperShop: React.FC = () => {
                 const r3 = Number((document.getElementById('r3') as HTMLInputElement).value);
                 handleSaveSettings(r1, r2, r3);
               }}
-              className="flex-1 bg-amber-700 text-white py-2 rounded hover:bg-amber-800"
+              className="flex-1 bg-amber-700 text-white py-1.5 rounded hover:bg-amber-800 text-sm"
             >
               保存配置
             </button>
           </div>
-          <div className="mt-4 pt-4 border-t flex gap-3">
-            <button onClick={() => exportCopperToExcel(data)} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-              <Download size={16} /> 导出Excel
+          <div className="mt-3 pt-3 border-t flex gap-2">
+            <button onClick={() => exportCopperToExcel(data)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">
+              <Download size={14} /> 导出Excel
             </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-stone-500 text-white rounded text-sm hover:bg-stone-600 cursor-pointer">
-              <Upload size={16} /> 导入Excel
+            <label className="flex items-center gap-1 px-3 py-1.5 bg-stone-500 text-white rounded text-xs hover:bg-stone-600 cursor-pointer">
+              <Upload size={14} /> 导入Excel
               <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
             </label>
           </div>
         </div>
       )}
 
-      {/* Total Assets Card */}
-      <div className="bg-gradient-to-r from-amber-700 to-amber-900 p-5 rounded-xl shadow-md text-white flex items-center justify-between">
-         <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/10 rounded-full">
-              <Wallet size={24} className="text-white" />
-            </div>
-            <div>
-               <div className="text-amber-100 text-sm font-medium">资金总和 (Total Assets)</div>
-               <div className="text-3xl font-bold mt-1">¥ {totalAssets.toFixed(2)}</div>
-            </div>
-         </div>
-         <div className="text-amber-200/50 text-6xl opacity-20 rotate-12">
-            <Coins />
-         </div>
+      {/* Total Assets & Jars Compact Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-4 bg-gradient-to-r from-amber-700 to-amber-900 p-3 rounded-xl shadow-sm text-white flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-white/10 rounded-full">
+                  <Wallet size={18} className="text-white" />
+                </div>
+                <div>
+                   <div className="text-amber-100 text-[10px] font-medium uppercase tracking-wider">Total Assets</div>
+                   <div className="text-xl font-bold leading-none">¥ {totalAssets.toFixed(2)}</div>
+                </div>
+             </div>
+             <div className="text-amber-200/50 text-3xl opacity-20 rotate-12">
+                <Coins />
+             </div>
+          </div>
       </div>
 
-      {/* Jars Dashboard (2 Column Layout) */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Liquid Jar - Takes full width of top row */}
-        <div className="col-span-2 bg-white p-6 rounded-xl shadow-md border-t-4 border-yellow-600 flex flex-col items-center justify-center text-center">
-          <div className="flex justify-center mb-2 text-yellow-600"><Coins size={32} /></div>
-          <h3 className="font-bold text-lg text-stone-600">🌊 流动库</h3>
-          <div className="text-3xl font-bold mt-2 text-stone-800">¥ {data.balances.liquid.toFixed(2)}</div>
-          <div className="text-sm text-stone-400 mt-1">占比 {data.ratios.liquid}%</div>
+      <div className="grid grid-cols-3 gap-3">
+        {/* Liquid Jar */}
+        <div className="bg-white p-2 rounded-lg shadow-sm border-t-2 border-yellow-600 text-center flex flex-col items-center justify-between min-h-[80px]">
+          <div className="flex flex-col items-center w-full">
+             <span className="text-[10px] font-bold text-stone-500 flex items-center justify-center gap-1 mb-1 w-full border-b border-dashed border-stone-100 pb-1">
+                <Coins size={12} className="text-yellow-600"/> 流动库
+             </span>
+             <span className="text-base font-bold text-stone-800">¥ {data.balances.liquid.toFixed(0)}</span>
+          </div>
+          <div className="text-[10px] text-stone-400 bg-stone-50 px-1.5 py-0 rounded-full mt-1">{data.ratios.liquid}%</div>
         </div>
 
         {/* Reserve Jar */}
-        <div className="col-span-1 bg-white p-5 rounded-xl shadow-md border-t-4 border-emerald-600 text-center">
-          <div className="flex justify-center mb-2 text-emerald-600"><Lock size={24} /></div>
-          <h3 className="font-bold text-stone-600">🔒 存储库</h3>
-          <div className="text-xl font-bold mt-2 text-stone-800">¥ {data.balances.reserve.toFixed(2)}</div>
-          <div className="text-xs text-stone-400 mt-1">占比 {data.ratios.reserve}%</div>
+        <div className="bg-white p-2 rounded-lg shadow-sm border-t-2 border-emerald-600 text-center flex flex-col items-center justify-between min-h-[80px]">
+          <div className="flex flex-col items-center w-full">
+             <span className="text-[10px] font-bold text-stone-500 flex items-center justify-center gap-1 mb-1 w-full border-b border-dashed border-stone-100 pb-1">
+                <Lock size={12} className="text-emerald-600"/> 存储库
+             </span>
+             <span className="text-base font-bold text-stone-800">¥ {data.balances.reserve.toFixed(0)}</span>
+          </div>
+          <div className="text-[10px] text-stone-400 bg-stone-50 px-1.5 py-0 rounded-full mt-1">{data.ratios.reserve}%</div>
         </div>
 
         {/* Collection Jar */}
-        <div className="col-span-1 bg-white p-5 rounded-xl shadow-md border-t-4 border-amber-900 text-center">
-          <div className="flex justify-center mb-2 text-amber-900"><Archive size={24} /></div>
-          <h3 className="font-bold text-stone-600">🧿 收藏库</h3>
-          <div className="text-xl font-bold mt-2 text-stone-800">¥ {data.balances.collection.toFixed(2)}</div>
-          <div className="text-xs text-stone-400 mt-1">占比 {data.ratios.collection}%</div>
+        <div className="bg-white p-2 rounded-lg shadow-sm border-t-2 border-amber-900 text-center flex flex-col items-center justify-between min-h-[80px]">
+           <div className="flex flex-col items-center w-full">
+             <span className="text-[10px] font-bold text-stone-500 flex items-center justify-center gap-1 mb-1 w-full border-b border-dashed border-stone-100 pb-1">
+                <Archive size={12} className="text-amber-900"/> 收藏库
+             </span>
+             <span className="text-base font-bold text-stone-800">¥ {data.balances.collection.toFixed(0)}</span>
+           </div>
+           <div className="text-[10px] text-stone-400 bg-stone-50 px-1.5 py-0 rounded-full mt-1">{data.ratios.collection}%</div>
         </div>
       </div>
 
-      {/* Input Section */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><PlusCircle size={20} className="text-amber-700"/> 生意记账</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <select 
-            value={form.type} 
-            onChange={e => setForm({...form, type: e.target.value})}
-            className="p-3 border rounded-lg bg-stone-50"
-          >
-            <option value="income">收入 (自动分账)</option>
-            <option value="expense">支出</option>
-          </select>
-          
-          {form.type === 'expense' && (
-            <select 
-              value={form.source} 
-              onChange={e => setForm({...form, source: e.target.value})}
-              className="p-3 border rounded-lg bg-stone-50"
-            >
-              <option value="liquid">从 流动库 扣款</option>
-              <option value="reserve">从 存储库 扣款</option>
-              <option value="collection">从 收藏库 扣款</option>
-            </select>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <input 
-            type="number" 
-            placeholder="金额" 
-            value={form.amount}
-            onChange={e => setForm({...form, amount: e.target.value})}
-            className="p-3 border rounded-lg text-lg"
-          />
-          <input 
-            type="text" 
-            placeholder="备注：如 卖出一枚康熙通宝" 
-            value={form.desc}
-            onChange={e => setForm({...form, desc: e.target.value})}
-            className="p-3 border rounded-lg"
-          />
-        </div>
+      {/* Super Compact Input Section (Toolbar Style) */}
+      <div className="bg-white p-2 rounded-xl shadow-sm border border-stone-200 flex flex-col md:flex-row items-stretch md:items-center gap-2">
+         {/* Left Group: Type & Date */}
+         <div className="flex items-center gap-2 bg-stone-50 p-1 rounded-lg">
+            <div className="flex bg-white rounded-md shadow-sm border border-stone-100 overflow-hidden">
+               <button
+                 onClick={() => setForm({...form, type: 'income'})}
+                 className={`px-3 py-1.5 text-xs font-bold transition-colors ${form.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'text-stone-400 hover:bg-stone-50'}`}
+               >
+                 收
+               </button>
+               <div className="w-px bg-stone-100"></div>
+               <button
+                 onClick={() => setForm({...form, type: 'expense'})}
+                 className={`px-3 py-1.5 text-xs font-bold transition-colors ${form.type === 'expense' ? 'bg-red-50 text-red-500' : 'text-stone-400 hover:bg-stone-50'}`}
+               >
+                 支
+               </button>
+            </div>
+            
+            <div className="h-4 w-px bg-stone-200 mx-1 hidden md:block"></div>
 
-        <button 
-          onClick={handleAddTransaction}
-          className="w-full py-3 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-lg transition-colors"
-        >
-          确认提交
-        </button>
+            <div className="relative">
+               <input 
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm({...form, date: e.target.value})}
+                  className="w-28 bg-transparent text-xs text-stone-600 font-medium focus:outline-none cursor-pointer pl-6 py-1"
+               />
+               <Calendar size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
+            </div>
+         </div>
+
+         {/* Right Group: Details & Action */}
+         <div className="flex flex-1 items-center gap-2 bg-stone-50 p-1 rounded-lg">
+             {form.type === 'expense' && (
+               <select 
+                  value={form.source} 
+                  onChange={e => setForm({...form, source: e.target.value})}
+                  className="bg-transparent text-xs text-stone-600 font-medium focus:outline-none border-r border-stone-200 pr-2"
+                >
+                  <option value="liquid">流动</option>
+                  <option value="reserve">存储</option>
+                  <option value="collection">收藏</option>
+                </select>
+             )}
+            
+            <input 
+               type="number" 
+               placeholder="金额" 
+               value={form.amount}
+               onChange={e => setForm({...form, amount: e.target.value})}
+               className="w-20 bg-transparent text-sm font-bold text-stone-800 placeholder:text-stone-300 focus:outline-none text-right"
+            />
+            <span className="text-stone-300 text-xs">|</span>
+            <input 
+               type="text" 
+               placeholder="备注..." 
+               value={form.desc}
+               onChange={e => setForm({...form, desc: e.target.value})}
+               className="flex-1 bg-transparent text-xs text-stone-700 placeholder:text-stone-300 focus:outline-none min-w-0"
+            />
+         </div>
+
+         <button 
+           onClick={handleAddTransaction}
+           className="bg-amber-700 hover:bg-amber-800 text-white p-2 rounded-lg transition-colors shadow-sm active:scale-95 flex items-center justify-center"
+         >
+           <ArrowRightCircle size={18} />
+         </button>
       </div>
+
+      {/* Chart Section */}
+      {chartData.length > 0 && (
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 h-56 relative">
+           <h3 className="absolute top-3 left-3 text-[10px] font-bold text-stone-400 flex items-center gap-1">
+              <TrendingUp size={10}/> 收支趋势
+           </h3>
+           <ResponsiveContainer width="100%" height="100%">
+             <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
+               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+               <XAxis dataKey="month" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
+               <YAxis tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
+               <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
+               <Legend verticalAlign="top" height={24} iconSize={6} wrapperStyle={{fontSize: '10px', right: 0, top: 0}} />
+               <Line type="monotone" name="收入" dataKey="income" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{r: 3}} />
+               <Line type="monotone" name="支出" dataKey="expense" stroke="#EF4444" strokeWidth={2} dot={false} activeDot={{r: 3}} />
+             </LineChart>
+           </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Monthly Summary Table */}
       {monthlyStats.length > 0 && (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="p-4 border-b border-stone-200 bg-stone-50 flex items-center gap-2">
-            <Table size={18} className="text-stone-500" />
-            <h3 className="font-bold text-stone-700">月度收支汇总</h3>
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-stone-100">
+          <div className="px-3 py-2 border-b border-stone-100 bg-stone-50 flex items-center gap-2">
+            <Table size={12} className="text-stone-500" />
+            <h3 className="font-bold text-[10px] text-stone-700">月度汇总</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-xs text-left">
               <thead className="bg-stone-50 text-stone-500 font-medium">
                 <tr>
-                  <th className="px-4 py-3">月份</th>
-                  <th className="px-4 py-3 text-emerald-600">总收入</th>
-                  <th className="px-4 py-3 text-red-500">总支出</th>
-                  <th className="px-4 py-3 text-right">净收益</th>
+                  <th className="px-3 py-1.5">月份</th>
+                  <th className="px-3 py-1.5 text-emerald-600">总收入</th>
+                  <th className="px-3 py-1.5 text-red-500">总支出</th>
+                  <th className="px-3 py-1.5 text-right">净收益</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {monthlyStats.map((stat) => (
                   <tr key={stat.month} className="hover:bg-stone-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-stone-700">{stat.month}</td>
-                    <td className="px-4 py-3 text-emerald-600">+{stat.income.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-red-500">-{stat.expense.toFixed(2)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${stat.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    <td className="px-3 py-1.5 font-medium text-stone-700">{stat.month}</td>
+                    <td className="px-3 py-1.5 text-emerald-600">+{stat.income.toFixed(2)}</td>
+                    <td className="px-3 py-1.5 text-red-500">-{stat.expense.toFixed(2)}</td>
+                    <td className={`px-3 py-1.5 text-right font-bold ${stat.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                       {stat.net >= 0 ? '+' : ''}{stat.net.toFixed(2)}
                     </td>
                   </tr>
@@ -345,19 +409,19 @@ export const CopperShop: React.FC = () => {
 
       {/* Recent Transactions */}
       <div>
-        <h2 className="text-lg font-bold text-stone-700 mb-3">📜 近期生意流水</h2>
-        <ul className="space-y-3">
+        <h2 className="text-[10px] font-bold text-stone-400 mb-2 uppercase tracking-wider">Recent Transactions</h2>
+        <ul className="space-y-1.5">
           {[...data.transactions].reverse().slice(0, 10).map((tx) => (
-            <li key={tx.id} className="bg-white p-4 rounded-lg shadow-sm flex justify-between items-center border-l-4 border-stone-200 group">
+            <li key={tx.id} className="bg-white px-3 py-2 rounded-lg shadow-sm flex justify-between items-center border border-stone-100 group">
               <div>
-                <div className="font-medium text-stone-800">{tx.desc}</div>
-                <div className="text-xs text-stone-400">
+                <div className="font-medium text-stone-800 text-xs">{tx.desc}</div>
+                <div className="text-[10px] text-stone-400 flex items-center gap-1">
                   {new Date(tx.date).toLocaleDateString()} 
-                  {tx.type === 'expense' && <span className="ml-2 px-1 bg-stone-100 rounded text-stone-500">{tx.source === 'liquid' ? '流动' : tx.source === 'reserve' ? '存储' : '收藏'}</span>}
+                  {tx.type === 'expense' && <span className="px-1 bg-stone-50 rounded text-stone-500 scale-90 origin-left">{tx.source === 'liquid' ? '流动' : tx.source === 'reserve' ? '存储' : '收藏'}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className={`text-lg font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
+              <div className="flex items-center gap-2">
+                <div className={`text-xs font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
                   {tx.type === 'income' ? '+' : '-'}{tx.amount.toFixed(2)}
                 </div>
                 <button 
@@ -365,12 +429,12 @@ export const CopperShop: React.FC = () => {
                   className="text-stone-300 hover:text-red-500 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
                   title="删除"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={12} />
                 </button>
               </div>
             </li>
           ))}
-          {data.transactions.length === 0 && <li className="text-center text-stone-400 py-4">暂无记录</li>}
+          {data.transactions.length === 0 && <li className="text-center text-stone-400 py-4 text-xs">暂无记录</li>}
         </ul>
       </div>
     </div>
