@@ -23,7 +23,7 @@ export const CopperShop: React.FC = () => {
     desc: '', 
     type: 'income', 
     source: 'liquid',
-    date: new Date().toISOString().split('T')[0] // Added date state
+    date: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -62,37 +62,50 @@ export const CopperShop: React.FC = () => {
       }));
   }, [data.transactions]);
 
-  // Daily Stats for Chart (Trend by Day)
+  // Daily Stats for Chart (Trend by Day + Running Assets)
   const chartData = useMemo(() => {
-    const stats: Record<string, { income: number; expense: number }> = {};
+    const dailyNetChange: Record<string, number> = {};
+    const dailyIncome: Record<string, number> = {};
+    const dailyExpense: Record<string, number> = {};
+
     data.transactions.forEach(tx => {
-       const dateKey = tx.date; // YYYY-MM-DD
-       if (!stats[dateKey]) {
-         stats[dateKey] = { income: 0, expense: 0 };
+       const d = tx.date; 
+       if (!dailyNetChange[d]) {
+         dailyNetChange[d] = 0;
+         dailyIncome[d] = 0;
+         dailyExpense[d] = 0;
        }
        if (tx.type === 'income') {
-         stats[dateKey].income += tx.amount;
+         dailyNetChange[d] += tx.amount;
+         dailyIncome[d] += tx.amount;
        } else {
-         stats[dateKey].expense += tx.amount;
+         dailyNetChange[d] -= tx.amount;
+         dailyExpense[d] += tx.amount;
        }
     });
 
-    // Sort by date ascending and take last 30 days with activity for clarity
-    const sortedStats = Object.entries(stats)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, { income, expense }]) => ({
-        date,
-        shortDate: date.substring(5), // MM-DD
-        income,
-        expense
-      }));
+    // Unique sorted dates (Descending)
+    const allDates = Object.keys(dailyNetChange).sort((a, b) => b.localeCompare(a));
+    
+    // Calculate historical assets working backwards from current
+    let runningAsset = totalAssets;
+    const history: any[] = [];
 
-    // If there are too many data points, maybe just show the last 30? 
-    // Or return all. Let's return all but slicing if very large might be needed in future.
-    // For now, let's return all to show full trend, or last 30 if strictly "recent trend".
-    // Usually "Trend" implies recent movement. Let's do last 30 entries if length > 30.
-    return sortedStats.slice(-30);
-  }, [data.transactions]);
+    for (const d of allDates) {
+        history.push({
+            date: d,
+            shortDate: d.substring(5),
+            assets: runningAsset,
+            income: dailyIncome[d],
+            expense: dailyExpense[d]
+        });
+        // Restore asset state for previous day
+        runningAsset -= dailyNetChange[d];
+    }
+
+    // Return last 30 entries (reversed to be ascending time)
+    return history.reverse().slice(-30);
+  }, [data.transactions, totalAssets]);
 
   const handleAddTransaction = () => {
     const amount = parseFloat(form.amount);
@@ -101,7 +114,7 @@ export const CopperShop: React.FC = () => {
 
     const newTx: Transaction = {
       id: Date.now(),
-      date: form.date, // Use selected date
+      date: form.date,
       type: form.type as 'income' | 'expense',
       amount,
       desc: form.desc || (form.type === 'income' ? '生意收入' : '生意支出'),
@@ -111,12 +124,10 @@ export const CopperShop: React.FC = () => {
     const newBalances = { ...data.balances };
 
     if (newTx.type === 'income') {
-      // Auto split logic
       newBalances.liquid += amount * (data.ratios.liquid / 100);
       newBalances.reserve += amount * (data.ratios.reserve / 100);
       newBalances.collection += amount * (data.ratios.collection / 100);
     } else {
-      // Deduct from specific source
       newBalances[form.source as keyof typeof newBalances] -= amount;
     }
 
@@ -138,12 +149,10 @@ export const CopperShop: React.FC = () => {
     const newBalances = { ...data.balances };
 
     if (tx.type === 'income') {
-      // Reverse income: deduct using CURRENT ratios
       newBalances.liquid -= tx.amount * (data.ratios.liquid / 100);
       newBalances.reserve -= tx.amount * (data.ratios.reserve / 100);
       newBalances.collection -= tx.amount * (data.ratios.collection / 100);
     } else {
-      // Reverse expense: add back to source
       if (tx.source) {
         newBalances[tx.source] += tx.amount;
       }
@@ -173,7 +182,6 @@ export const CopperShop: React.FC = () => {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'array' });
         
-        // Basic import logic - assumes strict template adherence
         const statusSheet = wb.Sheets["资产状态"];
         if(statusSheet) {
           const statusArr: any[] = XLSX.utils.sheet_to_json(statusSheet);
@@ -183,7 +191,7 @@ export const CopperShop: React.FC = () => {
             if (row['项目'] === "存储库") newBalances.reserve = Number(row['金额']);
             if (row['项目'] === "收藏库") newBalances.collection = Number(row['金额']);
           });
-          setData({ ...data, balances: newBalances, transactions: [] }); // Reset tx history on simple import
+          setData({ ...data, balances: newBalances, transactions: [] });
           alert("导入成功 (仅恢复余额)");
         }
       } catch (err) {
@@ -390,11 +398,17 @@ export const CopperShop: React.FC = () => {
              <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                <XAxis dataKey="shortDate" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
-               <YAxis tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
+               {/* Primary Axis for Income/Expense */}
+               <YAxis yAxisId="left" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
+               {/* Secondary Axis for Total Assets */}
+               <YAxis yAxisId="right" orientation="right" tick={{fontSize: 9, fill: '#F59E0B'}} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+               
                <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
                <Legend verticalAlign="top" height={24} iconSize={6} wrapperStyle={{fontSize: '10px', right: 0, top: 0}} />
-               <Line type="monotone" name="收入" dataKey="income" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{r: 3}} />
-               <Line type="monotone" name="支出" dataKey="expense" stroke="#EF4444" strokeWidth={2} dot={false} activeDot={{r: 3}} />
+               
+               <Line yAxisId="left" type="monotone" name="收入" dataKey="income" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{r: 3}} />
+               <Line yAxisId="left" type="monotone" name="支出" dataKey="expense" stroke="#EF4444" strokeWidth={2} dot={false} activeDot={{r: 3}} />
+               <Line yAxisId="right" type="monotone" name="总资产" dataKey="assets" stroke="#F59E0B" strokeWidth={2} strokeDasharray="3 3" dot={false} activeDot={{r: 3}} />
              </LineChart>
            </ResponsiveContainer>
         </div>
@@ -466,3 +480,4 @@ export const CopperShop: React.FC = () => {
       </div>
     </div>
   );
+};

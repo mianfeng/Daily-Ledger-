@@ -380,7 +380,7 @@ export const DailyLedger: React.FC = () => {
              <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
              <ReferenceLine y={data.dailyLimit} stroke="red" strokeDasharray="3 3" />
              <Line 
-               type="linear" 
+               type="monotone" 
                dataKey="amount" 
                stroke="#4A90E2" 
                strokeWidth={2} 
