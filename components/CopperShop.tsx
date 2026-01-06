@@ -40,7 +40,9 @@ export const CopperShop: React.FC = () => {
     const stats: Record<string, { income: number; expense: number }> = {};
     data.transactions.forEach(tx => {
       // Extract YYYY-MM
-      const monthKey = tx.date.substring(0, 7);
+      // Ensure we handle ISO strings safely
+      const dateStr = tx.date.split('T')[0];
+      const monthKey = dateStr.substring(0, 7);
       if (!stats[monthKey]) {
         stats[monthKey] = { income: 0, expense: 0 };
       }
@@ -69,7 +71,8 @@ export const CopperShop: React.FC = () => {
     const dailyExpense: Record<string, number> = {};
 
     data.transactions.forEach(tx => {
-       const d = tx.date; 
+       // Fix: Normalize date to YYYY-MM-DD to handle ISO strings with time
+       const d = tx.date.split('T')[0]; 
        if (!dailyNetChange[d]) {
          dailyNetChange[d] = 0;
          dailyIncome[d] = 0;
@@ -84,26 +87,27 @@ export const CopperShop: React.FC = () => {
        }
     });
 
-    // Unique sorted dates (Descending)
+    // Unique sorted dates (Descending for calculation)
     const allDates = Object.keys(dailyNetChange).sort((a, b) => b.localeCompare(a));
     
     // Calculate historical assets working backwards from current
     let runningAsset = totalAssets;
     const history: any[] = [];
 
+    // Iterating backwards (newest to oldest) to reconstruct history from current balance
     for (const d of allDates) {
         history.push({
             date: d,
-            shortDate: d.substring(5),
+            shortDate: d.substring(5), // "MM-DD"
             assets: runningAsset,
             income: dailyIncome[d],
             expense: dailyExpense[d]
         });
-        // Restore asset state for previous day
+        // Restore asset state for previous day 
         runningAsset -= dailyNetChange[d];
     }
 
-    // Return last 30 entries (reversed to be ascending time)
+    // Return last 30 entries (reversed to be ascending time for chart)
     return history.reverse().slice(-30);
   }, [data.transactions, totalAssets]);
 
@@ -395,7 +399,7 @@ export const CopperShop: React.FC = () => {
               <TrendingUp size={10}/> 收支趋势 (近30天)
            </h3>
            <ResponsiveContainer width="100%" height="100%">
-             <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
+             <LineChart data={chartData} margin={{ top: 20, right: 30, left: -25, bottom: 0 }}>
                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                <XAxis dataKey="shortDate" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
                {/* Primary Axis for Income/Expense */}
@@ -403,7 +407,11 @@ export const CopperShop: React.FC = () => {
                {/* Secondary Axis for Total Assets */}
                <YAxis yAxisId="right" orientation="right" tick={{fontSize: 9, fill: '#F59E0B'}} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                
-               <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
+               <Tooltip 
+                 formatter={(value: number) => value.toFixed(1)}
+                 labelFormatter={(label) => `日期: ${label}`}
+                 contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} 
+               />
                <Legend verticalAlign="top" height={24} iconSize={6} wrapperStyle={{fontSize: '10px', right: 0, top: 0}} />
                
                <Line yAxisId="left" type="monotone" name="收入" dataKey="income" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{r: 3}} />
