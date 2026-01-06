@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DailyData, Transaction } from '../types';
-import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp, Award } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Upload, Calendar, AlertTriangle, CheckCircle, Trash2, TrendingUp, Award, ChevronDown, Check } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { exportDailyToExcel } from '../utils/excel';
 import * as XLSX from 'xlsx';
@@ -174,78 +174,143 @@ export const DailyLedger: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in relative">
-      <div className="flex justify-between items-center border-b pb-4 border-blue-200">
-        <h1 className="text-2xl font-bold text-blue-700 flex items-center gap-3">
-           <Calendar className="text-blue-500" />
-           日常月度账本
-        </h1>
-      </div>
-
-      {/* Custom Month Picker Bar */}
-      <div className="relative z-20">
-        <div 
-          onClick={() => setShowPicker(!showPicker)}
-          className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center cursor-pointer hover:bg-blue-100 transition-colors select-none"
-        >
-          <div className="flex items-center gap-2 text-xl font-bold text-blue-800">
-             {currentYear}年{currentMonth}月 <span className="text-xs align-middle">▼</span>
-          </div>
-          <div className="text-right">
-             <div className="text-xs text-blue-400">本月结余</div>
-             <div className={`font-bold text-lg ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {balance >= 0 ? '+' : ''}{balance.toFixed(2)}
-             </div>
-          </div>
+    <div className="space-y-6 animate-fade-in relative pb-20">
+      {/* Header & Date Picker */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 border-stone-200 gap-4">
+        <div>
+           <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+              <div className="bg-blue-600 text-white p-2 rounded-lg"><Calendar size={20} /></div>
+              日常账本
+           </h1>
+           <p className="text-stone-400 text-sm mt-1 ml-11">
+              本月结余: <span className={`font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{balance >= 0 ? '+' : ''}{balance.toFixed(2)}</span>
+           </p>
         </div>
 
-        {/* Picker Dropdown */}
-        {showPicker && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-stone-200 shadow-2xl rounded-xl p-4 z-50">
-            <div className="flex justify-between items-center mb-4">
-              <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-stone-100 rounded"><ChevronLeft /></button>
-              <span className="font-bold text-lg">{pickerYear}</span>
-              <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-stone-100 rounded"><ChevronRight /></button>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                const { bal, hasTx } = calculateMonthBalanceForPicker(pickerYear, m);
-                const isActive = pickerYear === currentYear && m === currentMonth;
-                
-                let badgeStyle = '';
-                if (isActive) {
-                    badgeStyle = 'bg-white/20 text-white';
-                } else if (!hasTx) {
-                    badgeStyle = 'bg-stone-100 text-stone-400';
-                } else if (bal >= 0) {
-                    badgeStyle = 'bg-emerald-100 text-emerald-700';
-                } else {
-                    badgeStyle = 'bg-red-100 text-red-700';
-                }
+        {/* Optimized Date Picker Button */}
+        <div className="relative z-30 w-full md:w-auto">
+           <button 
+             onClick={() => setShowPicker(!showPicker)}
+             className="w-full md:w-auto flex justify-between md:justify-center items-center gap-3 bg-white border border-stone-200 px-4 py-2.5 rounded-full shadow-sm text-stone-600 hover:bg-stone-50 hover:border-blue-300 transition-all text-sm font-medium"
+           >
+              <span>{currentYear}年 {currentMonth}月</span>
+              <ChevronDown size={14} className={`transition-transform text-stone-400 ${showPicker ? 'rotate-180' : ''}`} />
+           </button>
 
-                return (
-                  <div 
-                    key={m}
-                    onClick={() => {
-                      setCurrentYear(pickerYear);
-                      setCurrentMonth(m);
-                      setShowPicker(false);
-                    }}
-                    className={`
-                      flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer border transition-all
-                      ${isActive ? 'bg-blue-500 text-white border-blue-600' : 'bg-white hover:bg-stone-50 border-transparent'}
-                    `}
-                  >
-                    <span className="font-bold text-sm">{m}月</span>
-                    <span className={`text-[10px] px-1.5 rounded-full mt-1 ${badgeStyle}`}>
-                       {!hasTx ? '0' : (bal > 0 ? '+' : '') + bal.toFixed(0)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+           {/* Picker Dropdown */}
+           {showPicker && (
+             <div className="absolute top-full right-0 mt-2 w-full md:w-80 bg-white border border-stone-200 shadow-xl rounded-xl p-4 z-50 animate-fade-in">
+               <div className="flex justify-between items-center mb-4 pb-2 border-b border-stone-100">
+                 <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-stone-100 rounded text-stone-500"><ChevronLeft size={18} /></button>
+                 <span className="font-bold text-stone-700">{pickerYear}</span>
+                 <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-stone-100 rounded text-stone-500"><ChevronRight size={18} /></button>
+               </div>
+               <div className="grid grid-cols-4 gap-2">
+                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                   const { bal, hasTx } = calculateMonthBalanceForPicker(pickerYear, m);
+                   const isActive = pickerYear === currentYear && m === currentMonth;
+                   
+                   let badgeStyle = '';
+                   if (isActive) {
+                       badgeStyle = 'bg-white/20 text-white';
+                   } else if (!hasTx) {
+                       badgeStyle = 'bg-stone-100 text-stone-400';
+                   } else if (bal >= 0) {
+                       badgeStyle = 'bg-emerald-100 text-emerald-700';
+                   } else {
+                       badgeStyle = 'bg-red-100 text-red-700';
+                   }
+
+                   return (
+                     <div 
+                       key={m}
+                       onClick={() => {
+                         setCurrentYear(pickerYear);
+                         setCurrentMonth(m);
+                         setShowPicker(false);
+                       }}
+                       className={`
+                         flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer border transition-all
+                         ${isActive ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white hover:bg-stone-50 border-transparent text-stone-600'}
+                       `}
+                     >
+                       <span className="font-bold text-sm">{m}月</span>
+                       <span className={`text-[10px] px-1.5 rounded-full mt-1 ${badgeStyle}`}>
+                          {!hasTx ? '·' : (bal > 0 ? '+' : '') + bal.toFixed(0)}
+                       </span>
+                     </div>
+                   );
+                 })}
+               </div>
+             </div>
+           )}
+        </div>
+      </div>
+
+      {/* Input Form (Optimized Layout) */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
+           {/* Type Toggle - Compact */}
+           <div className="flex bg-stone-100 p-1 rounded-lg w-full md:w-auto">
+              <button
+                onClick={() => setForm({...form, type: 'expense'})}
+                className={`flex-1 md:flex-none px-6 py-1.5 rounded-md text-sm font-bold transition-all ${form.type === 'expense' ? 'bg-white text-red-500 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+              >
+                支出
+              </button>
+              <button
+                onClick={() => setForm({...form, type: 'income'})}
+                className={`flex-1 md:flex-none px-6 py-1.5 rounded-md text-sm font-bold transition-all ${form.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
+              >
+                收入
+              </button>
+           </div>
+
+           {/* Date Picker - Optimized */}
+           <div className="relative w-full md:w-auto">
+              <input 
+                type="date" 
+                value={form.date} 
+                onChange={e => setForm({...form, date: e.target.value})} 
+                className="w-full md:w-auto pl-9 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
+           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-3">
+           {/* Amount Input */}
+           <div className="flex-1">
+              <div className="relative group">
+                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 font-bold group-focus-within:text-blue-500 transition-colors">¥</span>
+                 <input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={form.amount} 
+                    onChange={e => setForm({...form, amount: e.target.value})} 
+                    className="w-full pl-9 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-lg font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all placeholder:text-stone-300"
+                 />
+              </div>
+           </div>
+           
+           {/* Desc & Submit */}
+           <div className="flex-[2] flex gap-3">
+              <input 
+                type="text" 
+                placeholder="备注 (如: 超市购物)" 
+                value={form.desc} 
+                onChange={e => setForm({...form, desc: e.target.value})} 
+                className="flex-1 px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-stone-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all placeholder:text-stone-300"
+              />
+              <button 
+                onClick={handleAddTx} 
+                className="px-5 py-3 bg-stone-800 hover:bg-stone-900 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-200 active:scale-95 whitespace-nowrap"
+              >
+                <Check size={18} />
+                <span className="hidden md:inline">记一笔</span>
+              </button>
+           </div>
+        </div>
       </div>
 
       {/* Dashboard Stats */}
@@ -332,47 +397,8 @@ export const DailyLedger: React.FC = () => {
           </LineChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Input Form */}
-      <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-500">
-        <h3 className="font-bold text-stone-700 mb-4">📝 记一笔</h3>
-        <div className="grid grid-cols-2 gap-4 mb-3">
-          <select 
-            value={form.type} 
-            onChange={e => setForm({...form, type: e.target.value})} 
-            className="p-2 border rounded bg-stone-50"
-          >
-            <option value="expense">支出</option>
-            <option value="income">收入</option>
-          </select>
-          <input 
-            type="date" 
-            value={form.date} 
-            onChange={e => setForm({...form, date: e.target.value})} 
-            className="p-2 border rounded bg-stone-50"
-          />
-        </div>
-        <div className="space-y-3">
-          <input 
-            type="number" 
-            placeholder="金额" 
-            value={form.amount} 
-            onChange={e => setForm({...form, amount: e.target.value})} 
-            className="w-full p-2 border rounded text-lg"
-          />
-          <input 
-            type="text" 
-            placeholder="备注" 
-            value={form.desc} 
-            onChange={e => setForm({...form, desc: e.target.value})} 
-            className="w-full p-2 border rounded"
-          />
-          <button onClick={handleAddTx} className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition-colors">
-            提交
-          </button>
-        </div>
-      </div>
       
+      {/* Footer Actions */}
       <div className="flex gap-4 pt-4 border-t border-stone-200">
          <button 
            onClick={() => exportDailyToExcel(monthTransactions, currentYear, currentMonth)}
@@ -387,14 +413,17 @@ export const DailyLedger: React.FC = () => {
       </div>
 
       {/* List */}
-      <div className="pb-10">
-        <h3 className="font-bold text-stone-500 text-sm mb-2">本月明细</h3>
+      <div className="">
+        <h3 className="font-bold text-stone-500 text-sm mb-3">本月明细</h3>
         <ul className="space-y-2">
           {[...monthTransactions].reverse().map(tx => (
-            <li key={tx.id} className="flex justify-between items-center bg-white p-3 rounded shadow-sm group">
-               <div>
-                  <div className="text-stone-800 font-medium">{tx.desc}</div>
-                  <div className="text-xs text-stone-400">{tx.date}</div>
+            <li key={tx.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-stone-100 shadow-sm group hover:border-blue-200 transition-colors">
+               <div className="flex items-center gap-3">
+                  <div className={`w-1 h-8 rounded-full ${tx.type === 'income' ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
+                  <div>
+                    <div className="text-stone-800 font-medium">{tx.desc}</div>
+                    <div className="text-xs text-stone-400">{tx.date}</div>
+                  </div>
                </div>
                <div className="flex items-center gap-3">
                    <div className={`font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -402,7 +431,7 @@ export const DailyLedger: React.FC = () => {
                    </div>
                    <button 
                       onClick={() => handleDeleteTx(tx.id)}
-                      className="text-stone-300 hover:text-red-500 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      className="text-stone-300 hover:text-red-500 p-2 rounded-full hover:bg-stone-50 transition-all opacity-0 group-hover:opacity-100"
                       title="删除"
                     >
                       <Trash2 size={16} />
