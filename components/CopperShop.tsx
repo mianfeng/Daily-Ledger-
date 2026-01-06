@@ -35,7 +35,7 @@ export const CopperShop: React.FC = () => {
     return data.balances.liquid + data.balances.reserve + data.balances.collection;
   }, [data.balances]);
 
-  // Monthly Summary Calculation
+  // Monthly Summary Calculation (For Table)
   const monthlyStats = useMemo(() => {
     const stats: Record<string, { income: number; expense: number }> = {};
     data.transactions.forEach(tx => {
@@ -62,10 +62,37 @@ export const CopperShop: React.FC = () => {
       }));
   }, [data.transactions]);
 
-  // Chart Data (Ascending for Graph)
+  // Daily Stats for Chart (Trend by Day)
   const chartData = useMemo(() => {
-    return [...monthlyStats].reverse();
-  }, [monthlyStats]);
+    const stats: Record<string, { income: number; expense: number }> = {};
+    data.transactions.forEach(tx => {
+       const dateKey = tx.date; // YYYY-MM-DD
+       if (!stats[dateKey]) {
+         stats[dateKey] = { income: 0, expense: 0 };
+       }
+       if (tx.type === 'income') {
+         stats[dateKey].income += tx.amount;
+       } else {
+         stats[dateKey].expense += tx.amount;
+       }
+    });
+
+    // Sort by date ascending and take last 30 days with activity for clarity
+    const sortedStats = Object.entries(stats)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, { income, expense }]) => ({
+        date,
+        shortDate: date.substring(5), // MM-DD
+        income,
+        expense
+      }));
+
+    // If there are too many data points, maybe just show the last 30? 
+    // Or return all. Let's return all but slicing if very large might be needed in future.
+    // For now, let's return all to show full trend, or last 30 if strictly "recent trend".
+    // Usually "Trend" implies recent movement. Let's do last 30 entries if length > 30.
+    return sortedStats.slice(-30);
+  }, [data.transactions]);
 
   const handleAddTransaction = () => {
     const amount = parseFloat(form.amount);
@@ -303,12 +330,12 @@ export const CopperShop: React.FC = () => {
             
             <div className="h-4 w-px bg-stone-200 mx-1 hidden md:block"></div>
 
-            <div className="relative">
+            <div className="relative flex-1 md:flex-none">
                <input 
                   type="date"
                   value={form.date}
                   onChange={e => setForm({...form, date: e.target.value})}
-                  className="w-28 bg-transparent text-xs text-stone-600 font-medium focus:outline-none cursor-pointer pl-6 py-1"
+                  className="w-full md:w-32 bg-transparent text-xs text-stone-600 font-medium focus:outline-none cursor-pointer pl-6 py-1 min-w-[7.5rem]"
                />
                <Calendar size={12} className="absolute left-1 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"/>
             </div>
@@ -357,12 +384,12 @@ export const CopperShop: React.FC = () => {
       {chartData.length > 0 && (
         <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 h-56 relative">
            <h3 className="absolute top-3 left-3 text-[10px] font-bold text-stone-400 flex items-center gap-1">
-              <TrendingUp size={10}/> 收支趋势
+              <TrendingUp size={10}/> 收支趋势 (近30天)
            </h3>
            <ResponsiveContainer width="100%" height="100%">
              <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-               <XAxis dataKey="month" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
+               <XAxis dataKey="shortDate" tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
                <YAxis tick={{fontSize: 9, fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
                <Tooltip contentStyle={{borderRadius: '6px', border: 'none', boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', padding: '4px 8px'}} />
                <Legend verticalAlign="top" height={24} iconSize={6} wrapperStyle={{fontSize: '10px', right: 0, top: 0}} />
@@ -439,4 +466,3 @@ export const CopperShop: React.FC = () => {
       </div>
     </div>
   );
-};
