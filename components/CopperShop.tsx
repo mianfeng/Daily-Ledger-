@@ -132,7 +132,38 @@ export const CopperShop: React.FC = () => {
       newBalances.reserve += amount * (data.ratios.reserve / 100);
       newBalances.collection += amount * (data.ratios.collection / 100);
     } else {
-      newBalances[form.source as keyof typeof newBalances] -= amount;
+      if (form.source === 'liquid') {
+        let remaining = amount;
+
+        // 1. Try Liquid
+        if (newBalances.liquid > 0) {
+          if (newBalances.liquid >= remaining) {
+            newBalances.liquid -= remaining;
+            remaining = 0;
+          } else {
+            remaining -= newBalances.liquid;
+            newBalances.liquid = 0;
+          }
+        }
+
+        // 2. Try Collection
+        if (remaining > 0 && newBalances.collection > 0) {
+          if (newBalances.collection >= remaining) {
+            newBalances.collection -= remaining;
+            remaining = 0;
+          } else {
+            remaining -= newBalances.collection;
+            newBalances.collection = 0;
+          }
+        }
+
+        // 3. Remainder from Reserve
+        if (remaining > 0) {
+          newBalances.reserve -= remaining;
+        }
+      } else {
+        newBalances[form.source as keyof typeof newBalances] -= amount;
+      }
     }
 
     setData({
