@@ -1,12 +1,13 @@
 import * as XLSX from 'xlsx';
-import { Transaction, CopperData, DailyData } from '../types';
+import { CopperBalances, CopperData, Transaction } from '../types';
+import { normalizeTransaction } from '../lib/ledger';
 
 export const exportCopperToExcel = (data: CopperData) => {
   const wb = XLSX.utils.book_new();
   
   // Transactions Sheet
   const wsData = data.transactions.map(t => ({
-    日期: new Date(t.date).toLocaleDateString(),
+    日期: t.date,
     类型: t.type === 'income' ? '收入' : '支出',
     金额: t.amount,
     备注: t.desc,
@@ -36,4 +37,51 @@ export const exportDailyToExcel = (transactions: Transaction[], year: number, mo
   })));
   XLSX.utils.book_append_sheet(wb, ws, "记录");
   XLSX.writeFile(wb, `日常账本_${year}-${month}.xlsx`);
+};
+
+export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true });
+
+  return rows
+    .map((row) =>
+      normalizeTransaction(
+        {
+          date: row['日期'] ?? row.date,
+          type: row['类型'] ?? row.type,
+          amount: row['金额'] ?? row.amount,
+          desc: row['备注'] ?? row.desc,
+        },
+        {
+          incomeDesc: '额外收入',
+          expenseDesc: '日常支出',
+        },
+      ),
+    )
+    .filter((transaction): transaction is Transaction => transaction !== null);
+};
+
+export const parseCopperStatusSheet = (
+  sheet: XLSX.WorkSheet,
+  fallback: CopperBalances,
+) => {
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true });
+  const balances = { ...fallback };
+
+  for (const row of rows) {
+    const label = String(row['项目'] ?? '').trim();
+    const amount = Number(row['金额']);
+    if (!Number.isFinite(amount)) {
+      continue;
+    }
+
+    if (label === '流动库') {
+      balances.liquid = amount;
+    } else if (label === '存储库') {
+      balances.reserve = amount;
+    } else if (label === '收藏库') {
+      balances.collection = amount;
+    }
+  }
+
+  return balances;
 };

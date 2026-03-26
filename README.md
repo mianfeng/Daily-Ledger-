@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Daily Ledger
 
-# Run and deploy your AI Studio app
+一个基于 React + Vite 的本地账本工具，包含两个模块：
 
-This contains everything you need to run your app locally.
+- 铜钱分账：按比例分配收入，并记录不同资金库的支出
+- 日常账本：记录日常收支、每日额度和月度趋势
 
-View your app in AI Studio: https://ai.studio/apps/80692f1e-00d3-4587-99be-a68deed7eaa5
+## 技术栈
 
-## Run Locally
+- React 19
+- TypeScript
+- Vite
+- Recharts
+- SheetJS (`xlsx`)
+- Tailwind CSS CDN
 
-**Prerequisites:**  Node.js
+## 本地运行
 
+前提：已安装 Node.js。
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. 安装依赖：`npm install`
+2. 启动开发环境：`npm run dev`
+3. 构建生产包：`npm run build`
+
+## 数据说明
+
+- 应用数据默认保存在浏览器 `localStorage`
+- 导出功能使用 Excel 文件
+- 当前仓库不依赖 Gemini 或其他后端 API

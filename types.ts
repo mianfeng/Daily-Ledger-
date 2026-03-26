@@ -1,23 +1,28 @@
+export type CopperAccount = 'liquid' | 'reserve' | 'collection';
+
+export interface CopperBreakdown {
+  liquid: number;
+  reserve: number;
+  collection: number;
+}
+
+export type CopperRatios = CopperBreakdown;
+export type CopperBalances = CopperBreakdown;
+
 export interface Transaction {
   id: number;
-  date: string; // ISO string YYYY-MM-DD
+  date: string; // Local date string YYYY-MM-DD
   type: 'income' | 'expense';
   amount: number;
   desc: string;
-  source?: 'liquid' | 'reserve' | 'collection'; // For Copper Shop
+  source?: CopperAccount;
+  allocation?: CopperBreakdown;
+  isLegacyLocked?: boolean;
 }
 
 export interface CopperData {
-  ratios: {
-    liquid: number;
-    reserve: number;
-    collection: number;
-  };
-  balances: {
-    liquid: number;
-    reserve: number;
-    collection: number;
-  };
+  ratios: CopperRatios;
+  balances: CopperBalances;
   transactions: Transaction[];
 }
 
