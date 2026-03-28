@@ -36,7 +36,7 @@ import {
 } from '../lib/daily';
 import { createTransactionId } from '../lib/ledger';
 import { DailyData, Transaction } from '../types';
-import { exportDailyToExcel, parseDailyImportSheet } from '../utils/excel';
+import { exportDailyToExcel, parseDailyImportWorkbook } from '../utils/excel';
 
 const INITIAL_DATA: DailyData = {
   dailyLimit: 30,
@@ -147,23 +147,18 @@ export const DailyLedger: React.FC = () => {
       return;
     }
 
+    if (!window.confirm('确定用导入文件覆盖当前日常账本数据吗？日额度和全部流水都会被替换。')) {
+      input.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
       try {
         const workbook = XLSX.read(loadEvent.target?.result, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const importedTransactions = firstSheet ? parseDailyImportSheet(firstSheet) : [];
-
-        if (importedTransactions.length === 0) {
-          alert('导入失败，未识别到有效记录');
-          return;
-        }
-
-        setData((prev) => ({
-          ...prev,
-          transactions: [...prev.transactions, ...importedTransactions],
-        }));
-        alert(`导入成功，共 ${importedTransactions.length} 条`);
+        const importedData = parseDailyImportWorkbook(workbook, INITIAL_DATA);
+        setData(importedData);
+        alert(`导入成功，共恢复 ${importedData.transactions.length} 条记录`);
       } catch {
         alert('导入失败');
       } finally {
@@ -451,13 +446,13 @@ export const DailyLedger: React.FC = () => {
 
       <div className="flex gap-4 pt-2 border-t border-stone-200">
         <button
-          onClick={() => exportDailyToExcel(monthTransactions, currentYear, currentMonth)}
+          onClick={() => exportDailyToExcel(data, currentYear, currentMonth)}
           className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50"
         >
-          <Download size={12} /> 导出
+          <Download size={12} /> 导出备份
         </button>
         <label className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50 cursor-pointer">
-          <Upload size={12} /> 导入
+          <Upload size={12} /> 导入备份
           <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
         </label>
       </div>

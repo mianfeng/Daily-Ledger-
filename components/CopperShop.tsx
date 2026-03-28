@@ -42,7 +42,7 @@ import { getTodayDate } from '../lib/date';
 import { CopperAccount, CopperData, CopperRatios, Transaction } from '../types';
 import {
   exportCopperToExcel,
-  parseCopperStatusSheet,
+  parseCopperImportWorkbook,
 } from '../utils/excel';
 
 const INITIAL_DATA: CopperData = {
@@ -254,7 +254,7 @@ export const CopperShop: React.FC = () => {
       return;
     }
 
-    if (!window.confirm('确定覆盖现有余额并清空流水吗？')) {
+    if (!window.confirm('确定用导入文件覆盖当前铜钱分账数据吗？余额、比例和流水都会被替换。')) {
       input.value = '';
       return;
     }
@@ -263,19 +263,9 @@ export const CopperShop: React.FC = () => {
     reader.onload = (loadEvent) => {
       try {
         const workbook = XLSX.read(loadEvent.target?.result, { type: 'array' });
-        const statusSheet = workbook.Sheets['资产状态'];
-        if (!statusSheet) {
-          alert('导入失败，缺少“资产状态”工作表');
-          return;
-        }
-
-        const balances = parseCopperStatusSheet(statusSheet, data.balances);
-        setData((prev) => ({
-          ...prev,
-          balances,
-          transactions: [],
-        }));
-        alert('导入成功（仅恢复余额）');
+        const importedData = parseCopperImportWorkbook(workbook, INITIAL_DATA);
+        setData(importedData);
+        alert(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
       } catch {
         alert('导入失败，格式不正确');
       } finally {
@@ -360,13 +350,18 @@ export const CopperShop: React.FC = () => {
           </div>
           <div className="mt-3 pt-3 border-t flex gap-2">
             <button
-              onClick={() => exportCopperToExcel(data)}
+              onClick={() =>
+                exportCopperToExcel({
+                  ...data,
+                  transactions: resolvedTransactions,
+                })
+              }
               className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
             >
-              <Download size={14} /> 导出Excel
+              <Download size={14} /> 导出备份
             </button>
             <label className="flex items-center gap-1 px-3 py-1.5 bg-stone-500 text-white rounded text-xs hover:bg-stone-600 cursor-pointer">
-              <Upload size={14} /> 导入Excel
+              <Upload size={14} /> 导入备份
               <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
             </label>
           </div>

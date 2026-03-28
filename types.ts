@@ -31,6 +31,14 @@ export interface DailyData {
   transactions: Transaction[];
 }
 
+export interface AppBackup {
+  version: number;
+  exportedAt: string;
+  origin?: string;
+  copper: CopperData;
+  daily: DailyData;
+}
+
 export enum ViewType {
   COPPER = 'copper',
   DAILY = 'daily'
