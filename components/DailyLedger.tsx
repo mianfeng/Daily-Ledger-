@@ -487,8 +487,9 @@ export const DailyLedger: React.FC = () => {
                 </div>
                 <button
                   onClick={() => handleDeleteTx(transaction.id)}
-                  className="text-stone-300 hover:text-red-500 p-1 rounded-full hover:bg-stone-50 transition-all opacity-0 group-hover:opacity-100"
+                  className="text-stone-400 hover:text-red-500 p-2 -m-1 rounded-full hover:bg-stone-50 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 touch-manipulation"
                   title="删除"
+                  aria-label={`删除${transaction.desc}`}
                 >
                   <Trash2 size={12} />
                 </button>

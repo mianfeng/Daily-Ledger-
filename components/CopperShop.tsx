@@ -633,12 +633,13 @@ export const CopperShop: React.FC = () => {
                 </div>
                 <button
                   onClick={() => handleDeleteTransaction(transaction.id)}
-                  className={`p-1 rounded transition-colors opacity-0 group-hover:opacity-100 ${
+                  className={`p-2 -m-1 rounded-full transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 touch-manipulation ${
                     transaction.isLegacyLocked
                       ? 'text-stone-200 cursor-not-allowed'
-                      : 'text-stone-300 hover:text-red-500'
+                      : 'text-stone-400 hover:text-red-500 hover:bg-stone-50'
                   }`}
                   title={transaction.isLegacyLocked ? '历史锁定记录不可删除' : '删除'}
+                  aria-label={transaction.isLegacyLocked ? `${transaction.desc}不可删除` : `删除${transaction.desc}`}
                 >
                   <Trash2 size={12} />
                 </button>
