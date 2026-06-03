@@ -67,6 +67,8 @@ export const CopperShop: React.FC = () => {
   );
   const [showSettings, setShowSettings] = useState(false);
   const [ratioDraft, setRatioDraft] = useState<CopperRatios>(data.ratios);
+  const [inventoryEntryAmount, setInventoryEntryAmount] = useState('');
+  const [inventoryEntryDesc, setInventoryEntryDesc] = useState('');
   const [inventoryDraft, setInventoryDraft] = useState(String(data.inventoryCost));
   const [inventoryAdjustmentDesc, setInventoryAdjustmentDesc] = useState('');
   const [form, setForm] = useState<{
@@ -86,6 +88,8 @@ export const CopperShop: React.FC = () => {
   useEffect(() => {
     if (showSettings) {
       setRatioDraft(data.ratios);
+      setInventoryEntryAmount('');
+      setInventoryEntryDesc('');
       setInventoryDraft(String(data.inventoryCost));
       setInventoryAdjustmentDesc('');
     }
@@ -207,6 +211,29 @@ export const CopperShop: React.FC = () => {
     setShowSettings(false);
   };
 
+  const handleInventoryEntry = () => {
+    const amount = Number(inventoryEntryAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('请输入有效库存成本');
+      return;
+    }
+
+    setData((prev) =>
+      applyCopperTransaction(
+        prev,
+        createInventoryAdjustmentTransaction({
+          date: getTodayDate(),
+          desc: inventoryEntryDesc.trim() || '库存成本补录',
+          previousInventoryCost: prev.inventoryCost,
+          nextInventoryCost: prev.inventoryCost + amount,
+        }),
+      ),
+    );
+    setInventoryEntryAmount('');
+    setInventoryEntryDesc('');
+    setShowSettings(false);
+  };
+
   const handleInventoryAdjustment = () => {
     const nextInventoryCost = Number(inventoryDraft);
     if (!Number.isFinite(nextInventoryCost) || nextInventoryCost < 0) {
@@ -322,7 +349,33 @@ export const CopperShop: React.FC = () => {
           </div>
 
           <div className="pt-4 border-t border-stone-100">
-            <h3 className="font-bold text-sm mb-3">库存成本调整</h3>
+            <h3 className="font-bold text-sm mb-3">库存成本补录</h3>
+            <div className="flex flex-col md:flex-row gap-2">
+              <input
+                type="number"
+                value={inventoryEntryAmount}
+                onChange={(event) => setInventoryEntryAmount(event.target.value)}
+                className="md:w-32 p-1.5 border rounded text-sm"
+                placeholder="本笔成本"
+              />
+              <input
+                type="text"
+                value={inventoryEntryDesc}
+                onChange={(event) => setInventoryEntryDesc(event.target.value)}
+                className="flex-1 p-1.5 border rounded text-sm"
+                placeholder="备注"
+              />
+              <button
+                onClick={handleInventoryEntry}
+                className="px-3 py-1.5 bg-emerald-700 text-white rounded text-sm hover:bg-emerald-800"
+              >
+                补录库存
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-stone-100">
+            <h3 className="font-bold text-sm mb-3">盘点设置总额</h3>
             <div className="flex flex-col md:flex-row gap-2">
               <input
                 type="number"
