@@ -10,8 +10,9 @@ const COPPER_STORAGE_KEY = 'coinShopData_v5';
 const DAILY_STORAGE_KEY = 'dailyBookData_v5';
 
 const DEFAULT_COPPER_DATA: CopperData = {
-  ratios: { liquid: 70, reserve: 20, collection: 10 },
-  balances: { liquid: 4, reserve: 100, collection: 6 },
+  ratios: { liquid: 60, reserve: 40 },
+  balances: { liquid: 4, reserve: 100 },
+  inventoryCost: 0,
   transactions: [],
 };
 

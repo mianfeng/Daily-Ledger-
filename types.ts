@@ -1,34 +1,48 @@
-export type CopperAccount = 'liquid' | 'reserve' | 'collection';
+export type CopperAccount = 'liquid' | 'reserve';
 
 export interface CopperBreakdown {
   liquid: number;
   reserve: number;
-  collection: number;
 }
 
 export type CopperRatios = CopperBreakdown;
 export type CopperBalances = CopperBreakdown;
 
-export interface Transaction {
+interface BaseTransaction {
   id: number;
   date: string; // Local date string YYYY-MM-DD
-  type: 'income' | 'expense';
   amount: number;
   desc: string;
-  source?: CopperAccount;
-  allocation?: CopperBreakdown;
+}
+
+export interface DailyTransaction extends BaseTransaction {
+  type: 'income' | 'expense';
+}
+
+export interface CopperTransaction extends BaseTransaction {
+  type: 'income' | 'expense' | 'inventory_adjustment';
+  cost?: number;
+  profit?: number;
+  cashAllocation?: CopperBreakdown;
+  inventoryDelta?: number;
+  ratiosSnapshot?: CopperRatios;
+  previousInventoryCost?: number;
+  nextInventoryCost?: number;
   isLegacyLocked?: boolean;
 }
+
+export type Transaction = DailyTransaction;
 
 export interface CopperData {
   ratios: CopperRatios;
   balances: CopperBalances;
-  transactions: Transaction[];
+  inventoryCost: number;
+  transactions: CopperTransaction[];
 }
 
 export interface DailyData {
   dailyLimit: number;
-  transactions: Transaction[];
+  transactions: DailyTransaction[];
 }
 
 export interface AppBackup {

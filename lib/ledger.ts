@@ -1,7 +1,5 @@
-import { CopperAccount, CopperBreakdown, Transaction } from '../types';
+import { Transaction } from '../types';
 import { parseSpreadsheetDate } from './date';
-
-const COPPER_ACCOUNTS: CopperAccount[] = ['liquid', 'reserve', 'collection'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -9,22 +7,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const toFiniteNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-};
-
-const normalizeCopperBreakdown = (value: unknown): CopperBreakdown | undefined => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  const liquid = toFiniteNumber(value.liquid);
-  const reserve = toFiniteNumber(value.reserve);
-  const collection = toFiniteNumber(value.collection);
-
-  if (liquid === null || reserve === null || collection === null) {
-    return undefined;
-  }
-
-  return { liquid, reserve, collection };
 };
 
 const normalizeType = (value: unknown) => {
@@ -37,16 +19,6 @@ const normalizeType = (value: unknown) => {
   }
 
   return null;
-};
-
-const normalizeSource = (value: unknown) => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  return COPPER_ACCOUNTS.includes(value as CopperAccount)
-    ? (value as CopperAccount)
-    : undefined;
 };
 
 export const createTransactionId = () => Date.now() + Math.random();
@@ -83,7 +55,5 @@ export const normalizeTransaction = (
     type,
     amount,
     desc,
-    source: normalizeSource(raw.source),
-    allocation: normalizeCopperBreakdown(raw.allocation),
   };
 };

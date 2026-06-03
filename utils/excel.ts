@@ -22,39 +22,9 @@ const buildMetadataRows = (scope: string) => [
   { 项目: '导出来源', 值: getExportOrigin() },
 ];
 
-const normalizeSource = (value: unknown) => {
-  if (value === 'liquid' || value === '流动库' || value === '流动') {
-    return 'liquid' as const;
-  }
-
-  if (value === 'reserve' || value === '存储库' || value === '存储') {
-    return 'reserve' as const;
-  }
-
-  if (value === 'collection' || value === '收藏库' || value === '收藏') {
-    return 'collection' as const;
-  }
-
-  return undefined;
-};
-
-const parseBreakdown = (
-  row: Record<string, unknown>,
-  prefix = '分配',
-): CopperBreakdown | undefined => {
-  const liquid = Number(row[`${prefix}_流动`]);
-  const reserve = Number(row[`${prefix}_存储`]);
-  const collection = Number(row[`${prefix}_收藏`]);
-
-  if (![liquid, reserve, collection].some((value) => Number.isFinite(value))) {
-    return undefined;
-  }
-
-  return {
-    liquid: Number.isFinite(liquid) ? liquid : 0,
-    reserve: Number.isFinite(reserve) ? reserve : 0,
-    collection: Number.isFinite(collection) ? collection : 0,
-  };
+const parseNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const parseBoolean = (value: unknown) => {
@@ -69,6 +39,53 @@ const parseBoolean = (value: unknown) => {
 const findSheet = (workbook: XLSX.WorkBook, names: string[]) =>
   names.find((name) => workbook.Sheets[name]);
 
+const parseBreakdown = (
+  row: Record<string, unknown>,
+  prefix: string,
+): CopperBreakdown | undefined => {
+  const liquid = parseNumber(row[`${prefix}_流动`]);
+  const reserve = parseNumber(row[`${prefix}_存储`]);
+
+  if (liquid === null || reserve === null) {
+    return undefined;
+  }
+
+  return {
+    liquid,
+    reserve,
+  };
+};
+
+const parseLegacyAllocation = (row: Record<string, unknown>) => {
+  const liquid = parseNumber(row['分配_流动']);
+  const reserve = parseNumber(row['分配_存储']);
+
+  if (liquid === null || reserve === null) {
+    return undefined;
+  }
+
+  return {
+    liquid,
+    reserve,
+  };
+};
+
+const normalizeCopperType = (value: unknown) => {
+  if (value === 'income' || value === '收入' || value === '销售收入') {
+    return 'income';
+  }
+
+  if (value === 'expense' || value === '支出' || value === '进货支出') {
+    return 'expense';
+  }
+
+  if (value === 'inventory_adjustment' || value === '库存调整') {
+    return 'inventory_adjustment';
+  }
+
+  return value;
+};
+
 export const exportCopperToExcel = (data: CopperData) => {
   const workbook = XLSX.utils.book_new();
 
@@ -76,31 +93,34 @@ export const exportCopperToExcel = (data: CopperData) => {
   appendSheet(workbook, '配置比例', [
     { 项目: '流动库', 比例: data.ratios.liquid },
     { 项目: '存储库', 比例: data.ratios.reserve },
-    { 项目: '收藏库', 比例: data.ratios.collection },
   ]);
   appendSheet(workbook, '资产状态', [
     { 项目: '流动库', 金额: data.balances.liquid },
     { 项目: '存储库', 金额: data.balances.reserve },
-    { 项目: '收藏库', 金额: data.balances.collection },
+    { 项目: '库存成本', 金额: data.inventoryCost },
   ]);
   appendSheet(
     workbook,
     '铜钱流水',
     data.transactions.map((transaction) => ({
       日期: transaction.date,
-      类型: transaction.type === 'income' ? '收入' : '支出',
+      类型:
+        transaction.type === 'income'
+          ? '销售收入'
+          : transaction.type === 'expense'
+            ? '进货支出'
+            : '库存调整',
       金额: transaction.amount,
       备注: transaction.desc,
-      账户: transaction.source
-        ? transaction.source === 'liquid'
-          ? '流动库'
-          : transaction.source === 'reserve'
-            ? '存储库'
-            : '收藏库'
-        : '-',
-      分配_流动: transaction.allocation?.liquid ?? '',
-      分配_存储: transaction.allocation?.reserve ?? '',
-      分配_收藏: transaction.allocation?.collection ?? '',
+      成本: transaction.cost ?? '',
+      利润: transaction.profit ?? '',
+      现金_流动: transaction.cashAllocation?.liquid ?? '',
+      现金_存储: transaction.cashAllocation?.reserve ?? '',
+      库存变化: transaction.inventoryDelta ?? '',
+      调整前库存: transaction.previousInventoryCost ?? '',
+      调整后库存: transaction.nextInventoryCost ?? '',
+      比例_流动: transaction.ratiosSnapshot?.liquid ?? '',
+      比例_存储: transaction.ratiosSnapshot?.reserve ?? '',
       历史锁定: transaction.isLegacyLocked ? '是' : '',
     })),
   );
@@ -175,11 +195,12 @@ export const parseCopperStatusSheet = (
 ) => {
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true });
   const balances = { ...fallback };
+  let inventoryCost: number | undefined;
 
   for (const row of rows) {
     const label = String(row['项目'] ?? '').trim();
-    const amount = Number(row['金额']);
-    if (!Number.isFinite(amount)) {
+    const amount = parseNumber(row['金额']);
+    if (amount === null) {
       continue;
     }
 
@@ -187,12 +208,12 @@ export const parseCopperStatusSheet = (
       balances.liquid = amount;
     } else if (label === '存储库') {
       balances.reserve = amount;
-    } else if (label === '收藏库') {
-      balances.collection = amount;
+    } else if (label === '库存成本') {
+      inventoryCost = amount;
     }
   }
 
-  return balances;
+  return { balances, inventoryCost };
 };
 
 const parseCopperRatioSheet = (
@@ -204,8 +225,8 @@ const parseCopperRatioSheet = (
 
   for (const row of rows) {
     const label = String(row['项目'] ?? '').trim();
-    const value = Number(row['比例']);
-    if (!Number.isFinite(value)) {
+    const value = parseNumber(row['比例']);
+    if (value === null) {
       continue;
     }
 
@@ -213,30 +234,44 @@ const parseCopperRatioSheet = (
       ratios.liquid = value;
     } else if (label === '存储库') {
       ratios.reserve = value;
-    } else if (label === '收藏库') {
-      ratios.collection = value;
     }
   }
 
   return ratios;
 };
 
-const parseCopperTransactionSheet = (sheet: XLSX.WorkSheet): Transaction[] => {
+const parseCopperTransactionSheet = (sheet: XLSX.WorkSheet) => {
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true });
-  const transactions: Transaction[] = [];
+  const transactions: Record<string, unknown>[] = [];
 
   for (const row of rows) {
+    const type = normalizeCopperType(row['类型'] ?? row.type);
+    const common = {
+      id: row.id,
+      date: row['日期'] ?? row.date,
+      amount: row['金额'] ?? row.amount,
+      desc: row['备注'] ?? row.desc,
+    };
+
+    if (type === 'inventory_adjustment') {
+      transactions.push({
+        ...common,
+        type,
+        inventoryDelta: row['库存变化'] ?? row.inventoryDelta,
+        previousInventoryCost: row['调整前库存'] ?? row.previousInventoryCost,
+        nextInventoryCost: row['调整后库存'] ?? row.nextInventoryCost,
+      });
+      continue;
+    }
+
     const normalized = normalizeTransaction(
       {
-        date: row['日期'] ?? row.date,
-        type: row['类型'] ?? row.type,
-        amount: row['金额'] ?? row.amount,
-        desc: row['备注'] ?? row.desc,
-        source: normalizeSource(row['账户'] ?? row['来源'] ?? row.source),
+        ...common,
+        type,
       },
       {
         incomeDesc: '生意收入',
-        expenseDesc: '生意支出',
+        expenseDesc: '进货支出',
       },
     );
 
@@ -246,7 +281,12 @@ const parseCopperTransactionSheet = (sheet: XLSX.WorkSheet): Transaction[] => {
 
     transactions.push({
       ...normalized,
-      allocation: parseBreakdown(row) ?? normalized.allocation,
+      cost: row['成本'] ?? row.cost,
+      profit: row['利润'] ?? row.profit,
+      cashAllocation: parseBreakdown(row, '现金'),
+      allocation: parseLegacyAllocation(row),
+      inventoryDelta: row['库存变化'] ?? row.inventoryDelta,
+      ratiosSnapshot: parseBreakdown(row, '比例'),
       isLegacyLocked: parseBoolean(row['历史锁定']),
     });
   }
@@ -262,9 +302,9 @@ export const parseCopperImportWorkbook = (
   const ratioSheetName = findSheet(workbook, ['配置比例']);
   const transactionSheetName = findSheet(workbook, ['铜钱流水']);
 
-  const balances = statusSheetName
+  const status = statusSheetName
     ? parseCopperStatusSheet(workbook.Sheets[statusSheetName], fallback.balances)
-    : fallback.balances;
+    : { balances: fallback.balances, inventoryCost: fallback.inventoryCost };
   const ratios = ratioSheetName
     ? parseCopperRatioSheet(workbook.Sheets[ratioSheetName], fallback.ratios)
     : fallback.ratios;
@@ -275,7 +315,8 @@ export const parseCopperImportWorkbook = (
   return sanitizeCopperData(
     {
       ratios,
-      balances,
+      balances: status.balances,
+      inventoryCost: status.inventoryCost ?? fallback.inventoryCost,
       transactions,
     },
     fallback,
@@ -293,8 +334,8 @@ export const parseDailyImportWorkbook = (
   if (settingsSheetName) {
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[settingsSheetName], { raw: true });
     const limitRow = rows.find((row) => String(row['项目'] ?? '').trim() === '日额度');
-    const limitValue = Number(limitRow?.['值']);
-    if (Number.isFinite(limitValue)) {
+    const limitValue = parseNumber(limitRow?.['值']);
+    if (limitValue !== null) {
       dailyLimit = limitValue;
     }
   }
