@@ -10,8 +10,8 @@
 - React 19
 - TypeScript
 - Vite
-- Node.js + Express
-- SQLite (`better-sqlite3`)
+- Node.js built-in HTTP server
+- File-backed JSON storage
 - Recharts
 - SheetJS (`xlsx`)
 - Tailwind CSS CDN
@@ -48,48 +48,87 @@
 
 Vite 会把 `/api` 代理到本地后端。开发环境后端默认端口是 `3001`，生产环境默认端口是 `3000`。
 
-## VPS 部署
+## VPS 轻量部署（推荐给 1G 内存 VPS）
 
 前提：
 
-- VPS 已安装 Docker 和 Docker Compose
-- 域名 A 记录已解析到 VPS IP
-- 80 / 443 端口已开放
+- VPS 已安装 Node.js 20+
+- 域名 A 记录已解析到 VPS IP，或先通过 Tailscale IP 内网访问
+
+不要在 1G 内存 VPS 上运行 `npm run build` 或 `docker compose up --build`。请在本地构建，再上传 `dist/` 和 `server/`。
 
 部署步骤：
 
-1. 上传项目到 VPS。
-
-2. 生成密码 hash：
+1. 本地构建：
    ```bash
-   npm install
+   npm run build
+   ```
+
+2. 本地生成密码 hash：
+   ```bash
    npm run hash-password -- "your-password"
    ```
 
-3. 创建 `.env`：
-   ```bash
-   cp .env.example .env
+3. 上传这些内容到 VPS，例如 `/opt/daily-ledger/`：
+   ```text
+   dist/
+   server/
+   .env
    ```
 
-4. 编辑 `.env`：
+4. VPS 上创建数据目录：
+   ```bash
+   mkdir -p /opt/daily-ledger/data /opt/daily-ledger/backups
+   ```
+
+5. 编辑 `/opt/daily-ledger/.env`：
    ```env
    APP_DOMAIN=ledger.example.com
+   HOST=127.0.0.1
+   PORT=3000
    ADMIN_USERNAME=admin
    ADMIN_PASSWORD_HASH=scrypt:...
    SESSION_TTL_DAYS=30
-   COOKIE_SECURE=true
+   COOKIE_SECURE=false
    ```
 
-5. 启动：
+   如果通过 HTTPS 域名访问，`COOKIE_SECURE=true`。如果先走 Tailscale HTTP 内网地址，`COOKIE_SECURE=false`。
+
+6. 创建 systemd 服务 `/etc/systemd/system/daily-ledger.service`：
+   ```ini
+   [Unit]
+   Description=Daily Ledger
+   After=network.target
+
+   [Service]
+   Type=simple
+   WorkingDirectory=/opt/daily-ledger
+   EnvironmentFile=/opt/daily-ledger/.env
+   Environment=NODE_ENV=production
+   Environment=DATA_DIR=/opt/daily-ledger/data
+   Environment=BACKUP_DIR=/opt/daily-ledger/backups
+   ExecStart=/usr/bin/node /opt/daily-ledger/server/index.mjs
+   Restart=on-failure
+   RestartSec=5
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+7. 启动：
    ```bash
-   docker compose up -d --build
+   systemctl daemon-reload
+   systemctl enable --now daily-ledger
    ```
 
-Caddy 会自动申请 HTTPS 证书，并把域名流量转发到应用容器。
+## Docker 部署（较大 VPS 可用）
+
+仓库仍包含 `Dockerfile`、`docker-compose.yml` 和 `Caddyfile`。这条路线会在服务器上构建前端，不建议在 1G 内存 VPS 上使用。
 
 ## 数据和备份
 
-- SQLite 主库：`./data/ledger.sqlite`
+- 主数据：`./data/ledger.json`
+- 登录会话：`./data/sessions.json`
 - 每日 JSON 备份：`./backups/YYYY-MM-DD.json`
 - 自动备份保留最近 30 天
 - 前端仍支持手动导出整站 JSON 备份

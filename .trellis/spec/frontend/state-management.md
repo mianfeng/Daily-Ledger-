@@ -8,7 +8,7 @@
 
 ### 1. Scope / Trigger
 
-- Trigger: ledger persistence moved from browser-only `localStorage` to a VPS API backed by SQLite.
+- Trigger: ledger persistence moved from browser-only `localStorage` to a VPS API backed by file-backed JSON storage.
 - Applies when changing app-level ledger state, authentication state, backup import/export, migration, or autosave behavior.
 - The combined ledger state is the app-level source of truth:
   - `copper: CopperData`
@@ -25,9 +25,9 @@
 - Empty-server migration API: `POST /api/ledger/import`
 - Manual export API: `GET /api/ledger/export`
 - Manual backup API: `POST /api/backups/run`
-- SQLite tables:
-  - `app_state(id, data_json, revision, updated_at)`
-  - `sessions(token_hash, expires_at, created_at)`
+- Server files:
+  - `DATA_DIR/ledger.json`
+  - `DATA_DIR/sessions.json`
 
 ### 3. Contracts
 
@@ -55,6 +55,7 @@
   - `ADMIN_PASSWORD_HASH`
   - `APP_DOMAIN` for Caddy deployments
 - Optional environment keys:
+  - `HOST`
   - `PORT`
   - `DATA_DIR`
   - `BACKUP_DIR`
