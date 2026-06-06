@@ -22,7 +22,7 @@ import {
   YAxis,
 } from 'recharts';
 import * as XLSX from 'xlsx';
-import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { DEFAULT_DAILY_DATA } from '../lib/appData';
 import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date';
 import {
   getCompliantDaysCount,
@@ -32,27 +32,18 @@ import {
   getMonthTransactions,
   getTodaySpent,
   getTransactionSummary,
-  sanitizeDailyData,
 } from '../lib/daily';
 import { createTransactionId } from '../lib/ledger';
 import { DailyData, Transaction } from '../types';
 import { exportDailyToExcel, parseDailyImportWorkbook } from '../utils/excel';
 
-const INITIAL_DATA: DailyData = {
-  dailyLimit: 30,
-  transactions: [],
-};
+interface DailyLedgerProps {
+  data: DailyData;
+  setData: React.Dispatch<React.SetStateAction<DailyData>>;
+}
 
-export const DailyLedger: React.FC = () => {
+export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
   const today = new Date();
-  const [data, setData] = useLocalStorageState<DailyData>(
-    'dailyBookData_v5',
-    INITIAL_DATA,
-    {
-      deserialize: (raw) => sanitizeDailyData(JSON.parse(raw), INITIAL_DATA),
-    },
-  );
-
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [pickerYear, setPickerYear] = useState(today.getFullYear());
@@ -156,7 +147,7 @@ export const DailyLedger: React.FC = () => {
     reader.onload = (loadEvent) => {
       try {
         const workbook = XLSX.read(loadEvent.target?.result, { type: 'array' });
-        const importedData = parseDailyImportWorkbook(workbook, INITIAL_DATA);
+        const importedData = parseDailyImportWorkbook(workbook, DEFAULT_DAILY_DATA);
         setData(importedData);
         alert(`导入成功，共恢复 ${importedData.transactions.length} 条记录`);
       } catch {

@@ -25,7 +25,7 @@ import {
   YAxis,
 } from 'recharts';
 import * as XLSX from 'xlsx';
-import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { DEFAULT_COPPER_DATA } from '../lib/appData';
 import {
   applyCopperTransaction,
   createCopperExpenseTransaction,
@@ -38,7 +38,6 @@ import {
   getCopperTransactionKindLabel,
   getTotalCopperAssets,
   rollbackCopperTransaction,
-  sanitizeCopperData,
 } from '../lib/copper';
 import { getTodayDate } from '../lib/date';
 import { CopperData, CopperRatios } from '../types';
@@ -47,24 +46,15 @@ import {
   parseCopperImportWorkbook,
 } from '../utils/excel';
 
-const INITIAL_DATA: CopperData = {
-  ratios: { liquid: 60, reserve: 40 },
-  balances: { liquid: 4, reserve: 100 },
-  inventoryCost: 0,
-  transactions: [],
-};
-
 const formatSigned = (value: number) =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
-export const CopperShop: React.FC = () => {
-  const [data, setData] = useLocalStorageState<CopperData>(
-    'coinShopData_v5',
-    INITIAL_DATA,
-    {
-      deserialize: (raw) => sanitizeCopperData(JSON.parse(raw), INITIAL_DATA),
-    },
-  );
+interface CopperShopProps {
+  data: CopperData;
+  setData: React.Dispatch<React.SetStateAction<CopperData>>;
+}
+
+export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [ratioDraft, setRatioDraft] = useState<CopperRatios>(data.ratios);
   const [inventoryEntryAmount, setInventoryEntryAmount] = useState('');
@@ -276,7 +266,7 @@ export const CopperShop: React.FC = () => {
     reader.onload = (loadEvent) => {
       try {
         const workbook = XLSX.read(loadEvent.target?.result, { type: 'array' });
-        const importedData = parseCopperImportWorkbook(workbook, INITIAL_DATA);
+        const importedData = parseCopperImportWorkbook(workbook, DEFAULT_COPPER_DATA);
         setData(importedData);
         alert(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
       } catch {

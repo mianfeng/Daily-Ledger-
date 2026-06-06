@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node server/index.mjs",
+    "hash-password": "node server/hash-password.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "express": "^5.2.1",
+    "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "lucide-react": "^0.554.0",
     "recharts": "^3.5.0",
     "xlsx": "^0.18.5"
   },

@@ -45,6 +45,11 @@ export interface DailyData {
   transactions: DailyTransaction[];
 }
 
+export interface AppLedgerData {
+  copper: CopperData;
+  daily: DailyData;
+}
+
 export interface AppBackup {
   version: number;
   exportedAt: string;

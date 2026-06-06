@@ -4,48 +4,115 @@
 
 ---
 
-## Overview
+## Scenario: VPS-Backed Ledger State
 
-<!--
-Document your project's state management conventions here.
+### 1. Scope / Trigger
 
-Questions to answer:
-- What state management solution do you use?
-- How is local vs global state decided?
-- How do you handle server state?
-- What are the patterns for derived state?
--->
+- Trigger: ledger persistence moved from browser-only `localStorage` to a VPS API backed by SQLite.
+- Applies when changing app-level ledger state, authentication state, backup import/export, migration, or autosave behavior.
+- The combined ledger state is the app-level source of truth:
+  - `copper: CopperData`
+  - `daily: DailyData`
 
-(To be filled by the team)
+### 2. Signatures
+
+- Frontend state type: `AppLedgerData`
+- Login API: `POST /api/auth/login`
+- Session API: `GET /api/auth/session`
+- Logout API: `POST /api/auth/logout`
+- Load ledger API: `GET /api/ledger`
+- Save ledger API: `PUT /api/ledger`
+- Empty-server migration API: `POST /api/ledger/import`
+- Manual export API: `GET /api/ledger/export`
+- Manual backup API: `POST /api/backups/run`
+- SQLite tables:
+  - `app_state(id, data_json, revision, updated_at)`
+  - `sessions(token_hash, expires_at, created_at)`
+
+### 3. Contracts
+
+- `POST /api/auth/login` request:
+  - `username: string`
+  - `password: string`
+- Auth behavior:
+  - The server verifies `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`.
+  - Password hashes use `scrypt:<saltHex>:<hashHex>`.
+  - Successful login sets an httpOnly session cookie.
+- `GET /api/ledger` response:
+  - `hasData: boolean`
+  - `data: AppLedgerData | null`
+  - `revision: number`
+  - `updatedAt: string | null`
+- `PUT /api/ledger` request:
+  - `data: AppLedgerData`
+  - `revision: number`
+- `POST /api/ledger/import` request:
+  - `data: AppLedgerData`
+  - `revision: number`
+  - `requireEmpty: boolean`
+- Required environment keys:
+  - `ADMIN_USERNAME`
+  - `ADMIN_PASSWORD_HASH`
+  - `APP_DOMAIN` for Caddy deployments
+- Optional environment keys:
+  - `PORT`
+  - `DATA_DIR`
+  - `BACKUP_DIR`
+  - `SESSION_TTL_DAYS`
+  - `COOKIE_SECURE`
+
+### 4. Validation & Error Matrix
+
+- Missing or invalid session -> `401`.
+- Wrong username/password -> `401`.
+- Invalid ledger payload -> `400`.
+- Save with stale `revision` -> `409` and `currentRevision`.
+- Empty-server import when server already has data -> `409`.
+- Export with no server data -> `404`.
+- Network or server failure during autosave -> UI shows failure and keeps in-browser edits visible.
+- Save conflict -> UI shows conflict and asks the user to refresh before continuing.
+
+### 5. Good/Base/Bad Cases
+
+- Good: user logs in, loads `revision=3`, edits one entry, autosave sends `revision=3`, server stores `revision=4`, UI shows saved.
+- Base: server is empty and browser has old local data; UI prompts before importing old data.
+- Bad: phone loaded `revision=3`, desktop saved `revision=4`, phone tries to save `revision=3`; server rejects with `409` and phone must not overwrite desktop data.
+
+### 6. Tests Required
+
+- Type-check should cover frontend API call sites and `AppLedgerData` usage.
+- Build should cover production bundling.
+- Server smoke test should assert:
+  - `/api/health` returns `{ ok: true }`
+  - login succeeds with the configured admin hash
+  - unauthenticated ledger access fails
+  - authenticated empty ledger load returns `hasData=false`
+  - first save with `revision=0` returns `revision=1`
+- When automated tests are added later, cover stale revision `409` behavior and empty-server migration refusal.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+// Silently overwrite the server with whatever this browser currently has.
+await api.saveLedger(currentData, latestRevisionFromSomewhereElse);
+```
+
+#### Correct
+
+```ts
+// Save only against the revision this browser actually loaded.
+await api.saveLedger(currentData, loadedRevision);
+```
 
 ---
 
-## State Categories
+## Current Pattern
 
-<!-- Local state, global state, server state, URL state -->
-
-(To be filled by the team)
-
----
-
-## When to Use Global State
-
-<!-- Criteria for promoting state to global -->
-
-(To be filled by the team)
-
----
-
-## Server State
-
-<!-- How server data is cached and synchronized -->
-
-(To be filled by the team)
-
----
-
-## Common Mistakes
-
-<!-- State management mistakes your team has made -->
-
-(To be filled by the team)
+- `App.tsx` owns server-loaded ledger state and passes `data` plus `setData` into feature components.
+- Feature components should not read or write `localStorage` directly.
+- Old `localStorage` keys are migration inputs only:
+  - `coinShopData_v5`
+  - `dailyBookData_v5`
+- Autosave must be debounced and serialized so one browser does not create self-conflicts on slow networks.
