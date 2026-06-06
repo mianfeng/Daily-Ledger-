@@ -11,6 +11,7 @@
 - TypeScript
 - Vite
 - Node.js built-in HTTP server
+- Python stdlib deployment runner for constrained VPS hosts
 - File-backed JSON storage
 - Recharts
 - SheetJS (`xlsx`)
@@ -52,10 +53,11 @@ Vite 会把 `/api` 代理到本地后端。开发环境后端默认端口是 `30
 
 前提：
 
-- VPS 已安装 Node.js 20+
+- 本地已安装 Node.js，用于构建前端和生成密码 hash
+- VPS 已安装 Python 3
 - 域名 A 记录已解析到 VPS IP，或先通过 Tailscale IP 内网访问
 
-不要在 1G 内存 VPS 上运行 `npm run build` 或 `docker compose up --build`。请在本地构建，再上传 `dist/` 和 `server/`。
+不要在 1G 内存 VPS 上运行 `npm run build`、`npm install` 或 `docker compose up --build`。请在本地构建，再上传 `dist/` 和 `server/daily_ledger_server.py`。
 
 部署步骤：
 
@@ -72,7 +74,7 @@ Vite 会把 `/api` 代理到本地后端。开发环境后端默认端口是 `30
 3. 上传这些内容到 VPS，例如 `/opt/daily-ledger/`：
    ```text
    dist/
-   server/
+   server/daily_ledger_server.py
    .env
    ```
 
@@ -83,8 +85,7 @@ Vite 会把 `/api` 代理到本地后端。开发环境后端默认端口是 `30
 
 5. 编辑 `/opt/daily-ledger/.env`：
    ```env
-   APP_DOMAIN=ledger.example.com
-   HOST=127.0.0.1
+   HOST=100.104.222.23
    PORT=3000
    ADMIN_USERNAME=admin
    ADMIN_PASSWORD_HASH=scrypt:...
@@ -104,10 +105,7 @@ Vite 会把 `/api` 代理到本地后端。开发环境后端默认端口是 `30
    Type=simple
    WorkingDirectory=/opt/daily-ledger
    EnvironmentFile=/opt/daily-ledger/.env
-   Environment=NODE_ENV=production
-   Environment=DATA_DIR=/opt/daily-ledger/data
-   Environment=BACKUP_DIR=/opt/daily-ledger/backups
-   ExecStart=/usr/bin/node /opt/daily-ledger/server/index.mjs
+   ExecStart=/usr/bin/python3 /opt/daily-ledger/server/daily_ledger_server.py
    Restart=on-failure
    RestartSec=5
 

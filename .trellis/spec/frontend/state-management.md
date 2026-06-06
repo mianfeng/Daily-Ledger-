@@ -28,6 +28,10 @@
 - Server files:
   - `DATA_DIR/ledger.json`
   - `DATA_DIR/sessions.json`
+- Constrained VPS runner:
+  - `server/daily_ledger_server.py` is a Python standard-library runner for hosts where Node/npm installation or Vite builds would be too heavy.
+  - It must preserve the same API contract as `server/index.mjs`.
+  - Password verification must match `server/password.mjs`: the stored salt text is passed to scrypt as UTF-8 text, not decoded from hex bytes.
 
 ### 3. Contracts
 
