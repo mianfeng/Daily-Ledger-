@@ -4,120 +4,89 @@
 
 ---
 
-## Scenario: VPS-Backed Ledger State
+## Scenario: Static GitHub Ledger State
 
 ### 1. Scope / Trigger
 
-- Trigger: ledger persistence moved from browser-only `localStorage` to a VPS API backed by file-backed JSON storage.
-- Applies when changing app-level ledger state, authentication state, backup import/export, migration, or autosave behavior.
-- The combined ledger state is the app-level source of truth:
+- Trigger: the official app runtime is a static GitHub-hosted frontend with no VPS backend.
+- Applies when changing app-level ledger state, backup import/export, migration, or persistence behavior.
+- The combined ledger state is owned by `App.tsx`:
   - `copper: CopperData`
   - `daily: DailyData`
 
 ### 2. Signatures
 
 - Frontend state type: `AppLedgerData`
-- Login API: `POST /api/auth/login`
-- Session API: `GET /api/auth/session`
-- Logout API: `POST /api/auth/logout`
-- Load ledger API: `GET /api/ledger`
-- Save ledger API: `PUT /api/ledger`
-- Empty-server migration API: `POST /api/ledger/import`
-- Manual export API: `GET /api/ledger/export`
-- Manual backup API: `POST /api/backups/run`
-- Server files:
-  - `DATA_DIR/ledger.json`
-  - `DATA_DIR/sessions.json`
-- Constrained VPS runner:
-  - `server/daily_ledger_server.py` is a Python standard-library runner for hosts where Node/npm installation or Vite builds would be too heavy.
-  - It must preserve the same API contract as `server/index.mjs`.
-  - Password verification must match `server/password.mjs`: the stored salt text is passed to scrypt as UTF-8 text, not decoded from hex bytes.
+- Storage keys:
+  - `coinShopData_v5`
+  - `dailyBookData_v5`
+- Read helper:
+  - `readLocalLedgerData(): AppLedgerData`
+- Write helper:
+  - `writeLocalLedgerData(data: AppLedgerData): void`
+- Backup sanitizer:
+  - `sanitizeBackup(raw: unknown): AppLedgerData`
 
 ### 3. Contracts
 
-- `POST /api/auth/login` request:
-  - `username: string`
-  - `password: string`
-- Auth behavior:
-  - The server verifies `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`.
-  - Password hashes use `scrypt:<saltHex>:<hashHex>`.
-  - Successful login sets an httpOnly session cookie.
-- `GET /api/ledger` response:
-  - `hasData: boolean`
-  - `data: AppLedgerData | null`
-  - `revision: number`
-  - `updatedAt: string | null`
-- `PUT /api/ledger` request:
-  - `data: AppLedgerData`
-  - `revision: number`
-- `POST /api/ledger/import` request:
-  - `data: AppLedgerData`
-  - `revision: number`
-  - `requireEmpty: boolean`
-- Required environment keys:
-  - `ADMIN_USERNAME`
-  - `ADMIN_PASSWORD_HASH`
-  - `APP_DOMAIN` for Caddy deployments
-- Optional environment keys:
-  - `HOST`
-  - `PORT`
-  - `DATA_DIR`
-  - `BACKUP_DIR`
-  - `SESSION_TTL_DAYS`
-  - `COOKIE_SECURE`
+- The app must not require `/api/*` endpoints at runtime.
+- The app must not require login, cookies, server sessions, environment variables, or a Node/Python process for production use.
+- `App.tsx` owns the combined ledger state and passes each slice plus setter into feature components.
+- Feature components must not read or write `localStorage` directly.
+- Local persistence writes:
+  - `data.copper` to `coinShopData_v5`
+  - `data.daily` to `dailyBookData_v5`
+- Whole-site JSON backup shape:
+  - `version: number`
+  - `exportedAt: string`
+  - `origin?: string`
+  - `copper: CopperData`
+  - `daily: DailyData`
 
 ### 4. Validation & Error Matrix
 
-- Missing or invalid session -> `401`.
-- Wrong username/password -> `401`.
-- Invalid ledger payload -> `400`.
-- Save with stale `revision` -> `409` and `currentRevision`.
-- Empty-server import when server already has data -> `409`.
-- Export with no server data -> `404`.
-- Network or server failure during autosave -> UI shows failure and keeps in-browser edits visible.
-- Save conflict -> UI shows conflict and asks the user to refresh before continuing.
+- Missing local storage data -> use defaults.
+- Invalid local storage JSON -> use defaults.
+- Invalid backup JSON -> show import failure and keep current in-memory data.
+- Valid backup JSON -> sanitize both ledgers before replacing current state.
+- Browser storage write failure -> keep current in-memory edits visible; do not crash the UI.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: user logs in, loads `revision=3`, edits one entry, autosave sends `revision=3`, server stores `revision=4`, UI shows saved.
-- Base: server is empty and browser has old local data; UI prompts before importing old data.
-- Bad: phone loaded `revision=3`, desktop saved `revision=4`, phone tries to save `revision=3`; server rejects with `409` and phone must not overwrite desktop data.
+- Good: user edits an entry, `App.tsx` updates state, `writeLocalLedgerData` persists both ledger slices to browser storage.
+- Base: first visit has no storage keys; the app opens with default data.
+- Bad: feature components call `localStorage` directly; backup and app-level persistence can drift.
 
 ### 6. Tests Required
 
-- Type-check should cover frontend API call sites and `AppLedgerData` usage.
-- Build should cover production bundling.
-- Server smoke test should assert:
-  - `/api/health` returns `{ ok: true }`
-  - login succeeds with the configured admin hash
-  - unauthenticated ledger access fails
-  - authenticated empty ledger load returns `hasData=false`
-  - first save with `revision=0` returns `revision=1`
-- When automated tests are added later, cover stale revision `409` behavior and empty-server migration refusal.
+- Type-check should cover `AppLedgerData`, feature component props, and storage helper call sites.
+- Build should cover production static bundling.
+- When automated tests are added later, cover:
+  - invalid storage falls back to defaults
+  - backup import sanitizes malformed payloads
+  - App shell can render with no `/api/*` endpoints
 
 ### 7. Wrong vs Correct
 
 #### Wrong
 
 ```ts
-// Silently overwrite the server with whatever this browser currently has.
-await api.saveLedger(currentData, latestRevisionFromSomewhereElse);
+// Static GitHub deployments do not provide this endpoint.
+await api.saveLedger(currentData, revision);
 ```
 
 #### Correct
 
 ```ts
-// Save only against the revision this browser actually loaded.
-await api.saveLedger(currentData, loadedRevision);
+// Persist the app-owned ledger state to browser storage.
+writeLocalLedgerData(currentData);
 ```
 
 ---
 
 ## Current Pattern
 
-- `App.tsx` owns server-loaded ledger state and passes `data` plus `setData` into feature components.
+- `App.tsx` owns browser-loaded ledger state and passes `data` plus `setData` into feature components.
 - Feature components should not read or write `localStorage` directly.
-- Old `localStorage` keys are migration inputs only:
-  - `coinShopData_v5`
-  - `dailyBookData_v5`
-- Autosave must be debounced and serialized so one browser does not create self-conflicts on slow networks.
+- Whole-site JSON import/export is the migration path between browsers, devices, and domains.
+- Static deployment has no built-in multi-device sync; adding sync requires an external backend such as Supabase, Firebase, or Cloudflare Workers/D1.

@@ -63,6 +63,15 @@ export const readLocalLedgerData = (): AppLedgerData => {
   };
 };
 
+export const writeLocalLedgerData = (data: AppLedgerData) => {
+  try {
+    window.localStorage.setItem(COPPER_STORAGE_KEY, JSON.stringify(data.copper));
+    window.localStorage.setItem(DAILY_STORAGE_KEY, JSON.stringify(data.daily));
+  } catch {
+    // Keep edits visible even if browser storage is temporarily unavailable.
+  }
+};
+
 export const hasLocalLedgerData = () => {
   try {
     return (

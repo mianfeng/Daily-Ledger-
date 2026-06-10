@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node server/index.mjs",
-    "hash-password": "node server/hash-password.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
