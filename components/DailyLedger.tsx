@@ -12,9 +12,9 @@ import {
   Upload,
 } from 'lucide-react';
 import {
+  Bar,
   CartesianGrid,
-  Line,
-  LineChart,
+  ComposedChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -36,6 +36,14 @@ import {
 import { createTransactionId } from '../lib/ledger';
 import { DailyData, Transaction } from '../types';
 import { exportDailyToExcel, parseDailyImportWorkbook } from '../utils/excel';
+
+const formatCompactAmount = (value: number) => {
+  const absValue = Math.abs(value);
+  if (absValue >= 10000) {
+    return `${value < 0 ? '-' : ''}${(absValue / 10000).toFixed(absValue >= 100000 ? 0 : 1)}万`;
+  }
+  return `${Math.round(value)}`;
+};
 
 interface DailyLedgerProps {
   data: DailyData;
@@ -91,6 +99,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
     () => getDailyChartData(monthTransactions, currentYear, currentMonth),
     [currentMonth, currentYear, monthTransactions],
   );
+  const chartSummary = useMemo(() => {
+    const spentDays = chartData.filter((item) => item.amount > 0);
+    const maxDay = spentDays.reduce<(typeof chartData)[number] | null>(
+      (max, item) => (!max || item.amount > max.amount ? item : max),
+      null,
+    );
+    const averageSpent =
+      spentDays.length === 0 ? 0 : expense / spentDays.length;
+
+    return {
+      averageSpent,
+      maxDay,
+      overLimitDays: spentDays.filter((item) => item.amount > data.dailyLimit).length,
+      spentDays: spentDays.length,
+    };
+  }, [chartData, data.dailyLimit, expense]);
 
   const handleAddTx = () => {
     const amount = Number(form.amount);
@@ -411,28 +435,98 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
         </div>
       </div>
 
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 h-56 relative">
-        <h3 className="absolute top-3 left-3 text-[10px] font-bold text-stone-400 flex items-center gap-1">
-          <TrendingUp size={10} /> 收支趋势
-        </h3>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 20, right: 10, left: -25, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 9 }} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 9 }} />
-            <Tooltip
-              contentStyle={{
-                borderRadius: '6px',
-                border: 'none',
-                boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                fontSize: '11px',
-                padding: '4px 8px',
-              }}
-            />
-            <ReferenceLine y={data.dailyLimit} stroke="red" strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="amount" stroke="#4A90E2" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+              <TrendingUp size={13} className="text-blue-600" /> 支出节奏
+            </h3>
+            <div className="mt-1 flex items-center gap-3 text-[10px] text-stone-400">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-sm bg-red-400"></span>
+                每日支出
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-0.5 w-3 rounded-full bg-blue-500"></span>
+                日额度
+              </span>
+            </div>
+          </div>
+          <div className="rounded-lg bg-stone-50 px-2.5 py-1 text-right">
+            <div className="text-[9px] font-bold text-stone-400">有支出天数</div>
+            <div className="text-sm font-bold text-stone-800">
+              {chartSummary.spentDays} 天
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-blue-50 px-2 py-2">
+            <div className="text-[9px] font-bold text-blue-700">日均支出</div>
+            <div className="mt-0.5 text-sm font-bold text-blue-800">
+              ¥ {chartSummary.averageSpent.toFixed(0)}
+            </div>
+          </div>
+          <div className="rounded-lg bg-red-50 px-2 py-2">
+            <div className="text-[9px] font-bold text-red-700">超额天数</div>
+            <div className="mt-0.5 text-sm font-bold text-red-800">
+              {chartSummary.overLimitDays} 天
+            </div>
+          </div>
+          <div className="rounded-lg bg-stone-50 px-2 py-2">
+            <div className="text-[9px] font-bold text-stone-500">最高单日</div>
+            <div className="mt-0.5 text-sm font-bold text-stone-800">
+              {chartSummary.maxDay ? `¥ ${chartSummary.maxDay.amount.toFixed(0)}` : '-'}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={14}
+                tick={{ fill: '#9CA3AF', fontSize: 9 }}
+                tickLine={false}
+              />
+              <YAxis
+                axisLine={false}
+                tickFormatter={(value) => formatCompactAmount(Number(value))}
+                tick={{ fill: '#9CA3AF', fontSize: 9 }}
+                tickLine={false}
+                width={34}
+              />
+              <Tooltip
+                formatter={(value: number) => [`¥ ${Number(value).toFixed(2)}`, '支出']}
+                labelFormatter={(label) => `${currentMonth}月${label}日`}
+                contentStyle={{
+                  borderRadius: '8px',
+                  border: 'none',
+                  boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
+                  fontSize: '11px',
+                  padding: '6px 8px',
+                }}
+              />
+              <ReferenceLine
+                y={data.dailyLimit}
+                stroke="#2563EB"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+              />
+              <Bar
+                dataKey="amount"
+                name="支出"
+                fill="#F87171"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={12}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="flex gap-4 pt-2 border-t border-stone-200">

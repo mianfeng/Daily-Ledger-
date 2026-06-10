@@ -15,10 +15,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import {
+  Bar,
   CartesianGrid,
-  Legend,
   Line,
-  LineChart,
+  ComposedChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -49,6 +49,23 @@ import {
 const formatSigned = (value: number) =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 
+const formatCompactAmount = (value: number) => {
+  const absValue = Math.abs(value);
+  if (absValue >= 10000) {
+    return `${value < 0 ? '-' : ''}${(absValue / 10000).toFixed(absValue >= 100000 ? 0 : 1)}万`;
+  }
+  return `${Math.round(value)}`;
+};
+
+const formatCompactMoney = (value: number) => `¥ ${formatCompactAmount(value)}`;
+
+const formatSignedCompact = (value: number) =>
+  `${value >= 0 ? '+' : ''}${formatCompactAmount(value)}`;
+
+const formatMoney = (value: number) => `¥ ${value.toFixed(2)}`;
+
+type CopperTrendMode = 'flow' | 'inventory';
+
 interface CopperShopProps {
   data: CopperData;
   setData: React.Dispatch<React.SetStateAction<CopperData>>;
@@ -61,6 +78,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
   const [inventoryEntryDesc, setInventoryEntryDesc] = useState('');
   const [inventoryDraft, setInventoryDraft] = useState(String(data.inventoryCost));
   const [inventoryAdjustmentDesc, setInventoryAdjustmentDesc] = useState('');
+  const [trendMode, setTrendMode] = useState<CopperTrendMode>('flow');
   const [form, setForm] = useState<{
     amount: string;
     cost: string;
@@ -101,6 +119,41 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
     () => getCopperChartData(data.transactions, data.inventoryCost),
     [data.inventoryCost, data.transactions],
   );
+  const trendSummary = useMemo(() => {
+    const flowData = chartData.map((item, index, allItems) => {
+      const trendWindow = allItems.slice(Math.max(0, index - 2), index + 1);
+      const profitTrend =
+        trendWindow.reduce((total, current) => total + current.profit, 0) /
+        trendWindow.length;
+
+      return {
+        ...item,
+        profitTrend: Number(profitTrend.toFixed(2)),
+      };
+    });
+    const lastPoint = chartData.at(-1);
+    const firstPoint = chartData[0];
+    const totals = chartData.reduce(
+      (result, item) => ({
+        income: result.income + item.income,
+        profit: result.profit + item.profit,
+      }),
+      { income: 0, profit: 0 },
+    );
+    const bestProfitDay = chartData.reduce<(typeof chartData)[number] | null>(
+      (best, item) => (!best || item.profit > best.profit ? item : best),
+      null,
+    );
+
+    return {
+      bestProfitDay,
+      flowData,
+      inventoryChange:
+        lastPoint && firstPoint ? lastPoint.inventoryCost - firstPoint.inventoryCost : 0,
+      totalIncome: totals.income,
+      totalProfit: totals.profit,
+    };
+  }, [chartData]);
   const lockedLegacyCount = useMemo(
     () => data.transactions.filter((transaction) => transaction.isLegacyLocked).length,
     [data.transactions],
@@ -557,38 +610,181 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
       </div>
 
       {chartData.length > 0 && (
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 h-56 relative">
-          <h3 className="absolute top-3 left-3 text-[10px] font-bold text-stone-400 flex items-center gap-1">
-            <TrendingUp size={10} /> 经营趋势 (近30天)
-          </h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 30, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-              <XAxis dataKey="shortDate" tick={{ fontSize: 9, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="left" tick={{ fontSize: 9, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: '#10B981' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-              <Tooltip
-                formatter={(value: number) => value.toFixed(1)}
-                labelFormatter={(label) => `日期: ${label}`}
-                contentStyle={{
-                  borderRadius: '6px',
-                  border: 'none',
-                  boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                  fontSize: '11px',
-                  padding: '4px 8px',
-                }}
-              />
-              <Legend
-                verticalAlign="top"
-                height={24}
-                iconSize={6}
-                wrapperStyle={{ fontSize: '10px', right: 0, top: 0 }}
-              />
-              <Line yAxisId="left" type="monotone" name="收入" dataKey="income" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-              <Line yAxisId="left" type="monotone" name="毛利润" dataKey="profit" stroke="#4A90E2" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-              <Line yAxisId="right" type="monotone" name="库存成本" dataKey="inventoryCost" stroke="#F59E0B" strokeWidth={2} strokeDasharray="3 3" dot={false} activeDot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                  <TrendingUp size={13} className="text-amber-700" /> 经营趋势
+                </h3>
+                <div className="mt-1 flex items-center gap-3 text-[10px] text-stone-400">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-sm bg-emerald-500"></span>
+                    收入
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-0.5 w-3 rounded-full bg-blue-500"></span>
+                    利润均线
+                  </span>
+                </div>
+              </div>
+              <div className="flex shrink-0 rounded-lg bg-stone-100 p-0.5 text-[10px] font-bold">
+                {[
+                  ['flow', '收利'],
+                  ['inventory', '库存'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setTrendMode(mode as CopperTrendMode)}
+                    className={`rounded-md px-2 py-1 transition-colors ${
+                      trendMode === mode
+                        ? 'bg-white text-stone-800 shadow-sm'
+                        : 'text-stone-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-emerald-50 px-2 py-2">
+                <div className="text-[9px] font-bold text-emerald-700">近30天收入</div>
+                <div className="mt-0.5 text-sm font-bold text-emerald-800">
+                  {formatCompactMoney(trendSummary.totalIncome)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-blue-50 px-2 py-2">
+                <div className="text-[9px] font-bold text-blue-700">近30天毛利</div>
+                <div className="mt-0.5 text-sm font-bold text-blue-800">
+                  {formatSignedCompact(trendSummary.totalProfit)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-amber-50 px-2 py-2">
+                <div className="text-[9px] font-bold text-amber-700">库存变化</div>
+                <div
+                  className={`mt-0.5 text-sm font-bold ${
+                    trendSummary.inventoryChange >= 0
+                      ? 'text-amber-800'
+                      : 'text-emerald-700'
+                  }`}
+                >
+                  {formatSignedCompact(trendSummary.inventoryChange)}
+                </div>
+              </div>
+            </div>
+
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                {trendMode === 'flow' ? (
+                  <ComposedChart
+                    data={trendSummary.flowData}
+                    margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    <XAxis
+                      dataKey="shortDate"
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                      minTickGap={18}
+                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickFormatter={(value) => formatCompactAmount(Number(value))}
+                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tickLine={false}
+                      width={34}
+                    />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        formatMoney(Number(value)),
+                        name,
+                      ]}
+                      labelFormatter={(label) => `日期: ${label}`}
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: 'none',
+                        boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
+                        fontSize: '11px',
+                        padding: '6px 8px',
+                      }}
+                    />
+                    <Bar
+                      dataKey="income"
+                      name="收入"
+                      fill="#10B981"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={14}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="profitTrend"
+                      name="利润均线"
+                      stroke="#2563EB"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                    />
+                  </ComposedChart>
+                ) : (
+                  <ComposedChart
+                    data={chartData}
+                    margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    <XAxis
+                      dataKey="shortDate"
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                      minTickGap={18}
+                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      domain={['auto', 'auto']}
+                      tickFormatter={(value) => formatCompactAmount(Number(value))}
+                      tick={{ fontSize: 9, fill: '#D97706' }}
+                      tickLine={false}
+                      width={34}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => formatMoney(Number(value))}
+                      labelFormatter={(label) => `日期: ${label}`}
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: 'none',
+                        boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
+                        fontSize: '11px',
+                        padding: '6px 8px',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="inventoryCost"
+                      name="库存成本"
+                      stroke="#D97706"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                    />
+                  </ComposedChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+
+            {trendSummary.bestProfitDay && (
+              <div className="flex items-center justify-between rounded-lg bg-stone-50 px-2.5 py-2 text-[10px] text-stone-500">
+                <span>最高毛利日</span>
+                <span className="font-bold text-stone-700">
+                  {trendSummary.bestProfitDay.shortDate} / {formatMoney(trendSummary.bestProfitDay.profit)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
