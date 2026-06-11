@@ -754,13 +754,9 @@ export const allocateIncome = (
 
   const plannedNextIncomeDate = getNextPayday(normalizedDate, budget.settings.expectedPayday);
   const plannedEndDate = addDays(plannedNextIncomeDate, -1);
-  const fixedReserved = roundAmount(
-    budget.fixedExpenses
-      .filter((item) => item.isActive)
-      .reduce((total, item) => total + item.amount, 0),
-  );
+  const fixedReserved = 0;
   const dayUnits = daysBetweenInclusive(normalizedDate, plannedEndDate) / 7;
-  const availableAfterFixed = Math.max(0, safeAmount - fixedReserved);
+  const availableAfterFixed = safeAmount;
   const desiredReserve = roundAmount(safeAmount * budget.settings.savingsRate);
   const reserveGap = Math.max(0, getReserveMinimum(budget) - budget.pockets.reserve);
   const desiredRecovery = roundAmount(Math.min(reserveGap, safeAmount * budget.settings.reserveRecoveryRate));
@@ -824,7 +820,7 @@ export const allocateIncome = (
         spendable,
         buffer: startingBuffer,
         reserve: roundAmount(budget.pockets.reserve + reserveDeposit + reserveRecovery),
-        fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
+        fixedReserved: budget.pockets.fixedReserved,
       },
     },
   };

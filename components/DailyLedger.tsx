@@ -609,11 +609,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold text-stone-400">
           <span className="flex items-center gap-1">
-            <i className="h-2 w-2 rounded-full bg-[#8ba889]" />
+            <i className="h-2 w-2 rounded-full bg-[#c96f5d]" />
             已花
           </span>
           <span className="flex items-center gap-1">
-            <i className="h-2 w-2 rounded-full bg-[#d9b76c]" />
+            <i className="h-2 w-2 rounded-full bg-[#83b7ad]" />
             未花/预算
           </span>
         </div>
@@ -647,13 +647,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                         style={{ height: `${totalHeight}%` }}
                       >
                         <div
-                          className="bg-[#d9b76c]/70"
+                          className="bg-[#83b7ad]"
                           style={{ height: `${remainingRatio}%` }}
                         />
                         <div
-                          className={`${
-                            weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
-                          }`}
+                          className="bg-[#c96f5d]"
                           style={{ height: spentValue > 0 ? `${spentRatio}%` : '0%' }}
                         />
                       </div>
@@ -1055,7 +1053,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 </div>
               </div>
               <div className="text-right text-[10px] font-bold text-stone-500">
-                从可消费钱里单独挪出
+                留空或 0 时扣本周
               </div>
             </div>
             <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
@@ -1063,7 +1061,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 type="number"
                 value={fixedReservedAmount}
                 onChange={(event) => setFixedReservedAmount(event.target.value)}
-                placeholder="设置预留金额"
+                placeholder="留空/0 不预留"
                 className={fieldClass}
               />
               <button
