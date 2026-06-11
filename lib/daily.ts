@@ -362,11 +362,15 @@ const getWeekExpenseTotal = (
   return roundAmount(
     transactions
       .filter(
-        (transaction) =>
-          transaction.type === 'expense' &&
-          transaction.category !== 'large' &&
-          transaction.date >= week.startDate &&
-          transaction.date <= week.endDate,
+        (transaction) => {
+          const transactionDate = normalizeDateInput(transaction.date);
+          return (
+            transaction.type === 'expense' &&
+            transaction.category !== 'large' &&
+            transactionDate >= week.startDate &&
+            transactionDate <= week.endDate
+          );
+        },
       )
       .reduce((total, transaction) => {
         if (transaction.category === 'fixed') {
@@ -392,12 +396,16 @@ const getCycleLivingExpenseTotal = (
   return roundAmount(
     transactions
       .filter(
-        (transaction) =>
-          transaction.type === 'expense' &&
-          transaction.category !== 'large' &&
-          transaction.category !== 'fixed' &&
-          transaction.date >= cycle.startDate &&
-          transaction.date <= cycle.plannedEndDate,
+        (transaction) => {
+          const transactionDate = normalizeDateInput(transaction.date);
+          return (
+            transaction.type === 'expense' &&
+            transaction.category !== 'large' &&
+            transaction.category !== 'fixed' &&
+            transactionDate >= cycle.startDate &&
+            transactionDate <= cycle.plannedEndDate
+          );
+        },
       )
       .reduce((total, transaction) => total + transaction.amount, 0),
   );
@@ -413,7 +421,7 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   const reserveGap = roundAmount(Math.max(0, reserveMinimum - budget.pockets.reserve));
 
   const cycleTransactions = cycle
-    ? data.transactions.filter((transaction) => transaction.date >= cycle.startDate)
+    ? data.transactions.filter((transaction) => normalizeDateInput(transaction.date) >= cycle.startDate)
     : [];
   const reserveIn = cycle?.reserveDeposit ?? 0;
   const reserveOut = cycleTransactions
@@ -449,10 +457,14 @@ export const getCycleExpenseTotal = (
   return roundAmount(
     transactions
       .filter(
-        (transaction) =>
-          transaction.type === 'expense' &&
-          transaction.date >= cycle.startDate &&
-          transaction.date <= cycle.plannedEndDate,
+        (transaction) => {
+          const transactionDate = normalizeDateInput(transaction.date);
+          return (
+            transaction.type === 'expense' &&
+            transactionDate >= cycle.startDate &&
+            transactionDate <= cycle.plannedEndDate
+          );
+        },
       )
       .reduce((total, transaction) => total + transaction.amount, 0),
   );

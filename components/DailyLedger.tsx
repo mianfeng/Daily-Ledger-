@@ -624,14 +624,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
                 const spentValue = weekStatus === 'future' ? 0 : item.spent;
                 const remainingValue = Math.max(0, item.allowance - spentValue);
-                const spentHeight = Math.max(
+                const totalHeight = Math.max(
                   8,
-                  Math.round((spentValue / weeklyChartMax) * 100),
+                  Math.round((item.allowance / weeklyChartMax) * 100),
                 );
-                const remainingHeight = Math.max(
-                  8,
-                  Math.round((remainingValue / weeklyChartMax) * 100),
-                );
+                const spentRatio =
+                  item.allowance > 0
+                    ? Math.min(100, Math.round((spentValue / item.allowance) * 100))
+                    : 0;
+                const remainingRatio = Math.max(0, 100 - spentRatio);
 
                 return (
                   <button
@@ -640,17 +641,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
                     title={`第 ${item.index + 1} 周`}
                   >
-                    <div className="flex h-20 w-full items-end gap-1 rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
+                    <div className="flex h-20 w-full items-end rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
                       <div
-                        className={`w-1/2 rounded-md ${
-                          weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
-                        }`}
-                        style={{ height: spentValue > 0 ? `${spentHeight}%` : '4px' }}
-                      />
-                      <div
-                        className="w-1/2 rounded-md bg-[#d9b76c]/70"
-                        style={{ height: `${remainingHeight}%` }}
-                      />
+                        className="flex w-full flex-col overflow-hidden rounded-md"
+                        style={{ height: `${totalHeight}%` }}
+                      >
+                        <div
+                          className="bg-[#d9b76c]/70"
+                          style={{ height: `${remainingRatio}%` }}
+                        />
+                        <div
+                          className={`${
+                            weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
+                          }`}
+                          style={{ height: spentValue > 0 ? `${spentRatio}%` : '0%' }}
+                        />
+                      </div>
                     </div>
                     <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
                       W{item.index + 1}
