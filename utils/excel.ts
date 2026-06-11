@@ -135,7 +135,7 @@ export const exportDailyToExcel = (
 ) => {
   const workbook = XLSX.utils.book_new();
 
-  appendSheet(workbook, '元数据', buildMetadataRows('日常账本'));
+  appendSheet(workbook, '元数据', buildMetadataRows('生活预算'));
   appendSheet(workbook, '设置', [{ 项目: '日额度', 值: data.dailyLimit }]);
   appendSheet(
     workbook,
@@ -164,7 +164,7 @@ export const exportDailyToExcel = (
 
   XLSX.writeFile(
     workbook,
-    `日常账本_完整备份_${year}-${String(month).padStart(2, '0')}.xlsx`,
+    `生活预算_完整备份_${year}-${String(month).padStart(2, '0')}.xlsx`,
   );
 };
 

@@ -90,3 +90,64 @@ writeLocalLedgerData(currentData);
 - Feature components should not read or write `localStorage` directly.
 - Whole-site JSON import/export is the migration path between browsers, devices, and domains.
 - Static deployment has no built-in multi-device sync; adding sync requires an external backend such as Supabase, Firebase, or Cloudflare Workers/D1.
+
+---
+
+## Scenario: Life Budget Daily State
+
+### 1. Scope / Trigger
+
+- Trigger: the daily ledger is modeled as a life budget, not only legacy daily transactions.
+- Applies when changing `DailyData`, daily backup compatibility, or the life budget UI.
+
+### 2. Signatures
+
+- `DailyData` keeps legacy fields:
+  - `dailyLimit: number`
+  - `transactions: DailyTransaction[]`
+- `DailyData` may include the life budget state:
+  - `budget?: LifeBudgetState`
+- `LifeBudgetState` owns:
+  - settings such as payday, savings rate, buffer rate, minimum weekly living line
+  - pocket balances for spendable money, buffer, reserve, and fixed-expense reserve
+  - current budget cycle and fixed expenses
+
+### 3. Contracts
+
+- Existing stored payloads that only have `dailyLimit` and `transactions` must still load.
+- `sanitizeDailyData` is responsible for filling missing budget fields with defaults.
+- Components must update the daily slice through `setData`; they must not persist directly.
+- Life budget calculations belong in `lib/daily.ts`, not scattered through the component.
+
+### 4. Validation & Error Matrix
+
+- Missing `budget` -> use the default uninitialized life budget.
+- Invalid budget settings -> clamp to safe defaults.
+- Invalid fixed expenses or budget weeks -> drop invalid entries while keeping the rest.
+- Invalid transactions -> drop invalid entries through transaction normalization.
+
+### 5. Good/Base/Bad Cases
+
+- Good: old daily backup opens, then the user initializes life budget balances.
+- Base: new user starts with an uninitialized budget and empty transactions.
+- Bad: a component assumes `data.budget` always exists without going through the budget helper/default.
+
+### 6. Tests Required
+
+- Build/type-check should cover old and new `DailyData` shapes.
+- Manual verification should cover initialization, main income allocation, normal expenses, large expenses, calibration, and fixed expense payment.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const reserve = data.budget.pockets.reserve;
+```
+
+#### Correct
+
+```ts
+const budget = getLifeBudget(data);
+const reserve = budget.pockets.reserve;
+```

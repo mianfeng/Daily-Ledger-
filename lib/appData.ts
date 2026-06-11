@@ -1,6 +1,6 @@
 import { AppBackup, AppLedgerData, CopperData, DailyData } from '../types';
 import { sanitizeCopperData } from './copper';
-import { sanitizeDailyData } from './daily';
+import { DEFAULT_LIFE_BUDGET, sanitizeDailyData } from './daily';
 
 export const COPPER_STORAGE_KEY = 'coinShopData_v5';
 export const DAILY_STORAGE_KEY = 'dailyBookData_v5';
@@ -15,6 +15,7 @@ export const DEFAULT_COPPER_DATA: CopperData = {
 export const DEFAULT_DAILY_DATA: DailyData = {
   dailyLimit: 30,
   transactions: [],
+  budget: DEFAULT_LIFE_BUDGET,
 };
 
 export const DEFAULT_LEDGER_DATA: AppLedgerData = {

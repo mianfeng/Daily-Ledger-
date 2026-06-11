@@ -1,158 +1,262 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Award,
-  Calendar,
+  AlertTriangle,
+  CalendarDays,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  CircleDollarSign,
   Download,
-  Trash2,
-  TrendingUp,
+  Landmark,
+  PiggyBank,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Settings,
+  Shield,
+  Tag,
   Upload,
+  Utensils,
+  Wallet,
 } from 'lucide-react';
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import * as XLSX from 'xlsx';
 import { DEFAULT_DAILY_DATA } from '../lib/appData';
 import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date';
 import {
-  getCompliantDaysCount,
-  getDailyChartData,
-  getEstimatedMonthEndBalance,
-  getMonthBalanceSnapshot,
-  getMonthTransactions,
-  getTodaySpent,
-  getTransactionSummary,
+  addFixedExpense,
+  allocateIncome,
+  calibrateSpendableBalance,
+  getBudgetSnapshot,
+  initializeLifeBudget,
+  markFixedExpensePaid,
+  recordExpense,
 } from '../lib/daily';
-import { createTransactionId } from '../lib/ledger';
-import { DailyData, Transaction } from '../types';
+import {
+  DailyData,
+  DailyExpenseCategory,
+  DailyIncomeKind,
+  LifeBudgetSettings,
+} from '../types';
 import { exportDailyToExcel, parseDailyImportWorkbook } from '../utils/excel';
-
-const formatCompactAmount = (value: number) => {
-  const absValue = Math.abs(value);
-  if (absValue >= 10000) {
-    return `${value < 0 ? '-' : ''}${(absValue / 10000).toFixed(absValue >= 100000 ? 0 : 1)}万`;
-  }
-  return `${Math.round(value)}`;
-};
 
 interface DailyLedgerProps {
   data: DailyData;
   setData: React.Dispatch<React.SetStateAction<DailyData>>;
+  theme: 'light' | 'dark';
 }
 
-export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
-  const today = new Date();
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
-  const [pickerYear, setPickerYear] = useState(today.getFullYear());
-  const [showPicker, setShowPicker] = useState(false);
-  const [form, setForm] = useState<{
-    amount: string;
-    date: string;
-    desc: string;
-    type: Transaction['type'];
-  }>({
+type Panel = 'expense' | 'income' | 'calibration' | 'fixed' | 'settings' | null;
+
+const formatAmount = (value: number) =>
+  `¥ ${Math.round(value).toLocaleString('zh-CN')}`;
+
+const formatSignedAmount = (value: number) =>
+  `${value >= 0 ? '+' : '-'}${formatAmount(Math.abs(value))}`;
+
+const parseAmount = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const percentToInput = (value: number) => String(Math.round(value * 100));
+
+const inputToRate = (value: string, fallback: number) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(0, Math.min(100, parsed)) / 100;
+};
+
+const categoryLabels: Record<DailyExpenseCategory, string> = {
+  daily: '日常',
+  dining: '外食/外卖',
+  other: '其他',
+  unplanned: '计划外',
+  large: '大额',
+  fixed: '固定支出',
+  unrecorded: '未记录支出',
+};
+
+const incomeKindLabels: Record<DailyIncomeKind, string> = {
+  main: '主要收入',
+  casual: '零散收入',
+  refund: '退款报销',
+  correction: '余额修正',
+};
+
+const panelButtonClass =
+  'flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98]';
+
+const fieldClass =
+  'life-field w-full rounded-xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm text-stone-800 outline-none transition focus:border-[#8aa0a2] focus:ring-2 focus:ring-[#8aa0a2]/20';
+
+const SectionShell: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className = '' }) => (
+  <section className={`life-section rounded-2xl border border-stone-200 bg-white/85 shadow-sm ${className}`}>
+    {children}
+  </section>
+);
+
+export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }) => {
+  const today = getTodayDate();
+  const snapshot = useMemo(() => getBudgetSnapshot(data, today), [data, today]);
+  const { budget, cycle, week } = snapshot;
+  const [panel, setPanel] = useState<Panel>(budget.initialized ? null : 'settings');
+  const [showBackup, setShowBackup] = useState(false);
+
+  const [setupForm, setSetupForm] = useState({
+    spendable: String(budget.pockets.spendable || ''),
+    buffer: String(budget.pockets.buffer || ''),
+    reserve: String(budget.pockets.reserve || ''),
+    expectedPayday: String(budget.settings.expectedPayday),
+    savingsRate: percentToInput(budget.settings.savingsRate),
+    bufferRate: percentToInput(budget.settings.bufferRate),
+    minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
+  });
+  const [incomeForm, setIncomeForm] = useState({
     amount: '',
+    date: today,
     desc: '',
-    type: 'expense',
-    date: getTodayDate(),
+    incomeKind: 'main' as DailyIncomeKind,
+  });
+  const [expenseForm, setExpenseForm] = useState({
+    amount: '',
+    date: today,
+    desc: '',
+    category: 'daily' as DailyExpenseCategory,
+  });
+  const [calibrationAmount, setCalibrationAmount] = useState('');
+  const [fixedForm, setFixedForm] = useState({
+    name: '',
+    amount: '',
+    dueDay: '1',
   });
 
-  const monthTransactions = useMemo(
-    () => getMonthTransactions(data.transactions, currentYear, currentMonth),
-    [currentMonth, currentYear, data.transactions],
-  );
-  const { income, expense, balance } = useMemo(
-    () => getTransactionSummary(monthTransactions),
-    [monthTransactions],
-  );
-  const todaySpent = useMemo(
-    () => getTodaySpent(data.transactions),
+  const weekProgress =
+    week && week.allowance > 0
+      ? Math.min(100, Math.round((snapshot.weekSpent / week.allowance) * 100))
+      : 0;
+  const reserveProgress =
+    snapshot.reserveMinimum > 0
+      ? Math.min(100, Math.round((budget.pockets.reserve / snapshot.reserveMinimum) * 100))
+      : 100;
+  const actualBookBalance = snapshot.weekRemaining + budget.pockets.buffer;
+  const shouldRecommendLarge =
+    parseAmount(expenseForm.amount) >= budget.settings.largeExpenseAbsoluteThreshold ||
+    (week?.allowance ?? 0) > 0 &&
+      parseAmount(expenseForm.amount) >=
+        (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate;
+
+  const recentEvents = useMemo(
+    () =>
+      [...data.transactions]
+        .sort((left, right) => (left.date < right.date ? 1 : -1))
+        .slice(0, 10),
     [data.transactions],
   );
-  const compliantDaysCount = useMemo(
-    () => getCompliantDaysCount(monthTransactions, data.dailyLimit),
-    [data.dailyLimit, monthTransactions],
-  );
-  const estimatedMonthEndBalance = useMemo(
-    () =>
-      getEstimatedMonthEndBalance({
-        balance,
-        currentMonth,
-        currentYear,
-        dailyLimit: data.dailyLimit,
-        todaySpent,
+
+  const handleInitialize = () => {
+    setData((prev) =>
+      initializeLifeBudget(prev, {
+        spendable: parseAmount(setupForm.spendable),
+        buffer: parseAmount(setupForm.buffer),
+        reserve: parseAmount(setupForm.reserve),
+        settings: {
+          expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
+          savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
+          bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+          minimumWeeklyLiving:
+            parseAmount(setupForm.minimumWeeklyLiving) ||
+            budget.settings.minimumWeeklyLiving,
+        },
       }),
-    [balance, currentMonth, currentYear, data.dailyLimit, todaySpent],
-  );
-  const chartData = useMemo(
-    () => getDailyChartData(monthTransactions, currentYear, currentMonth),
-    [currentMonth, currentYear, monthTransactions],
-  );
-  const chartSummary = useMemo(() => {
-    const spentDays = chartData.filter((item) => item.amount > 0);
-    const maxDay = spentDays.reduce<(typeof chartData)[number] | null>(
-      (max, item) => (!max || item.amount > max.amount ? item : max),
-      null,
     );
-    const averageSpent =
-      spentDays.length === 0 ? 0 : expense / spentDays.length;
-
-    return {
-      averageSpent,
-      maxDay,
-      overLimitDays: spentDays.filter((item) => item.amount > data.dailyLimit).length,
-      spentDays: spentDays.length,
-    };
-  }, [chartData, data.dailyLimit, expense]);
-
-  const handleAddTx = () => {
-    const amount = Number(form.amount);
-    const date = normalizeDateInput(form.date);
-
-    if (!Number.isFinite(amount) || amount <= 0 || !date) {
-      alert('请完善信息');
-      return;
-    }
-
-    const newTransaction: Transaction = {
-      id: createTransactionId(),
-      date,
-      type: form.type,
-      amount,
-      desc: form.desc.trim() || (form.type === 'expense' ? '日常支出' : '额外收入'),
-    };
-
-    setData((prev) => ({
-      ...prev,
-      transactions: [...prev.transactions, newTransaction],
-    }));
-
-    const [year, month] = date.split('-').map(Number);
-    setCurrentYear(year);
-    setCurrentMonth(month);
-    setForm((prev) => ({ ...prev, amount: '', desc: '' }));
+    setPanel(null);
   };
 
-  const handleDeleteTx = (id: number) => {
-    if (!window.confirm('确定删除这条记录吗？')) {
+  const handleIncomeSubmit = () => {
+    const amount = parseAmount(incomeForm.amount);
+    if (amount <= 0) {
+      alert('请输入收入金额');
       return;
     }
 
-    setData((prev) => ({
-      ...prev,
-      transactions: prev.transactions.filter((transaction) => transaction.id !== id),
-    }));
+    setData((prev) =>
+      allocateIncome(prev, {
+        amount,
+        date: incomeForm.date,
+        desc: incomeForm.desc,
+        incomeKind: incomeForm.incomeKind,
+      }),
+    );
+    setIncomeForm((prev) => ({ ...prev, amount: '', desc: '' }));
+    setPanel(null);
+  };
+
+  const handleExpenseSubmit = () => {
+    const amount = parseAmount(expenseForm.amount);
+    if (amount <= 0) {
+      alert('请输入支出金额');
+      return;
+    }
+
+    const category =
+      shouldRecommendLarge && expenseForm.category !== 'large'
+        ? window.confirm('这笔支出较大，要按“大额支出”处理吗？')
+          ? 'large'
+          : expenseForm.category
+        : expenseForm.category;
+
+    if (
+      category === 'large' &&
+      budget.pockets.reserve - amount < snapshot.reserveMinimum &&
+      !window.confirm('这笔大额支出会让储备金低于最低线，仍然记录吗？')
+    ) {
+      return;
+    }
+
+    setData((prev) =>
+      recordExpense(prev, {
+        amount,
+        category,
+        date: expenseForm.date,
+        desc: expenseForm.desc,
+      }),
+    );
+    setExpenseForm((prev) => ({ ...prev, amount: '', desc: '', category: 'daily' }));
+    setPanel(null);
+  };
+
+  const handleCalibrationSubmit = () => {
+    const amount = parseAmount(calibrationAmount);
+    if (amount < 0) {
+      alert('请输入当前可消费余额');
+      return;
+    }
+
+    setData((prev) => calibrateSpendableBalance(prev, amount, today));
+    setCalibrationAmount('');
+    setPanel(null);
+  };
+
+  const handleAddFixedExpense = () => {
+    const amount = parseAmount(fixedForm.amount);
+    const dueDay = Math.round(parseAmount(fixedForm.dueDay));
+    if (!fixedForm.name.trim() || amount <= 0 || dueDay <= 0) {
+      alert('请完善固定支出');
+      return;
+    }
+
+    setData((prev) =>
+      addFixedExpense(prev, {
+        name: fixedForm.name.trim(),
+        amount,
+        dueDay,
+      }),
+    );
+    setFixedForm({ name: '', amount: '', dueDay: '1' });
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +266,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
       return;
     }
 
-    if (!window.confirm('确定用导入文件覆盖当前日常账本数据吗？日额度和全部流水都会被替换。')) {
+    if (!window.confirm('确定用导入文件覆盖当前生活预算数据吗？旧流水和预算状态都会被替换。')) {
       input.value = '';
       return;
     }
@@ -183,408 +287,587 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData }) => {
     reader.readAsArrayBuffer(file);
   };
 
+  const updateSettings = (nextSettings: Partial<LifeBudgetSettings>) => {
+    setData((prev) => ({
+      ...prev,
+      budget: {
+        ...budget,
+        settings: {
+          ...budget.settings,
+          ...nextSettings,
+        },
+      },
+    }));
+  };
+
   return (
-    <div className="space-y-4 animate-fade-in relative pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-3 border-stone-200 gap-4">
+    <div className={`life-budget life-budget-${theme} relative space-y-4 pb-24 text-stone-800 animate-fade-in`}>
+      <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-stone-800 flex items-center gap-2">
-            <div className="bg-blue-600 text-white p-1.5 rounded-lg">
-              <Calendar size={18} />
-            </div>
-            日常账本
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8b8175]">
+            Life Budget
+          </div>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-black text-[#3f4842]">
+            <span className="rounded-xl bg-[#8aa0a2] p-2 text-white shadow-sm">
+              <Wallet size={20} />
+            </span>
+            生活预算
           </h1>
         </div>
+        <button
+          onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+          className="rounded-full border border-stone-200 bg-white/80 p-2.5 text-[#70685f] shadow-sm"
+          title="设置"
+        >
+          <Settings size={18} />
+        </button>
+      </header>
 
-        <div className="relative z-30 w-full md:w-auto">
-          <button
-            onClick={() => setShowPicker((prev) => !prev)}
-            className="w-full md:w-auto flex justify-between md:justify-center items-center gap-2 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-sm text-stone-600 hover:bg-stone-50 hover:border-blue-300 transition-all text-sm font-medium"
-          >
-            <span>
-              {currentYear}年 {currentMonth}月
-            </span>
-            <ChevronDown
-              size={14}
-              className={`transition-transform text-stone-400 ${showPicker ? 'rotate-180' : ''}`}
+      {!budget.initialized && (
+        <SectionShell className="border-[#d2b48f] bg-[#f6efe3] p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 text-[#b78952]" size={18} />
+            <div>
+              <h2 className="font-bold text-[#5d5144]">先建立生活预算</h2>
+              <p className="mt-1 text-xs leading-5 text-[#7d7165]">
+                只需要填当前可消费余额、缓冲金和储备金。旧日常流水会保留，新预算从这里开始。
+              </p>
+            </div>
+          </div>
+        </SectionShell>
+      )}
+
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-[1.35fr_0.9fr]">
+        <div className="life-week-card rounded-[1.35rem] border border-[#b8c5c3] bg-[#dce8e6] p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-[#657b7a]">
+                <CalendarDays size={14} />
+                本预算周
+              </div>
+              <div className="mt-2 text-4xl font-black tracking-tight text-[#30413f]">
+                {formatAmount(snapshot.weekRemaining)}
+              </div>
+              <div className="mt-1 text-xs font-medium text-[#657b7a]">
+                {week
+                  ? `${formatDisplayDate(week.startDate)} - ${formatDisplayDate(week.endDate)}`
+                  : '收入分配后生成预算周'}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/55 px-3 py-2 text-right">
+              <div className="text-[10px] font-bold text-[#657b7a]">已用</div>
+              <div className="text-sm font-black text-[#30413f]">
+                {formatAmount(snapshot.weekSpent)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/60">
+            <div
+              className="h-full rounded-full bg-[#8aa0a2] transition-all"
+              style={{ width: `${weekProgress}%` }}
             />
-          </button>
-
-          {showPicker && (
-            <div className="absolute top-full right-0 mt-2 w-full md:w-80 bg-white border border-stone-200 shadow-xl rounded-xl p-4 z-50 animate-fade-in">
-              <div className="flex justify-between items-center mb-4 pb-2 border-b border-stone-100">
-                <button
-                  onClick={() => setPickerYear((prev) => prev - 1)}
-                  className="p-1 hover:bg-stone-100 rounded text-stone-500"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="font-bold text-stone-700">{pickerYear}</span>
-                <button
-                  onClick={() => setPickerYear((prev) => prev + 1)}
-                  className="p-1 hover:bg-stone-100 rounded text-stone-500"
-                >
-                  <ChevronRight size={18} />
-                </button>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-xl bg-white/45 px-3 py-2">
+              <div className="text-[#657b7a]">本周额度</div>
+              <div className="font-black text-[#30413f]">
+                {formatAmount(week?.allowance ?? 0)}
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => {
-                  const { balance: monthBalance, hasTransactions } = getMonthBalanceSnapshot(
-                    data.transactions,
-                    pickerYear,
-                    month,
-                  );
-                  const isActive = pickerYear === currentYear && month === currentMonth;
-
-                  let badgeStyle = '';
-                  if (isActive) {
-                    badgeStyle = 'bg-white/20 text-white';
-                  } else if (!hasTransactions) {
-                    badgeStyle = 'bg-stone-100 text-stone-400';
-                  } else if (monthBalance >= 0) {
-                    badgeStyle = 'bg-emerald-100 text-emerald-700';
-                  } else {
-                    badgeStyle = 'bg-red-100 text-red-700';
-                  }
-
-                  return (
-                    <div
-                      key={month}
-                      onClick={() => {
-                        setCurrentYear(pickerYear);
-                        setCurrentMonth(month);
-                        setShowPicker(false);
-                      }}
-                      className={`flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer border transition-all ${
-                        isActive
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                          : 'bg-white hover:bg-stone-50 border-transparent text-stone-600'
-                      }`}
-                    >
-                      <span className="font-bold text-sm">{month}月</span>
-                      <span className={`text-[10px] px-1.5 rounded-full mt-1 ${badgeStyle}`}>
-                        {!hasTransactions
-                          ? '·'
-                          : `${monthBalance > 0 ? '+' : ''}${monthBalance.toFixed(0)}`}
-                      </span>
-                    </div>
-                  );
-                })}
+            </div>
+            <div className="rounded-xl bg-white/45 px-3 py-2">
+              <div className="text-[#657b7a]">周期状态</div>
+              <div className="font-black text-[#30413f]">
+                {snapshot.isExtended ? '延长期' : cycle ? '进行中' : '未开始'}
               </div>
+            </div>
+            <div className="rounded-xl bg-white/45 px-3 py-2">
+              <div className="text-[#657b7a]">可消费池</div>
+              <div className="font-black text-[#30413f]">
+                {formatAmount(actualBookBalance)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="life-buffer-card rounded-[1.35rem] border border-[#c9d7ca] bg-[#e4ecdf] p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#6f806a]">
+              <Shield size={14} />
+              缓冲金
+            </div>
+            <span className="rounded-full bg-white/55 px-2 py-1 text-[10px] font-bold text-[#6f806a]">
+              本周补充
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-black text-[#3f563d]">
+            {formatAmount(budget.pockets.buffer)}
+          </div>
+          <p className="mt-2 text-xs leading-5 text-[#6f806a]">
+            普通支出超出本预算周时自动补上；不用时，周期结束后多余部分会回到储备金。
+          </p>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3">
+        <SectionShell className="p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#6e7c6b]">
+            <PiggyBank size={14} />
+            储备金
+          </div>
+          <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
+            {formatAmount(budget.pockets.reserve)}
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
+            <div
+              className={`h-full rounded-full ${
+                snapshot.reserveGap > 0 ? 'bg-[#b66b5d]' : 'bg-[#8ba889]'
+              }`}
+              style={{ width: `${reserveProgress}%` }}
+            />
+          </div>
+          <div className="mt-2 text-[10px] font-medium text-stone-500">
+            最低线 {formatAmount(snapshot.reserveMinimum)}
+          </div>
+          <div
+            className={`mt-1 text-xs font-black ${
+              snapshot.reserveNetChange >= 0 ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
+            }`}
+          >
+            净变化 {formatSignedAmount(snapshot.reserveNetChange)}
+          </div>
+        </SectionShell>
+
+        <SectionShell className="p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#8b7356]">
+            <AlertTriangle size={14} />
+            待处理
+          </div>
+          <div className="mt-3 space-y-2 text-xs">
+            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+              <span>固定支出</span>
+              <b>{snapshot.pendingFixed.length}</b>
+            </div>
+            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+              <span>余额校准</span>
+              <b>{snapshot.needsCalibration ? '可做' : '-'}</b>
+            </div>
+            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+              <span>补回缺口</span>
+              <b>{snapshot.reserveGap > 0 ? formatAmount(snapshot.reserveGap) : '无'}</b>
+            </div>
+          </div>
+        </SectionShell>
+      </section>
+
+      <section className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setPanel(panel === 'expense' ? null : 'expense')}
+          className={`${panelButtonClass} bg-[#3f4842] text-white`}
+        >
+          <ReceiptText size={16} /> 记支出
+        </button>
+        <button
+          onClick={() => setPanel(panel === 'income' ? null : 'income')}
+          className={`${panelButtonClass} bg-[#8aa0a2] text-white`}
+        >
+          <CircleDollarSign size={16} /> 收入分配
+        </button>
+        <button
+          onClick={() => setPanel(panel === 'calibration' ? null : 'calibration')}
+          className={`${panelButtonClass} bg-[#e8dfd1] text-[#65594c]`}
+        >
+          <RefreshCw size={16} /> 余额校准
+        </button>
+        <button
+          onClick={() => setPanel(panel === 'fixed' ? null : 'fixed')}
+          className={`${panelButtonClass} bg-[#eee8dd] text-[#65594c]`}
+        >
+          <Landmark size={16} /> 固定支出
+        </button>
+      </section>
+
+      {panel === 'settings' && (
+        <SectionShell className="p-4">
+          <PanelTitle icon={<Settings size={16} />} title={budget.initialized ? '预算设置' : '初始设置'} />
+          {!budget.initialized && (
+            <div className="life-help mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
+              填写建议：可消费余额填你现在准备用来日常花的钱；缓冲金可先填 0 或 100；储备金填你已经攒下、可用于大额/兜底的钱。
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white px-3 py-3 rounded-xl shadow-sm border border-stone-100 flex flex-col justify-between min-h-[100px] relative overflow-hidden">
-          <div className="flex justify-between items-start z-10">
-            <h3 className="text-stone-400 font-bold text-xs">收支概览</h3>
-            <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-100">
-              <Award size={10} className="text-amber-500" />
-              <span className="text-[9px] font-bold text-amber-700">
-                达标 {compliantDaysCount} 天
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-2 z-10">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-stone-400 scale-90 origin-left">收入</span>
-              <span className="font-bold text-emerald-600 text-sm">
-                +{income.toFixed(0)}
-              </span>
-            </div>
-            <div className="h-6 w-px bg-stone-100 mx-1"></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-stone-400 scale-90 origin-left">支出</span>
-              <span className="font-bold text-red-500 text-sm">
-                -{expense.toFixed(0)}
-              </span>
-            </div>
-            <div className="h-6 w-px bg-stone-100 mx-1"></div>
-            <div className="flex flex-col text-right">
-              <span className="text-[10px] text-stone-400 scale-90 origin-right">结余</span>
-              <span className={`font-bold text-sm ${balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {balance >= 0 ? '+' : ''}
-                {balance.toFixed(0)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white px-3 py-3 rounded-xl shadow-sm border border-stone-100 flex flex-col justify-between min-h-[100px]">
-          <div className="flex justify-between items-center">
-            <h3 className="text-stone-400 font-bold text-xs">今日额度</h3>
-            <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-              todaySpent > data.dailyLimit
-                ? 'bg-red-50 text-red-500 border border-red-100'
-                : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-            }`}>
-              {todaySpent > data.dailyLimit ? '已超' : '正常'}
-            </div>
-          </div>
-
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className={`text-lg font-bold ${todaySpent > data.dailyLimit ? 'text-red-500' : 'text-stone-800'}`}>
-              {todaySpent.toFixed(0)}
-            </span>
-            <span className="text-xs text-stone-300">/</span>
-            <input
-              type="number"
-              value={data.dailyLimit}
-              onChange={(event) =>
-                setData((prev) => ({
-                  ...prev,
-                  dailyLimit: Number(event.target.value) || 0,
-                }))
-              }
-              className="w-8 text-xs text-stone-400 border-b border-dashed border-stone-200 focus:outline-none focus:border-blue-400 bg-transparent text-center"
-            />
-          </div>
-
-          <div className="pt-2 mt-1 border-t border-dashed border-stone-100 flex justify-between items-center">
-            <span className="text-[9px] text-stone-400 flex items-center gap-1">
-              <TrendingUp size={10} /> 月末预估
-            </span>
-            {estimatedMonthEndBalance !== null ? (
-              <span className={`text-[10px] font-bold ${
-                estimatedMonthEndBalance >= 0 ? 'text-emerald-600' : 'text-red-500'
-              }`}>
-                {estimatedMonthEndBalance >= 0 ? '+' : ''}
-                {estimatedMonthEndBalance.toFixed(0)}
-              </span>
-            ) : (
-              <span className="text-[10px] text-stone-300">-</span>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {!budget.initialized && (
+              <>
+                <NumberField label="当前可消费余额" value={setupForm.spendable} onChange={(spendable) => setSetupForm((prev) => ({ ...prev, spendable }))} />
+                <NumberField label="当前缓冲金" value={setupForm.buffer} onChange={(buffer) => setSetupForm((prev) => ({ ...prev, buffer }))} />
+                <NumberField label="当前储备金" value={setupForm.reserve} onChange={(reserve) => setSetupForm((prev) => ({ ...prev, reserve }))} />
+              </>
             )}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100">
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
-          <div className="flex gap-2 bg-stone-50 p-1 rounded-lg">
-            <div className="flex bg-white rounded-md shadow-sm border border-stone-100 overflow-hidden shrink-0">
-              <button
-                onClick={() => setForm((prev) => ({ ...prev, type: 'expense' }))}
-                className={`px-4 py-2 text-xs font-bold ${
-                  form.type === 'expense'
-                    ? 'bg-red-50 text-red-500'
-                    : 'text-stone-400 hover:bg-stone-50'
-                }`}
-              >
-                支
-              </button>
-              <div className="w-px bg-stone-100"></div>
-              <button
-                onClick={() => setForm((prev) => ({ ...prev, type: 'income' }))}
-                className={`px-4 py-2 text-xs font-bold ${
-                  form.type === 'income'
-                    ? 'bg-emerald-50 text-emerald-600'
-                    : 'text-stone-400 hover:bg-stone-50'
-                }`}
-              >
-                收
-              </button>
-            </div>
-
-            <div className="relative flex-1 md:flex-none">
+            <NumberField label="预计发薪日" value={setupForm.expectedPayday} onChange={(expectedPayday) => setSetupForm((prev) => ({ ...prev, expectedPayday }))} />
+            <NumberField label="储备比例 %" value={setupForm.savingsRate} onChange={(savingsRate) => setSetupForm((prev) => ({ ...prev, savingsRate }))} />
+            <NumberField label="缓冲比例 %" value={setupForm.bufferRate} onChange={(bufferRate) => setSetupForm((prev) => ({ ...prev, bufferRate }))} />
+            <NumberField label="最低每周生活线" value={setupForm.minimumWeeklyLiving} onChange={(minimumWeeklyLiving) => setSetupForm((prev) => ({ ...prev, minimumWeeklyLiving }))} />
+            <label className="text-xs font-bold text-stone-500">
+              储备金最低线覆盖
               <input
-                type="date"
-                value={form.date}
+                type="number"
+                value={budget.settings.reserveMinimumOverride ?? ''}
                 onChange={(event) =>
-                  setForm((prev) => ({ ...prev, date: event.target.value }))
+                  updateSettings({
+                    reserveMinimumOverride:
+                      event.target.value === '' ? null : parseAmount(event.target.value),
+                  })
                 }
-                className="w-full md:w-32 h-full bg-transparent pl-8 text-xs font-medium text-stone-600 focus:outline-none cursor-pointer"
+                placeholder="留空自动计算"
+                className={`${fieldClass} mt-1`}
               />
-              <Calendar
-                size={14}
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
-              />
-            </div>
+            </label>
           </div>
+          <button
+            onClick={() => {
+              if (!budget.initialized) {
+                handleInitialize();
+                return;
+              }
 
-          <div className="flex-1 flex gap-2 items-center bg-stone-50 p-1 rounded-lg px-3">
-            <span className="text-stone-400 text-xs font-bold">¥</span>
+              updateSettings({
+                expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
+                savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
+                bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+                minimumWeeklyLiving:
+                  parseAmount(setupForm.minimumWeeklyLiving) ||
+                  budget.settings.minimumWeeklyLiving,
+              });
+              setPanel(null);
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3f4842] px-4 py-3 text-sm font-black text-white"
+          >
+            <Check size={16} /> 保存生活预算设置
+          </button>
+        </SectionShell>
+      )}
+
+      {panel === 'income' && (
+        <SectionShell className="p-4">
+          <PanelTitle icon={<CircleDollarSign size={16} />} title="收入分配" />
+          <SegmentedChoices
+            value={incomeForm.incomeKind}
+            options={[
+              ['main', '主要收入'],
+              ['casual', '零散收入'],
+              ['refund', '退款报销'],
+            ]}
+            onChange={(incomeKind) =>
+              setIncomeForm((prev) => ({ ...prev, incomeKind: incomeKind as DailyIncomeKind }))
+            }
+          />
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_2fr]">
+            <NumberField label="金额" value={incomeForm.amount} onChange={(amount) => setIncomeForm((prev) => ({ ...prev, amount }))} />
+            <DateField label="日期" value={incomeForm.date} onChange={(date) => setIncomeForm((prev) => ({ ...prev, date }))} />
+            <TextField label="备注" value={incomeForm.desc} onChange={(desc) => setIncomeForm((prev) => ({ ...prev, desc }))} placeholder="如 6月工资、红包、退款" />
+          </div>
+          {incomeForm.incomeKind === 'main' && (
+            <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
+              主要收入会开启新的预算周期：先预留固定支出，再存入储备金，剩余自动拆成本预算周额度和缓冲金。
+            </div>
+          )}
+          <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
+        </SectionShell>
+      )}
+
+      {panel === 'expense' && (
+        <SectionShell className="p-4">
+          <PanelTitle icon={<ReceiptText size={16} />} title="记支出" />
+          <div className="mt-3 grid grid-cols-5 gap-2">
+            {[
+              ['daily', '日常', <Wallet size={14} />],
+              ['dining', '外食', <Utensils size={14} />],
+              ['other', '其他', <Tag size={14} />],
+              ['unplanned', '计划外', <AlertTriangle size={14} />],
+              ['large', '大额', <Landmark size={14} />],
+            ].map(([value, label, icon]) => (
+              <button
+                key={String(value)}
+                onClick={() =>
+                  setExpenseForm((prev) => ({
+                    ...prev,
+                    category: value as DailyExpenseCategory,
+                  }))
+                }
+                className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-bold transition ${
+                  expenseForm.category === value
+                    ? 'border-[#8aa0a2] bg-[#dce8e6] text-[#30413f]'
+                    : 'border-stone-200 bg-white text-stone-500'
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_2fr]">
+            <NumberField label="金额" value={expenseForm.amount} onChange={(amount) => setExpenseForm((prev) => ({ ...prev, amount }))} />
+            <DateField label="日期" value={expenseForm.date} onChange={(date) => setExpenseForm((prev) => ({ ...prev, date }))} />
+            <TextField label="备注" value={expenseForm.desc} onChange={(desc) => setExpenseForm((prev) => ({ ...prev, desc }))} placeholder="可选" />
+          </div>
+          {shouldRecommendLarge && expenseForm.category !== 'large' && (
+            <div className="mt-3 rounded-xl bg-[#f8ece8] px-3 py-2 text-xs font-bold text-[#9b5b4e]">
+              这笔金额较大，提交时会询问是否按大额支出处理。
+            </div>
+          )}
+          <SubmitButton onClick={handleExpenseSubmit} label="记录支出" />
+        </SectionShell>
+      )}
+
+      {panel === 'calibration' && (
+        <SectionShell className="p-4">
+          <PanelTitle icon={<RefreshCw size={16} />} title="余额校准" />
+          <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
+            当前账面可消费余额为 {formatAmount(actualBookBalance)}。只填你现在准备用来日常花的钱合计，差额会自动修正。
+          </div>
+          <div className="mt-3">
+            <NumberField label="当前可消费余额" value={calibrationAmount} onChange={setCalibrationAmount} />
+          </div>
+          <SubmitButton onClick={handleCalibrationSubmit} label="完成校准" />
+        </SectionShell>
+      )}
+
+      {panel === 'fixed' && (
+        <SectionShell className="p-4">
+          <PanelTitle icon={<Landmark size={16} />} title="固定支出" />
+          <div className="mt-3 grid grid-cols-[1.4fr_1fr_0.8fr] gap-2">
+            <input
+              value={fixedForm.name}
+              onChange={(event) => setFixedForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="名称"
+              className={fieldClass}
+            />
             <input
               type="number"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, amount: event.target.value }))
-              }
-              className="w-24 bg-transparent text-sm font-bold text-stone-800 placeholder:text-stone-300 focus:outline-none"
+              value={fixedForm.amount}
+              onChange={(event) => setFixedForm((prev) => ({ ...prev, amount: event.target.value }))}
+              placeholder="金额"
+              className={fieldClass}
             />
-            <div className="w-px h-4 bg-stone-200 mx-1"></div>
             <input
-              type="text"
-              placeholder="备注 (如: 早餐)"
-              value={form.desc}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, desc: event.target.value }))
-              }
-              className="flex-1 bg-transparent text-xs text-stone-700 placeholder:text-stone-300 focus:outline-none"
+              type="number"
+              value={fixedForm.dueDay}
+              onChange={(event) => setFixedForm((prev) => ({ ...prev, dueDay: event.target.value }))}
+              placeholder="日"
+              className={fieldClass}
             />
           </div>
-
           <button
-            onClick={handleAddTx}
-            className="bg-stone-800 hover:bg-stone-900 text-white p-2.5 rounded-lg shadow-sm active:scale-95 transition-all flex justify-center"
+            onClick={handleAddFixedExpense}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#eee8dd] px-4 py-2.5 text-xs font-black text-[#65594c]"
           >
-            <Check size={18} />
+            <Plus size={14} /> 添加固定支出
           </button>
-        </div>
-      </div>
-
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-              <TrendingUp size={13} className="text-blue-600" /> 支出节奏
-            </h3>
-            <div className="mt-1 flex items-center gap-3 text-[10px] text-stone-400">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-red-400"></span>
-                每日支出
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-0.5 w-3 rounded-full bg-blue-500"></span>
-                日额度
-              </span>
-            </div>
-          </div>
-          <div className="rounded-lg bg-stone-50 px-2.5 py-1 text-right">
-            <div className="text-[9px] font-bold text-stone-400">有支出天数</div>
-            <div className="text-sm font-bold text-stone-800">
-              {chartSummary.spentDays} 天
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-lg bg-blue-50 px-2 py-2">
-            <div className="text-[9px] font-bold text-blue-700">日均支出</div>
-            <div className="mt-0.5 text-sm font-bold text-blue-800">
-              ¥ {chartSummary.averageSpent.toFixed(0)}
-            </div>
-          </div>
-          <div className="rounded-lg bg-red-50 px-2 py-2">
-            <div className="text-[9px] font-bold text-red-700">超额天数</div>
-            <div className="mt-0.5 text-sm font-bold text-red-800">
-              {chartSummary.overLimitDays} 天
-            </div>
-          </div>
-          <div className="rounded-lg bg-stone-50 px-2 py-2">
-            <div className="text-[9px] font-bold text-stone-500">最高单日</div>
-            <div className="mt-0.5 text-sm font-bold text-stone-800">
-              {chartSummary.maxDay ? `¥ ${chartSummary.maxDay.amount.toFixed(0)}` : '-'}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-              <XAxis
-                dataKey="day"
-                axisLine={false}
-                interval="preserveStartEnd"
-                minTickGap={14}
-                tick={{ fill: '#9CA3AF', fontSize: 9 }}
-                tickLine={false}
-              />
-              <YAxis
-                axisLine={false}
-                tickFormatter={(value) => formatCompactAmount(Number(value))}
-                tick={{ fill: '#9CA3AF', fontSize: 9 }}
-                tickLine={false}
-                width={34}
-              />
-              <Tooltip
-                formatter={(value: number) => [`¥ ${Number(value).toFixed(2)}`, '支出']}
-                labelFormatter={(label) => `${currentMonth}月${label}日`}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: 'none',
-                  boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
-                  fontSize: '11px',
-                  padding: '6px 8px',
-                }}
-              />
-              <ReferenceLine
-                y={data.dailyLimit}
-                stroke="#2563EB"
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
-              />
-              <Bar
-                dataKey="amount"
-                name="支出"
-                fill="#F87171"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={12}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="flex gap-4 pt-2 border-t border-stone-200">
-        <button
-          onClick={() => exportDailyToExcel(data, currentYear, currentMonth)}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50"
-        >
-          <Download size={12} /> 导出备份
-        </button>
-        <label className="flex items-center gap-2 px-3 py-1.5 text-xs text-stone-500 bg-white border rounded hover:bg-stone-50 cursor-pointer">
-          <Upload size={12} /> 导入备份
-          <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
-        </label>
-      </div>
-
-      <div>
-        <h3 className="font-bold text-stone-400 text-[10px] uppercase tracking-wider mb-2">
-          Transaction History
-        </h3>
-        <ul className="space-y-2">
-          {[...monthTransactions].reverse().map((transaction) => (
-            <li
-              key={transaction.id}
-              className="flex justify-between items-center bg-white px-3 py-2 rounded-lg border border-stone-100 shadow-sm group hover:border-blue-200 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-0.5 h-6 rounded-full ${
-                  transaction.type === 'income' ? 'bg-emerald-400' : 'bg-red-400'
-                }`}></div>
+          <ul className="mt-3 space-y-2">
+            {budget.fixedExpenses.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2"
+              >
                 <div>
-                  <div className="text-stone-800 font-medium text-xs">{transaction.desc}</div>
-                  <div className="text-[10px] text-stone-400">
-                    {formatDisplayDate(transaction.date)}
+                  <div className="text-sm font-bold text-stone-800">{item.name}</div>
+                  <div className="text-[11px] text-stone-500">
+                    {formatAmount(item.amount)} · 每月 {item.dueDay} 日
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`font-bold text-xs ${
-                  transaction.type === 'income' ? 'text-emerald-600' : 'text-red-500'
-                }`}>
-                  {transaction.type === 'income' ? '+' : '-'}
-                  {transaction.amount.toFixed(2)}
-                </div>
                 <button
-                  onClick={() => handleDeleteTx(transaction.id)}
-                  className="text-stone-300 hover:text-red-500 p-1 rounded-full hover:bg-stone-50 transition-all opacity-0 group-hover:opacity-100"
-                  title="删除"
+                  onClick={() => setData((prev) => markFixedExpensePaid(prev, item.id))}
+                  disabled={item.paidCycleId === cycle?.id}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                    item.paidCycleId === cycle?.id
+                      ? 'bg-[#e4ecdf] text-[#6f806a]'
+                      : 'bg-[#3f4842] text-white'
+                  }`}
                 >
-                  <Trash2 size={12} />
+                  {item.paidCycleId === cycle?.id ? '已支付' : '标记已付'}
                 </button>
+              </li>
+            ))}
+            {budget.fixedExpenses.length === 0 && (
+              <li className="rounded-xl bg-stone-50 px-3 py-4 text-center text-xs text-stone-400">
+                暂无固定支出
+              </li>
+            )}
+          </ul>
+        </SectionShell>
+      )}
+
+      <SectionShell className="p-3">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xs font-black text-stone-500">
+            <ReceiptText size={14} />
+            最近关键事件
+          </h2>
+          <span className="text-[10px] text-stone-400">最近 10 条</span>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {recentEvents.map((transaction) => (
+            <li
+              key={transaction.id}
+              className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
+            >
+              <div>
+                <div className="text-xs font-bold text-stone-800">
+                  {transaction.type === 'income'
+                    ? incomeKindLabels[transaction.incomeKind ?? 'casual']
+                    : categoryLabels[transaction.category ?? 'other']}
+                  <span className="ml-2 font-medium text-stone-500">{transaction.desc}</span>
+                </div>
+                <div className="mt-0.5 text-[10px] text-stone-400">
+                  {formatDisplayDate(transaction.date)}
+                </div>
+              </div>
+              <div
+                className={`text-xs font-black ${
+                  transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
+                }`}
+              >
+                {transaction.type === 'income' ? '+' : '-'}
+                {formatAmount(transaction.amount)}
               </div>
             </li>
           ))}
-          {monthTransactions.length === 0 && (
-            <li className="text-center text-stone-400 text-xs py-4">本月暂无记录</li>
+          {recentEvents.length === 0 && (
+            <li className="rounded-xl bg-stone-50 px-3 py-4 text-center text-xs text-stone-400">
+              暂无记录
+            </li>
           )}
         </ul>
-      </div>
+      </SectionShell>
+
+      <SectionShell className="p-3">
+        <button
+          onClick={() => setShowBackup((prev) => !prev)}
+          className="flex w-full items-center justify-between text-xs font-black text-stone-500"
+        >
+          <span className="flex items-center gap-2">
+            <Settings size={14} /> 备份与旧数据
+          </span>
+          <ChevronDown
+            size={14}
+            className={`transition ${showBackup ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {showBackup && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-stone-100 pt-3">
+            <button
+              onClick={() =>
+                exportDailyToExcel(
+                  data,
+                  new Date().getFullYear(),
+                  new Date().getMonth() + 1,
+                )
+              }
+              className="flex items-center gap-2 rounded-lg bg-stone-100 px-3 py-2 text-xs font-bold text-stone-500"
+            >
+              <Download size={12} /> 导出生活预算
+            </button>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-stone-100 px-3 py-2 text-xs font-bold text-stone-500">
+              <Upload size={12} /> 导入旧备份
+              <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
+            </label>
+          </div>
+        )}
+      </SectionShell>
     </div>
   );
 };
+
+const PanelTitle: React.FC<{ icon: React.ReactNode; title: string }> = ({
+  icon,
+  title,
+}) => (
+  <h2 className="flex items-center gap-2 text-sm font-black text-[#4c554e]">
+    {icon}
+    {title}
+  </h2>
+);
+
+const NumberField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ label, value, onChange }) => (
+  <label className="text-xs font-bold text-stone-500">
+    {label}
+    <input
+      type="number"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${fieldClass} mt-1`}
+    />
+  </label>
+);
+
+const DateField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ label, value, onChange }) => (
+  <label className="text-xs font-bold text-stone-500">
+    {label}
+    <input
+      type="date"
+      value={normalizeDateInput(value)}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${fieldClass} mt-1`}
+    />
+  </label>
+);
+
+const TextField: React.FC<{
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}> = ({ label, value, placeholder, onChange }) => (
+  <label className="text-xs font-bold text-stone-500">
+    {label}
+    <input
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className={`${fieldClass} mt-1`}
+    />
+  </label>
+);
+
+const SegmentedChoices: React.FC<{
+  value: string;
+  options: [string, string][];
+  onChange: (value: string) => void;
+}> = ({ value, options, onChange }) => (
+  <div className="mt-3 grid grid-cols-3 gap-2 rounded-2xl bg-stone-100 p-1">
+    {options.map(([optionValue, label]) => (
+      <button
+        key={optionValue}
+        onClick={() => onChange(optionValue)}
+        className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+          value === optionValue
+            ? 'bg-white text-[#3f4842] shadow-sm'
+            : 'text-stone-500'
+        }`}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
+const SubmitButton: React.FC<{ label: string; onClick: () => void }> = ({
+  label,
+  onClick,
+}) => (
+        <button
+          onClick={onClick}
+    className="life-primary-button mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3f4842] px-4 py-3 text-sm font-black text-white"
+  >
+    <Check size={16} />
+    {label}
+  </button>
+);

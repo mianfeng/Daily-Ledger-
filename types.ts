@@ -15,8 +15,30 @@ interface BaseTransaction {
   desc: string;
 }
 
+export type DailyExpenseCategory =
+  | 'daily'
+  | 'dining'
+  | 'other'
+  | 'unplanned'
+  | 'large'
+  | 'fixed'
+  | 'unrecorded';
+
+export type DailyIncomeKind = 'main' | 'casual' | 'refund' | 'correction';
+
+export interface DailyTransactionAllocation {
+  week: number;
+  buffer: number;
+  advance: number;
+  reserve: number;
+  fixed: number;
+}
+
 export interface DailyTransaction extends BaseTransaction {
   type: 'income' | 'expense';
+  category?: DailyExpenseCategory;
+  incomeKind?: DailyIncomeKind;
+  allocation?: DailyTransactionAllocation;
 }
 
 export interface CopperTransaction extends BaseTransaction {
@@ -43,6 +65,66 @@ export interface CopperData {
 export interface DailyData {
   dailyLimit: number;
   transactions: DailyTransaction[];
+  budget?: LifeBudgetState;
+}
+
+export interface LifeBudgetSettings {
+  expectedPayday: number;
+  savingsRate: number;
+  bufferRate: number;
+  reserveRecoveryRate: number;
+  weeklyRolloverReserveRate: number;
+  minimumWeeklyLiving: number;
+  reserveMinimumOverride: number | null;
+  largeExpenseAbsoluteThreshold: number;
+  largeExpenseWeeklyRate: number;
+}
+
+export interface LifeBudgetPockets {
+  spendable: number;
+  buffer: number;
+  reserve: number;
+  fixedReserved: number;
+}
+
+export interface BudgetWeek {
+  index: number;
+  startDate: string;
+  endDate: string;
+  allowance: number;
+}
+
+export interface BudgetCycle {
+  id: number;
+  startDate: string;
+  plannedEndDate: string;
+  plannedNextIncomeDate: string;
+  status: 'active' | 'extended' | 'closed';
+  mainIncome: number;
+  fixedReserved: number;
+  reserveDeposit: number;
+  reserveRecovery: number;
+  startingBuffer: number;
+  weeklyAllowance: number;
+  weeks: BudgetWeek[];
+}
+
+export interface FixedExpense {
+  id: number;
+  name: string;
+  amount: number;
+  dueDay: number;
+  isActive: boolean;
+  paidCycleId?: number;
+  paidDate?: string;
+}
+
+export interface LifeBudgetState {
+  initialized: boolean;
+  settings: LifeBudgetSettings;
+  pockets: LifeBudgetPockets;
+  currentCycle: BudgetCycle | null;
+  fixedExpenses: FixedExpense[];
 }
 
 export interface AppLedgerData {

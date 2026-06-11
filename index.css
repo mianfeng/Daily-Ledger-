@@ -27,3 +27,166 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
 }
+
+.life-budget {
+  --life-text: #26342f;
+  --life-muted: #65716a;
+  --life-surface: rgba(255, 255, 255, 0.92);
+  --life-surface-soft: #fff7ea;
+  --life-border: rgba(77, 91, 82, 0.16);
+  --life-blue: #91c7d1;
+  --life-blue-deep: #427987;
+  --life-green: #95c79a;
+  --life-green-deep: #5f8d62;
+  --life-amber: #d9b76c;
+  --life-red: #d88b7f;
+}
+
+.life-budget-dark {
+  --life-text: #edf2ea;
+  --life-muted: #aab7ad;
+  --life-surface: rgba(29, 35, 30, 0.94);
+  --life-surface-soft: #272f27;
+  --life-border: rgba(255, 255, 255, 0.12);
+  --life-blue: #5faac0;
+  --life-blue-deep: #b6efff;
+  --life-green: #83bd8b;
+  --life-green-deep: #d4f7d7;
+  --life-amber: #d8b763;
+  --life-red: #dc8b82;
+}
+
+.life-budget,
+.life-budget h1,
+.life-budget h2,
+.life-budget h3 {
+  color: var(--life-text);
+}
+
+.life-budget .text-stone-400,
+.life-budget .text-stone-500,
+.life-budget .text-stone-600,
+.life-budget .text-\[\#657b7a\],
+.life-budget .text-\[\#6f806a\],
+.life-budget .text-\[\#8b7356\],
+.life-budget .text-\[\#8b8175\] {
+  color: var(--life-muted);
+}
+
+.life-section {
+  border-color: var(--life-border);
+  background: var(--life-surface);
+}
+
+.life-week-card {
+  border-color: rgba(45, 126, 148, 0.24);
+  background:
+    linear-gradient(135deg, rgba(145, 199, 209, 0.94), rgba(207, 232, 226, 0.96)),
+    var(--life-blue);
+}
+
+.life-buffer-card {
+  border-color: rgba(74, 145, 78, 0.24);
+  background:
+    linear-gradient(135deg, rgba(149, 199, 154, 0.94), rgba(226, 238, 196, 0.96)),
+    var(--life-green);
+}
+
+.life-budget-dark .life-week-card {
+  background:
+    linear-gradient(135deg, rgba(43, 93, 111, 0.96), rgba(38, 76, 78, 0.96)),
+    #16343b;
+}
+
+.life-budget-dark .life-buffer-card {
+  background:
+    linear-gradient(135deg, rgba(55, 102, 61, 0.96), rgba(48, 79, 56, 0.96)),
+    #17351f;
+}
+
+.life-week-card,
+.life-week-card .text-\[\#30413f\],
+.life-week-card .text-\[\#657b7a\],
+.life-buffer-card,
+.life-buffer-card .text-\[\#3f563d\],
+.life-buffer-card .text-\[\#6f806a\] {
+  color: #17302f;
+}
+
+.life-budget-dark .life-week-card,
+.life-budget-dark .life-week-card .text-\[\#30413f\],
+.life-budget-dark .life-week-card .text-\[\#657b7a\],
+.life-budget-dark .life-buffer-card,
+.life-budget-dark .life-buffer-card .text-\[\#3f563d\],
+.life-budget-dark .life-buffer-card .text-\[\#6f806a\] {
+  color: #f3fbf6;
+}
+
+.life-field {
+  border-color: var(--life-border);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--life-text);
+}
+
+.life-budget-dark .life-field {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--life-text);
+}
+
+.life-budget-dark .life-field::placeholder {
+  color: #7f8b82;
+}
+
+.life-help,
+.life-budget .bg-\[\#f3f0e9\],
+.life-budget .bg-\[\#f8f4ec\],
+.life-budget .bg-stone-50,
+.life-budget .bg-stone-100 {
+  background: var(--life-surface-soft);
+}
+
+.life-budget-dark .life-help,
+.life-budget-dark .bg-\[\#f3f0e9\],
+.life-budget-dark .bg-\[\#f8f4ec\],
+.life-budget-dark .bg-stone-50,
+.life-budget-dark .bg-stone-100 {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.life-primary-button,
+.life-budget .bg-\[\#3f4842\] {
+  background: #4f7f8c;
+}
+
+.life-budget-dark .life-primary-button,
+.life-budget-dark .bg-\[\#3f4842\] {
+  background: #4f91aa;
+}
+
+.life-budget .bg-\[\#8aa0a2\] {
+  background: #6aaebe;
+}
+
+.life-budget .bg-\[\#e8dfd1\],
+.life-budget .bg-\[\#eee8dd\] {
+  background: #ead08d;
+  color: #3f321f;
+}
+
+.life-budget-dark .bg-\[\#e8dfd1\],
+.life-budget-dark .bg-\[\#eee8dd\] {
+  background: #8d6b25;
+  color: #fff3cf;
+}
+
+.life-budget-dark .border-stone-100,
+.life-budget-dark .border-stone-200 {
+  border-color: var(--life-border);
+}
+
+.life-budget-dark .text-stone-800,
+.life-budget-dark .text-\[\#3f4842\],
+.life-budget-dark .text-\[\#4c554e\],
+.life-budget-dark .text-\[\#65594c\] {
+  color: var(--life-text);
+}
