@@ -24,6 +24,7 @@ import { DEFAULT_DAILY_DATA } from '../lib/appData';
 import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date';
 import {
   addFixedExpense,
+  adjustFixedReserved,
   allocateIncome,
   deleteDailyTransaction,
   getBudgetCycleSummaries,
@@ -178,6 +179,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     amount: '',
     dueDay: '1',
   });
+  const [fixedReservedAmount, setFixedReservedAmount] = useState('');
 
   const weekProgress =
     week && week.allowance > 0
@@ -339,6 +341,16 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       }),
     );
     setFixedForm({ name: '', amount: '', dueDay: '1' });
+  };
+
+  const handleFixedReservedSubmit = () => {
+    const amount = parseAmount(fixedReservedAmount);
+    if (amount < 0) {
+      alert('请输入固定支出预留金额');
+      return;
+    }
+    setData((prev) => adjustFixedReserved(prev, amount));
+    setFixedReservedAmount('');
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -601,12 +613,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             已花
           </span>
           <span className="flex items-center gap-1">
-            <i className="h-2 w-2 rounded-full bg-[#dce8e6]" />
-            剩余
-          </span>
-          <span className="flex items-center gap-1">
             <i className="h-2 w-2 rounded-full bg-[#d9b76c]" />
-            未来预算
+            未花/预算
           </span>
         </div>
         {(currentCycleSummary?.weeks.length ?? 0) > 0 ? (
@@ -616,15 +624,14 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
                 const spentValue = weekStatus === 'future' ? 0 : item.spent;
                 const remainingValue = Math.max(0, item.allowance - spentValue);
-                const totalHeight = Math.max(
+                const spentHeight = Math.max(
                   8,
-                  Math.round((item.allowance / weeklyChartMax) * 100),
+                  Math.round((spentValue / weeklyChartMax) * 100),
                 );
-                const spentHeight =
-                  item.allowance > 0
-                    ? Math.max(0, Math.round((spentValue / item.allowance) * 100))
-                    : 0;
-                const remainingHeight = Math.max(0, 100 - spentHeight);
+                const remainingHeight = Math.max(
+                  8,
+                  Math.round((remainingValue / weeklyChartMax) * 100),
+                );
 
                 return (
                   <button
@@ -633,29 +640,17 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
                     title={`第 ${item.index + 1} 周`}
                   >
-                    <div className="flex h-20 w-full items-end">
-                      <div className="flex w-full flex-col overflow-hidden rounded-lg bg-[#f8f4ec]" style={{ height: `${totalHeight}%` }}>
-                        {weekStatus === 'future' ? (
-                          <div className="flex h-full items-center justify-center bg-[#d9b76c]/65 px-0.5 text-[9px] font-black text-white">
-                            预算
-                          </div>
-                        ) : (
-                          <>
-                            <div
-                              className="bg-[#dce8e6]"
-                              style={{ height: `${remainingHeight}%` }}
-                            />
-                            <div
-                              className={`flex items-center justify-center px-0.5 text-[9px] font-black text-white ${
-                                weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
-                              }`}
-                              style={{ height: `${spentHeight}%` }}
-                            >
-                              {spentValue > 0 ? '已花' : ''}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                    <div className="flex h-20 w-full items-end gap-1 rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
+                      <div
+                        className={`w-1/2 rounded-md ${
+                          weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
+                        }`}
+                        style={{ height: spentValue > 0 ? `${spentHeight}%` : '4px' }}
+                      />
+                      <div
+                        className="w-1/2 rounded-md bg-[#d9b76c]/70"
+                        style={{ height: `${remainingHeight}%` }}
+                      />
                     </div>
                     <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
                       W{item.index + 1}
@@ -1045,6 +1040,35 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           title="固定支出"
           onClose={() => setPanel(null)}
         >
+          <div className="life-soft-row rounded-2xl bg-[#f8f4ec] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black text-stone-500">固定支出预留</div>
+                <div className="mt-1 text-2xl font-black text-[#3e4c3b]">
+                  {formatAmount(budget.pockets.fixedReserved)}
+                </div>
+              </div>
+              <div className="text-right text-[10px] font-bold text-stone-500">
+                从可消费钱里单独挪出
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+              <input
+                type="number"
+                value={fixedReservedAmount}
+                onChange={(event) => setFixedReservedAmount(event.target.value)}
+                placeholder="设置预留金额"
+                className={fieldClass}
+              />
+              <button
+                onClick={handleFixedReservedSubmit}
+                className="rounded-xl bg-[#3f4842] px-3 text-xs font-black text-white"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+
           <div className="mt-3 grid grid-cols-[1.4fr_1fr_0.8fr] gap-2">
             <input
               value={fixedForm.name}

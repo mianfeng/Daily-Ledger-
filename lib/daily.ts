@@ -578,6 +578,31 @@ export const addFixedExpense = (
   };
 };
 
+export const adjustFixedReserved = (
+  data: DailyData,
+  amount: number,
+): DailyData => {
+  const budget = getLifeBudget(data);
+  const safeAmount = roundAmount(Math.max(0, amount));
+
+  return {
+    ...data,
+    budget: {
+      ...budget,
+      pockets: {
+        ...budget.pockets,
+        fixedReserved: safeAmount,
+        spendable: roundAmount(
+          Math.max(
+            0,
+            budget.pockets.spendable + budget.pockets.fixedReserved - safeAmount,
+          ),
+        ),
+      },
+    },
+  };
+};
+
 export const allocateIncome = (
   data: DailyData,
   {
