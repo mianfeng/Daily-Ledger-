@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -26,6 +26,7 @@ import {
   allocateIncome,
   calibrateSpendableBalance,
   getBudgetSnapshot,
+  getLifeBudget,
   initializeLifeBudget,
   markFixedExpensePaid,
   recordExpense,
@@ -105,6 +106,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
   const { budget, cycle, week } = snapshot;
   const [panel, setPanel] = useState<Panel>(budget.initialized ? null : 'settings');
   const [showBackup, setShowBackup] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const [setupForm, setSetupForm] = useState({
     spendable: String(budget.pockets.spendable || ''),
@@ -156,6 +158,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
         .slice(0, 10),
     [data.transactions],
   );
+
+  useEffect(() => {
+    if (panel !== 'settings') {
+      return;
+    }
+
+    setSetupForm({
+      spendable: String(budget.pockets.spendable || ''),
+      buffer: String(budget.pockets.buffer || ''),
+      reserve: String(budget.pockets.reserve || ''),
+      expectedPayday: String(budget.settings.expectedPayday),
+      savingsRate: percentToInput(budget.settings.savingsRate),
+      bufferRate: percentToInput(budget.settings.bufferRate),
+      minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
+    });
+  }, [budget, panel]);
 
   const handleInitialize = () => {
     setData((prev) =>
@@ -291,13 +309,14 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
     setData((prev) => ({
       ...prev,
       budget: {
-        ...budget,
+        ...getLifeBudget(prev),
         settings: {
-          ...budget.settings,
+          ...getLifeBudget(prev).settings,
           ...nextSettings,
         },
       },
     }));
+    setSettingsSaved(true);
   };
 
   return (
@@ -315,7 +334,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           </h1>
         </div>
         <button
-          onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+          onClick={() => {
+            setSettingsSaved(false);
+            setPanel(panel === 'settings' ? null : 'settings');
+          }}
           className="rounded-full border border-stone-200 bg-white/80 p-2.5 text-[#70685f] shadow-sm"
           title="设置"
         >
@@ -410,50 +432,42 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
 
       <section className="grid grid-cols-2 gap-3">
         <SectionShell className="p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6e7c6b]">
-            <PiggyBank size={14} />
-            储备金
-          </div>
-          <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
-            {formatAmount(budget.pockets.reserve)}
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
-            <div
-              className={`h-full rounded-full ${
-                snapshot.reserveGap > 0 ? 'bg-[#b66b5d]' : 'bg-[#8ba889]'
-              }`}
-              style={{ width: `${reserveProgress}%` }}
-            />
-          </div>
-          <div className="mt-2 text-[10px] font-medium text-stone-500">
-            最低线 {formatAmount(snapshot.reserveMinimum)}
-          </div>
-          <div
-            className={`mt-1 text-xs font-black ${
-              snapshot.reserveNetChange >= 0 ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
-            }`}
-          >
-            净变化 {formatSignedAmount(snapshot.reserveNetChange)}
-          </div>
-        </SectionShell>
-
-        <SectionShell className="p-3">
           <div className="flex items-center gap-2 text-xs font-bold text-[#8b7356]">
             <AlertTriangle size={14} />
             待处理
           </div>
           <div className="mt-3 space-y-2 text-xs">
-            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
               <span>固定支出</span>
               <b>{snapshot.pendingFixed.length}</b>
             </div>
-            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
               <span>余额校准</span>
               <b>{snapshot.needsCalibration ? '可做' : '-'}</b>
             </div>
-            <div className="flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
               <span>补回缺口</span>
               <b>{snapshot.reserveGap > 0 ? formatAmount(snapshot.reserveGap) : '无'}</b>
+            </div>
+          </div>
+        </SectionShell>
+
+        <SectionShell className="p-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#6e7c6b]">
+            <Landmark size={14} />
+            固定支出预留
+          </div>
+          <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
+            {formatAmount(budget.pockets.fixedReserved)}
+          </div>
+          <div className="mt-3 space-y-2 text-xs">
+            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+              <span>本期固定项</span>
+              <b>{budget.fixedExpenses.filter((item) => item.isActive).length}</b>
+            </div>
+            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+              <span>待确认</span>
+              <b>{snapshot.pendingFixed.length}</b>
             </div>
           </div>
         </SectionShell>
@@ -492,6 +506,44 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           {!budget.initialized && (
             <div className="life-help mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
               填写建议：可消费余额填你现在准备用来日常花的钱；缓冲金可先填 0 或 100；储备金填你已经攒下、可用于大额/兜底的钱。
+            </div>
+          )}
+          {budget.initialized && (
+            <div className="mt-3 rounded-2xl border border-stone-200 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-[#6e7c6b]">
+                  <PiggyBank size={14} />
+                  储备金概览
+                </div>
+                <span className="text-[10px] font-bold text-stone-500">只在设置里查看</span>
+              </div>
+              <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
+                {formatAmount(budget.pockets.reserve)}
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
+                <div
+                  className={`h-full rounded-full ${
+                    snapshot.reserveGap > 0 ? 'bg-[#b66b5d]' : 'bg-[#8ba889]'
+                  }`}
+                  style={{ width: `${reserveProgress}%` }}
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <div className="text-stone-500">最低线</div>
+                  <b>{formatAmount(snapshot.reserveMinimum)}</b>
+                </div>
+                <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <div className="text-stone-500">净变化</div>
+                  <b className={snapshot.reserveNetChange >= 0 ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'}>
+                    {formatSignedAmount(snapshot.reserveNetChange)}
+                  </b>
+                </div>
+                <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <div className="text-stone-500">缺口</div>
+                  <b>{snapshot.reserveGap > 0 ? formatAmount(snapshot.reserveGap) : '无'}</b>
+                </div>
+              </div>
             </div>
           )}
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -537,12 +589,16 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                   parseAmount(setupForm.minimumWeeklyLiving) ||
                   budget.settings.minimumWeeklyLiving,
               });
-              setPanel(null);
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3f4842] px-4 py-3 text-sm font-black text-white"
           >
             <Check size={16} /> 保存生活预算设置
           </button>
+          {settingsSaved && (
+            <div className="mt-2 text-center text-xs font-bold text-[#6f8b6b]">
+              已保存设置
+            </div>
+          )}
         </SectionShell>
       )}
 
@@ -595,8 +651,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                 }
                 className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl border text-[11px] font-bold transition ${
                   expenseForm.category === value
-                    ? 'border-[#8aa0a2] bg-[#dce8e6] text-[#30413f]'
-                    : 'border-stone-200 bg-white text-stone-500'
+                    ? 'life-choice-active border-[#8aa0a2] bg-[#dce8e6] text-[#30413f]'
+                    : 'life-choice border-stone-200 bg-white text-stone-500'
                 }`}
               >
                 {icon}
@@ -666,7 +722,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             {budget.fixedExpenses.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2"
+                className="life-event-row flex items-center justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2"
               >
                 <div>
                   <div className="text-sm font-bold text-stone-800">{item.name}</div>
@@ -708,7 +764,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           {recentEvents.map((transaction) => (
             <li
               key={transaction.id}
-              className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
+              className="life-event-row flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
             >
               <div>
                 <div className="text-xs font-bold text-stone-800">
