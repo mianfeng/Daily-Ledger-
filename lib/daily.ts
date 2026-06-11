@@ -373,6 +373,28 @@ const getWeekExpenseTotal = (
   );
 };
 
+const getCycleLivingExpenseTotal = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle | null,
+) => {
+  if (!cycle) {
+    return 0;
+  }
+
+  return roundAmount(
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'expense' &&
+          transaction.category !== 'large' &&
+          transaction.category !== 'fixed' &&
+          transaction.date >= cycle.startDate &&
+          transaction.date <= cycle.plannedEndDate,
+      )
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
+};
+
 export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   const budget = getLifeBudget(data);
   const cycle = budget.currentCycle;
@@ -450,12 +472,23 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
     ...budget.archivedCycles,
   ];
 
-  return cycles.map((cycle) => ({
-    cycle,
-    spent: getCycleExpenseTotal(data.transactions, cycle),
-    weeks: getBudgetWeekSummaries(data, cycle),
-    reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery),
-  }));
+  return cycles.map((cycle) => {
+    const livingSpent = getCycleLivingExpenseTotal(data.transactions, cycle);
+    const livingBudget = roundAmount(
+      cycle.weeks.reduce((total, week) => total + week.allowance, 0) +
+        cycle.startingBuffer,
+    );
+
+    return {
+      cycle,
+      spent: getCycleExpenseTotal(data.transactions, cycle),
+      livingSpent,
+      weeks: getBudgetWeekSummaries(data, cycle),
+      balance: roundAmount(livingBudget - livingSpent),
+      budget: livingBudget,
+      reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery),
+    };
+  });
 };
 
 const buildWeeks = (

@@ -162,6 +162,16 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
 
+  const getWeekStatus = (startDate: string, endDate: string) => {
+    if (startDate > today) {
+      return 'future';
+    }
+    if (endDate < today) {
+      return 'past';
+    }
+    return 'current';
+  };
+
   const openPanel = (nextPanel: Panel) => {
     setSettingsSaved(false);
     setPanel((prev) => {
@@ -553,18 +563,18 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                     </div>
                     <b>{snapshot.isExtended ? '延长期' : cycle.status === 'closed' ? '已结束' : '进行中'}</b>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">周期收入</span>
                       <b className="block">{formatAmount(cycle.mainIncome)}</b>
                     </div>
                     <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-                      <span className="text-stone-500">周期已花</span>
-                      <b className="block">{formatAmount(currentCycleSummary?.spent ?? 0)}</b>
+                      <span className="text-stone-500">日常预算</span>
+                      <b className="block">{formatAmount(currentCycleSummary?.budget ?? 0)}</b>
                     </div>
                     <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-                      <span className="text-stone-500">固定预留</span>
-                      <b className="block">{formatAmount(cycle.fixedReserved)}</b>
+                      <span className="text-stone-500">日常结余</span>
+                      <b className="block">{formatAmount(currentCycleSummary?.balance ?? 0)}</b>
                     </div>
                     <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">储备增长</span>
@@ -576,31 +586,47 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                 <div className="mt-4">
                   <h3 className="text-xs font-black text-stone-500">本周期每周情况</h3>
                   <div className="mt-2 space-y-2">
-                    {(currentCycleSummary?.weeks ?? []).map((item) => (
-                      <div
-                        key={`${item.startDate}-${item.endDate}`}
-                        className="life-event-row rounded-xl bg-stone-50 px-3 py-2"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <b>
-                            第 {item.index + 1} 周 · {formatDisplayDate(item.startDate)} - {formatDisplayDate(item.endDate)}
-                          </b>
-                          <span className="text-stone-500">剩 {formatAmount(item.remaining)}</span>
+                    {(currentCycleSummary?.weeks ?? []).map((item) => {
+                      const weekStatus = getWeekStatus(item.startDate, item.endDate);
+                      const headline =
+                        weekStatus === 'future'
+                          ? `预算 ${formatAmount(item.allowance)}`
+                          : `余额 ${formatAmount(item.remaining)}`;
+
+                      return (
+                        <div
+                          key={`${item.startDate}-${item.endDate}`}
+                          className="life-event-row rounded-xl bg-stone-50 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <b>
+                              第 {item.index + 1} 周 · {formatDisplayDate(item.startDate)} - {formatDisplayDate(item.endDate)}
+                            </b>
+                            <span className="shrink-0 text-stone-500">{headline}</span>
+                          </div>
+                          {weekStatus === 'future' ? (
+                            <div className="mt-2 rounded-lg bg-[#f8f4ec] px-2 py-1.5 text-[10px] font-bold text-stone-500">
+                              未来周，只显示预算，不计算余额。
+                            </div>
+                          ) : (
+                            <>
+                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
+                                <div
+                                  className="h-full rounded-full bg-[#8aa0a2]"
+                                  style={{
+                                    width: `${item.allowance > 0 ? Math.min(100, Math.round((item.spent / item.allowance) * 100)) : 0}%`,
+                                  }}
+                                />
+                              </div>
+                              <div className="mt-1 flex justify-between text-[10px] text-stone-500">
+                                <span>预算 {formatAmount(item.allowance)}</span>
+                                <span>已花 {formatAmount(item.spent)}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
-                          <div
-                            className="h-full rounded-full bg-[#8aa0a2]"
-                            style={{
-                              width: `${item.allowance > 0 ? Math.min(100, Math.round((item.spent / item.allowance) * 100)) : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="mt-1 flex justify-between text-[10px] text-stone-500">
-                          <span>额度 {formatAmount(item.allowance)}</span>
-                          <span>已花 {formatAmount(item.spent)}</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </>
@@ -614,7 +640,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
               <div className="mt-4">
                 <h3 className="text-xs font-black text-stone-500">最近周期</h3>
                 <div className="mt-2 space-y-2">
-                  {cycleSummaries.slice(1, 5).map(({ cycle: item, spent, reserveChange }) => (
+                  {cycleSummaries.slice(1, 5).map(({ cycle: item, balance, budget, reserveChange }) => {
+                    const isFutureCycle = item.startDate > today;
+                    return (
                     <div
                       key={item.id}
                       className="life-event-row flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-xs"
@@ -622,7 +650,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                       <div>
                         <b>{formatDisplayDate(item.startDate)} - {formatDisplayDate(item.plannedEndDate)}</b>
                         <div className="mt-0.5 text-[10px] text-stone-500">
-                          收入 {formatAmount(item.mainIncome)} · 已花 {formatAmount(spent)}
+                          收入 {formatAmount(item.mainIncome)} · {isFutureCycle ? '预算' : '结余'} {formatAmount(isFutureCycle ? budget : balance)}
                         </div>
                       </div>
                       <div className="text-right">
@@ -632,7 +660,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
