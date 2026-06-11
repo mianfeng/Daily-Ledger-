@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Settings,
   Tag,
+  Trash2,
   Upload,
   Utensils,
   Wallet,
@@ -24,6 +25,7 @@ import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date
 import {
   addFixedExpense,
   allocateIncome,
+  deleteDailyTransaction,
   getBudgetCycleSummaries,
   calibrateSpendableBalance,
   getBudgetSnapshot,
@@ -368,6 +370,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleDeleteTransaction = (transactionId: number) => {
+    if (!window.confirm('确定删除这条记录吗？相关余额会按这条记录的分配自动回滚。')) {
+      return;
+    }
+    setData((prev) => deleteDailyTransaction(prev, transactionId));
   };
 
   const updateSettings = (nextSettings: Partial<LifeBudgetSettings>) => {
@@ -1108,13 +1117,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                   {formatDisplayDate(transaction.date)}
                 </div>
               </div>
-              <div
-                className={`text-xs font-black ${
-                  transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
-                }`}
-              >
-                {transaction.type === 'income' ? '+' : '-'}
-                {formatAmount(transaction.amount)}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`text-xs font-black ${
+                    transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
+                  }`}
+                >
+                  {transaction.type === 'income' ? '+' : '-'}
+                  {formatAmount(transaction.amount)}
+                </div>
+                <button
+                  onClick={() => handleDeleteTransaction(transaction.id)}
+                  className="rounded-lg p-1 text-stone-400 transition hover:bg-stone-100 hover:text-[#b66b5d]"
+                  title="删除"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
             </li>
           ))}
@@ -1149,13 +1167,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     {formatDisplayDate(transaction.date)}
                   </div>
                 </div>
-                <div
-                  className={`text-xs font-black ${
-                    transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
-                  }`}
-                >
-                  {transaction.type === 'income' ? '+' : '-'}
-                  {formatAmount(transaction.amount)}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`text-xs font-black ${
+                      transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
+                    }`}
+                  >
+                    {transaction.type === 'income' ? '+' : '-'}
+                    {formatAmount(transaction.amount)}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteTransaction(transaction.id)}
+                    className="rounded-lg p-1 text-stone-400 transition hover:bg-stone-100 hover:text-[#b66b5d]"
+                    title="删除"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </li>
             ))}

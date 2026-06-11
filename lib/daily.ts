@@ -365,11 +365,19 @@ const getWeekExpenseTotal = (
         (transaction) =>
           transaction.type === 'expense' &&
           transaction.category !== 'large' &&
-          transaction.category !== 'fixed' &&
           transaction.date >= week.startDate &&
           transaction.date <= week.endDate,
       )
-      .reduce((total, transaction) => total + transaction.amount, 0),
+      .reduce((total, transaction) => {
+        if (transaction.category === 'fixed') {
+          return (
+            total +
+            (transaction.allocation?.week ?? 0) +
+            (transaction.allocation?.advance ?? 0)
+          );
+        }
+        return total + transaction.amount;
+      }, 0),
   );
 };
 
@@ -604,7 +612,19 @@ export const allocateIncome = (
   if (incomeKind === 'casual' || incomeKind === 'correction') {
     return {
       ...data,
-      transactions: [...data.transactions, incomeTransaction],
+      transactions: [
+        ...data.transactions,
+        {
+          ...incomeTransaction,
+          allocation: {
+            week: 0,
+            buffer: safeAmount,
+            advance: 0,
+            reserve: 0,
+            fixed: 0,
+          },
+        },
+      ],
       budget: {
         ...budget,
         pockets: {
@@ -618,7 +638,19 @@ export const allocateIncome = (
   if (incomeKind === 'refund') {
     return {
       ...data,
-      transactions: [...data.transactions, incomeTransaction],
+      transactions: [
+        ...data.transactions,
+        {
+          ...incomeTransaction,
+          allocation: {
+            week: safeAmount,
+            buffer: 0,
+            advance: 0,
+            reserve: 0,
+            fixed: 0,
+          },
+        },
+      ],
       budget: {
         ...budget,
         pockets: {
@@ -651,7 +683,19 @@ export const allocateIncome = (
 
     return {
       ...data,
-      transactions: [...data.transactions, incomeTransaction],
+      transactions: [
+        ...data.transactions,
+        {
+          ...incomeTransaction,
+          allocation: {
+            week: spendable,
+            buffer,
+            advance: 0,
+            reserve: reserveDeposit + reserveRecovery,
+            fixed: 0,
+          },
+        },
+      ],
       budget: {
         ...budget,
         currentCycle: {
@@ -716,7 +760,19 @@ export const allocateIncome = (
 
   return {
     ...data,
-    transactions: [...data.transactions, incomeTransaction],
+    transactions: [
+      ...data.transactions,
+      {
+        ...incomeTransaction,
+        allocation: {
+          week: spendable,
+          buffer: startingBuffer,
+          advance: 0,
+          reserve: reserveDeposit + reserveRecovery,
+          fixed: fixedReserved,
+        },
+      },
+    ],
     budget: {
       ...budget,
       initialized: true,
@@ -887,9 +943,16 @@ export const markFixedExpensePaid = (
       buffer: 0,
       advance: 0,
       reserve: 0,
-      fixed: fixedExpense.amount,
+      fixed: Math.min(fixedExpense.amount, budget.pockets.fixedReserved),
     },
   };
+  let remaining = roundAmount(fixedExpense.amount - transaction.allocation.fixed);
+  const snapshot = getBudgetSnapshot(data, transaction.date);
+  transaction.allocation.week = roundAmount(Math.min(remaining, snapshot.weekRemaining));
+  remaining = roundAmount(remaining - transaction.allocation.week);
+  transaction.allocation.buffer = roundAmount(Math.min(remaining, budget.pockets.buffer));
+  remaining = roundAmount(remaining - transaction.allocation.buffer);
+  transaction.allocation.advance = remaining;
 
   return {
     ...data,
@@ -899,6 +962,15 @@ export const markFixedExpensePaid = (
       pockets: {
         ...budget.pockets,
         fixedReserved: roundAmount(Math.max(0, budget.pockets.fixedReserved - fixedExpense.amount)),
+        spendable: roundAmount(
+          Math.max(
+            0,
+            budget.pockets.spendable -
+              transaction.allocation.week -
+              transaction.allocation.advance,
+          ),
+        ),
+        buffer: roundAmount(Math.max(0, budget.pockets.buffer - transaction.allocation.buffer)),
       },
       fixedExpenses: budget.fixedExpenses.map((item) =>
         item.id === fixedExpense.id
@@ -910,6 +982,65 @@ export const markFixedExpensePaid = (
           : item,
       ),
     },
+  };
+};
+
+export const deleteDailyTransaction = (
+  data: DailyData,
+  transactionId: number,
+): DailyData => {
+  const transaction = data.transactions.find((item) => item.id === transactionId);
+  if (!transaction) {
+    return data;
+  }
+
+  const budget = getLifeBudget(data);
+  const allocation = transaction.allocation ?? {
+    week: transaction.type === 'income' && transaction.incomeKind === 'refund' ? transaction.amount : 0,
+    buffer:
+      transaction.type === 'income' &&
+      (transaction.incomeKind === 'casual' || transaction.incomeKind === 'correction')
+        ? transaction.amount
+        : 0,
+    advance: 0,
+    reserve: transaction.type === 'expense' && transaction.category === 'large' ? transaction.amount : 0,
+    fixed: transaction.type === 'expense' && transaction.category === 'fixed' ? transaction.amount : 0,
+  };
+
+  const direction = transaction.type === 'income' ? -1 : 1;
+  const nextBudget: LifeBudgetState = {
+    ...budget,
+    pockets: {
+      ...budget.pockets,
+      spendable: roundAmount(
+        Math.max(0, budget.pockets.spendable + direction * (allocation.week + allocation.advance)),
+      ),
+      buffer: roundAmount(Math.max(0, budget.pockets.buffer + direction * allocation.buffer)),
+      reserve: roundAmount(Math.max(0, budget.pockets.reserve + direction * allocation.reserve)),
+      fixedReserved: roundAmount(
+        Math.max(0, budget.pockets.fixedReserved + direction * allocation.fixed),
+      ),
+    },
+    fixedExpenses:
+      transaction.type === 'expense' && transaction.category === 'fixed'
+        ? budget.fixedExpenses.map((item) =>
+            item.name === transaction.desc &&
+            item.amount === transaction.amount &&
+            item.paidDate === transaction.date
+              ? {
+                  ...item,
+                  paidCycleId: undefined,
+                  paidDate: undefined,
+                }
+              : item,
+          )
+        : budget.fixedExpenses,
+  };
+
+  return {
+    ...data,
+    budget: nextBudget,
+    transactions: data.transactions.filter((item) => item.id !== transactionId),
   };
 };
 
