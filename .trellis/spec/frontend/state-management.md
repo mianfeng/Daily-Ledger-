@@ -110,7 +110,7 @@ writeLocalLedgerData(currentData);
 - `LifeBudgetState` owns:
   - settings such as payday, savings rate, buffer rate, minimum weekly living line
   - pocket balances for spendable money, buffer, reserve, and fixed-expense reserve
-  - current budget cycle and fixed expenses
+  - current budget cycle, recent archived cycles, and fixed expenses
 
 ### 3. Contracts
 
@@ -122,6 +122,7 @@ writeLocalLedgerData(currentData);
 ### 4. Validation & Error Matrix
 
 - Missing `budget` -> use the default uninitialized life budget.
+- Missing `archivedCycles` -> use an empty array for backward compatibility.
 - Invalid budget settings -> clamp to safe defaults.
 - Invalid fixed expenses or budget weeks -> drop invalid entries while keeping the rest.
 - Invalid transactions -> drop invalid entries through transaction normalization.

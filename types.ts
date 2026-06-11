@@ -124,6 +124,7 @@ export interface LifeBudgetState {
   settings: LifeBudgetSettings;
   pockets: LifeBudgetPockets;
   currentCycle: BudgetCycle | null;
+  archivedCycles: BudgetCycle[];
   fixedExpenses: FixedExpense[];
 }
 

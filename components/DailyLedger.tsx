@@ -24,6 +24,7 @@ import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date
 import {
   addFixedExpense,
   allocateIncome,
+  getBudgetCycleSummaries,
   calibrateSpendableBalance,
   getBudgetSnapshot,
   getLifeBudget,
@@ -45,7 +46,7 @@ interface DailyLedgerProps {
   theme: 'light' | 'dark';
 }
 
-type Panel = 'expense' | 'income' | 'calibration' | 'fixed' | 'settings' | null;
+type Panel = 'expense' | 'income' | 'calibration' | 'fixed' | 'settings' | 'cycle' | null;
 
 const formatAmount = (value: number) =>
   `¥ ${Math.round(value).toLocaleString('zh-CN')}`;
@@ -158,6 +159,23 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
         .slice(0, 10),
     [data.transactions],
   );
+  const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
+  const currentCycleSummary = cycleSummaries[0];
+
+  const openPanel = (nextPanel: Panel) => {
+    setSettingsSaved(false);
+    setPanel((prev) => {
+      const resolvedPanel = prev === nextPanel ? null : nextPanel;
+      if (resolvedPanel) {
+        window.requestAnimationFrame(() => {
+          document
+            .getElementById(`life-panel-${resolvedPanel}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      return resolvedPanel;
+    });
+  };
 
   useEffect(() => {
     if (panel !== 'settings') {
@@ -334,10 +352,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           </h1>
         </div>
         <button
-          onClick={() => {
-            setSettingsSaved(false);
-            setPanel(panel === 'settings' ? null : 'settings');
-          }}
+          onClick={() => openPanel('settings')}
           className="rounded-full border border-stone-200 bg-white/80 p-2.5 text-[#70685f] shadow-sm"
           title="设置"
         >
@@ -396,12 +411,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                 {formatAmount(week?.allowance ?? 0)}
               </div>
             </div>
-            <div className="rounded-xl bg-white/45 px-3 py-2">
+            <button
+              onClick={() => openPanel('cycle')}
+              className="rounded-xl bg-white/45 px-3 py-2 text-left transition active:scale-[0.98]"
+            >
               <div className="text-[#657b7a]">周期状态</div>
               <div className="font-black text-[#30413f]">
                 {snapshot.isExtended ? '延长期' : cycle ? '进行中' : '未开始'}
               </div>
-            </div>
+            </button>
             <div className="rounded-xl bg-white/45 px-3 py-2">
               <div className="text-[#657b7a]">可消费池</div>
               <div className="font-black text-[#30413f]">
@@ -475,32 +493,155 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
 
       <section className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => setPanel(panel === 'expense' ? null : 'expense')}
+          onClick={() => openPanel('expense')}
           className={`${panelButtonClass} bg-[#3f4842] text-white`}
         >
           <ReceiptText size={16} /> 记支出
         </button>
         <button
-          onClick={() => setPanel(panel === 'income' ? null : 'income')}
+          onClick={() => openPanel('income')}
           className={`${panelButtonClass} bg-[#8aa0a2] text-white`}
         >
           <CircleDollarSign size={16} /> 收入分配
         </button>
         <button
-          onClick={() => setPanel(panel === 'calibration' ? null : 'calibration')}
+          onClick={() => openPanel('calibration')}
           className={`${panelButtonClass} bg-[#e8dfd1] text-[#65594c]`}
         >
           <RefreshCw size={16} /> 余额校准
         </button>
         <button
-          onClick={() => setPanel(panel === 'fixed' ? null : 'fixed')}
+          onClick={() => openPanel('fixed')}
           className={`${panelButtonClass} bg-[#eee8dd] text-[#65594c]`}
         >
           <Landmark size={16} /> 固定支出
         </button>
       </section>
 
+      {panel === 'cycle' && (
+        <div id="life-panel-cycle">
+          <SectionShell className="p-4">
+            <PanelTitle icon={<CalendarDays size={16} />} title="周期详情" />
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
+                <div className="text-stone-500">本预算周剩余</div>
+                <b className="text-base">{formatAmount(snapshot.weekRemaining)}</b>
+              </div>
+              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
+                <div className="text-stone-500">缓冲金</div>
+                <b className="text-base">{formatAmount(budget.pockets.buffer)}</b>
+              </div>
+              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
+                <div className="text-stone-500">固定支出预留</div>
+                <b className="text-base">{formatAmount(budget.pockets.fixedReserved)}</b>
+              </div>
+              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
+                <div className="text-stone-500">储备金</div>
+                <b className="text-base">{formatAmount(budget.pockets.reserve)}</b>
+              </div>
+            </div>
+
+            {cycle ? (
+              <>
+                <div className="mt-4 rounded-2xl border border-stone-200 p-3">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <div className="font-black text-[#4c554e]">当前周期</div>
+                      <div className="mt-0.5 text-stone-500">
+                        {formatDisplayDate(cycle.startDate)} - {formatDisplayDate(cycle.plannedEndDate)}
+                      </div>
+                    </div>
+                    <b>{snapshot.isExtended ? '延长期' : cycle.status === 'closed' ? '已结束' : '进行中'}</b>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                      <span className="text-stone-500">周期收入</span>
+                      <b className="block">{formatAmount(cycle.mainIncome)}</b>
+                    </div>
+                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                      <span className="text-stone-500">周期已花</span>
+                      <b className="block">{formatAmount(currentCycleSummary?.spent ?? 0)}</b>
+                    </div>
+                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                      <span className="text-stone-500">固定预留</span>
+                      <b className="block">{formatAmount(cycle.fixedReserved)}</b>
+                    </div>
+                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                      <span className="text-stone-500">储备增长</span>
+                      <b className="block">{formatAmount((currentCycleSummary?.reserveChange ?? 0))}</b>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <h3 className="text-xs font-black text-stone-500">本周期每周情况</h3>
+                  <div className="mt-2 space-y-2">
+                    {(currentCycleSummary?.weeks ?? []).map((item) => (
+                      <div
+                        key={`${item.startDate}-${item.endDate}`}
+                        className="life-event-row rounded-xl bg-stone-50 px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <b>
+                            第 {item.index + 1} 周 · {formatDisplayDate(item.startDate)} - {formatDisplayDate(item.endDate)}
+                          </b>
+                          <span className="text-stone-500">剩 {formatAmount(item.remaining)}</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
+                          <div
+                            className="h-full rounded-full bg-[#8aa0a2]"
+                            style={{
+                              width: `${item.allowance > 0 ? Math.min(100, Math.round((item.spent / item.allowance) * 100)) : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-1 flex justify-between text-[10px] text-stone-500">
+                          <span>额度 {formatAmount(item.allowance)}</span>
+                          <span>已花 {formatAmount(item.spent)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="life-help mt-3 rounded-xl bg-[#f3f0e9] px-3 py-3 text-xs leading-5 text-stone-600">
+                还没有预算周期。录入一次“主要收入”后，会生成当前周期和每周额度。
+              </div>
+            )}
+
+            {cycleSummaries.length > 1 && (
+              <div className="mt-4">
+                <h3 className="text-xs font-black text-stone-500">最近周期</h3>
+                <div className="mt-2 space-y-2">
+                  {cycleSummaries.slice(1, 5).map(({ cycle: item, spent, reserveChange }) => (
+                    <div
+                      key={item.id}
+                      className="life-event-row flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <b>{formatDisplayDate(item.startDate)} - {formatDisplayDate(item.plannedEndDate)}</b>
+                        <div className="mt-0.5 text-[10px] text-stone-500">
+                          收入 {formatAmount(item.mainIncome)} · 已花 {formatAmount(spent)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <b>{item.status === 'closed' ? '已结束' : item.status === 'extended' ? '延长期' : '进行中'}</b>
+                        <div className="mt-0.5 text-[10px] text-stone-500">
+                          储备 +{formatAmount(reserveChange)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </SectionShell>
+        </div>
+      )}
+
       {panel === 'settings' && (
+        <div id="life-panel-settings">
         <SectionShell className="p-4">
           <PanelTitle icon={<Settings size={16} />} title={budget.initialized ? '预算设置' : '初始设置'} />
           {!budget.initialized && (
@@ -600,9 +741,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             </div>
           )}
         </SectionShell>
+        </div>
       )}
 
       {panel === 'income' && (
+        <div id="life-panel-income">
         <SectionShell className="p-4">
           <PanelTitle icon={<CircleDollarSign size={16} />} title="收入分配" />
           <SegmentedChoices
@@ -628,9 +771,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           )}
           <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
         </SectionShell>
+        </div>
       )}
 
       {panel === 'expense' && (
+        <div id="life-panel-expense">
         <SectionShell className="p-4">
           <PanelTitle icon={<ReceiptText size={16} />} title="记支出" />
           <div className="mt-3 grid grid-cols-5 gap-2">
@@ -672,9 +817,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           )}
           <SubmitButton onClick={handleExpenseSubmit} label="记录支出" />
         </SectionShell>
+        </div>
       )}
 
       {panel === 'calibration' && (
+        <div id="life-panel-calibration">
         <SectionShell className="p-4">
           <PanelTitle icon={<RefreshCw size={16} />} title="余额校准" />
           <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
@@ -685,9 +832,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           </div>
           <SubmitButton onClick={handleCalibrationSubmit} label="完成校准" />
         </SectionShell>
+        </div>
       )}
 
       {panel === 'fixed' && (
+        <div id="life-panel-fixed">
         <SectionShell className="p-4">
           <PanelTitle icon={<Landmark size={16} />} title="固定支出" />
           <div className="mt-3 grid grid-cols-[1.4fr_1fr_0.8fr] gap-2">
@@ -750,6 +899,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             )}
           </ul>
         </SectionShell>
+        </div>
       )}
 
       <SectionShell className="p-3">

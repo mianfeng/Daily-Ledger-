@@ -123,6 +123,7 @@ export const DEFAULT_LIFE_BUDGET: LifeBudgetState = {
     fixedReserved: 0,
   },
   currentCycle: null,
+  archivedCycles: [],
   fixedExpenses: [],
 };
 
@@ -268,6 +269,11 @@ const sanitizeLifeBudget = (raw: unknown): LifeBudgetState => {
       fixedReserved: roundAmount(Math.max(0, toFiniteNumber(pockets.fixedReserved, 0))),
     },
     currentCycle: sanitizeCycle(raw.currentCycle),
+    archivedCycles: Array.isArray(raw.archivedCycles)
+      ? raw.archivedCycles
+          .map(sanitizeCycle)
+          .filter((cycle): cycle is BudgetCycle => cycle !== null)
+      : [],
     fixedExpenses,
   };
 };
@@ -400,6 +406,56 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
     isExtended:
       Boolean(cycle) && normalizeDateInput(today) >= (cycle?.plannedNextIncomeDate ?? '9999-12-31'),
   };
+};
+
+export const getCycleExpenseTotal = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle | null,
+) => {
+  if (!cycle) {
+    return 0;
+  }
+
+  return roundAmount(
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'expense' &&
+          transaction.date >= cycle.startDate &&
+          transaction.date <= cycle.plannedEndDate,
+      )
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
+};
+
+export const getBudgetWeekSummaries = (
+  data: DailyData,
+  cycle: BudgetCycle | null,
+) =>
+  cycle
+    ? cycle.weeks.map((week) => {
+        const spent = getWeekExpenseTotal(data.transactions, week);
+        return {
+          ...week,
+          spent,
+          remaining: roundAmount(Math.max(0, week.allowance - spent)),
+        };
+      })
+    : [];
+
+export const getBudgetCycleSummaries = (data: DailyData) => {
+  const budget = getLifeBudget(data);
+  const cycles = [
+    ...(budget.currentCycle ? [budget.currentCycle] : []),
+    ...budget.archivedCycles,
+  ];
+
+  return cycles.map((cycle) => ({
+    cycle,
+    spent: getCycleExpenseTotal(data.transactions, cycle),
+    weeks: getBudgetWeekSummaries(data, cycle),
+    reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery),
+  }));
 };
 
 const buildWeeks = (
@@ -631,6 +687,12 @@ export const allocateIncome = (
     budget: {
       ...budget,
       initialized: true,
+      archivedCycles: budget.currentCycle
+        ? [
+            { ...budget.currentCycle, status: 'closed' },
+            ...budget.archivedCycles,
+          ].slice(0, 12)
+        : budget.archivedCycles,
       currentCycle,
       pockets: {
         spendable,
