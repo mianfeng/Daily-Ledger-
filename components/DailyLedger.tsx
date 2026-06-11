@@ -203,12 +203,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   );
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
-  const weeklyChartMax = Math.max(
+  const weeklyChartMax = (currentCycleSummary?.weeks ?? []).reduce(
+    (maxValue, item) => Math.max(maxValue, item.allowance, item.spent),
     1,
-    ...(currentCycleSummary?.weeks ?? []).flatMap((item) => [
-      item.allowance,
-      item.spent,
-    ]),
   );
 
   const getWeekStatus = (startDate: string, endDate: string) => {
