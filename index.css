@@ -28,6 +28,26 @@ body {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+@keyframes sheetIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
 .life-budget {
   --life-text: #26342f;
   --life-muted: #65716a;
@@ -235,4 +255,36 @@ body {
 .life-budget-dark .bg-white\/85,
 .life-budget-dark .bg-white\/90 {
   background-color: #202820;
+}
+
+.life-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(13, 18, 15, 0.52);
+  animation: sheetIn 0.18s ease-out;
+}
+
+.life-sheet {
+  width: min(100%, 42rem);
+  max-height: min(78vh, 720px);
+  overflow-y: auto;
+  border: 1px solid var(--life-border);
+  border-radius: 24px 24px 0 0;
+  background: var(--life-surface);
+  color: var(--life-text);
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -24px 48px rgba(21, 26, 22, 0.24);
+  animation: sheetSlideUp 0.22s ease-out;
+}
+
+.life-budget-dark .life-sheet {
+  background: #202820;
+}
+
+.life-action-button {
+  min-width: 0;
 }

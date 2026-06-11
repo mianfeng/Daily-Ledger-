@@ -17,6 +17,7 @@ import {
   Upload,
   Utensils,
   Wallet,
+  X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DEFAULT_DAILY_DATA } from '../lib/appData';
@@ -46,7 +47,15 @@ interface DailyLedgerProps {
   theme: 'light' | 'dark';
 }
 
-type Panel = 'expense' | 'income' | 'calibration' | 'fixed' | 'settings' | 'cycle' | null;
+type Panel =
+  | 'expense'
+  | 'income'
+  | 'calibration'
+  | 'fixed'
+  | 'settings'
+  | 'cycle'
+  | 'events'
+  | null;
 
 const formatAmount = (value: number) =>
   `¥ ${Math.round(value).toLocaleString('zh-CN')}`;
@@ -86,8 +95,8 @@ const incomeKindLabels: Record<DailyIncomeKind, string> = {
   correction: '余额修正',
 };
 
-const panelButtonClass =
-  'flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98]';
+const quickActionClass =
+  'life-action-button flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black shadow-sm transition active:scale-[0.98]';
 
 const fieldClass =
   'life-field w-full rounded-xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm text-stone-800 outline-none transition focus:border-[#8aa0a2] focus:ring-2 focus:ring-[#8aa0a2]/20';
@@ -101,6 +110,30 @@ const SectionShell: React.FC<{
   </section>
 );
 
+const BottomSheet: React.FC<{
+  children: React.ReactNode;
+  icon: React.ReactNode;
+  title: string;
+  onClose: () => void;
+}> = ({ children, icon, title, onClose }) => (
+  <div className="life-sheet-overlay" onClick={onClose}>
+    <div className="life-sheet" onClick={(event) => event.stopPropagation()}>
+      <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <PanelTitle icon={icon} title={title} />
+        <button
+          onClick={onClose}
+          className="rounded-full border border-stone-200 bg-white/80 p-2 text-stone-500"
+          title="关闭"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
 export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }) => {
   const today = getTodayDate();
   const snapshot = useMemo(() => getBudgetSnapshot(data, today), [data, today]);
@@ -108,6 +141,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
   const [panel, setPanel] = useState<Panel>(budget.initialized ? null : 'settings');
   const [showBackup, setShowBackup] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [summaryCard, setSummaryCard] = useState<'pending' | 'fixed'>('pending');
+  const [summaryTouchStart, setSummaryTouchStart] = useState<number | null>(null);
 
   const [setupForm, setSetupForm] = useState({
     spendable: String(budget.pockets.spendable || ''),
@@ -174,17 +209,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
 
   const openPanel = (nextPanel: Panel) => {
     setSettingsSaved(false);
-    setPanel((prev) => {
-      const resolvedPanel = prev === nextPanel ? null : nextPanel;
-      if (resolvedPanel) {
-        window.requestAnimationFrame(() => {
-          document
-            .getElementById(`life-panel-${resolvedPanel}`)
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
-      return resolvedPanel;
-    });
+    setPanel((prev) => (prev === nextPanel ? null : nextPanel));
   };
 
   useEffect(() => {
@@ -384,7 +409,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
         </SectionShell>
       )}
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-[1.35fr_0.9fr]">
+      <section className="grid grid-cols-1 gap-3">
         <div className="life-week-card rounded-[1.35rem] border border-[#b8c5c3] bg-[#dce8e6] p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -439,99 +464,172 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           </div>
         </div>
 
-        <div className="life-buffer-card rounded-[1.35rem] border border-[#c9d7ca] bg-[#e4ecdf] p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-[#6f806a]">
-              <Shield size={14} />
-              缓冲金
-            </div>
-            <span className="rounded-full bg-white/55 px-2 py-1 text-[10px] font-bold text-[#6f806a]">
-              本周补充
-            </span>
-          </div>
-          <div className="mt-3 text-3xl font-black text-[#3f563d]">
-            {formatAmount(budget.pockets.buffer)}
-          </div>
-          <p className="mt-2 text-xs leading-5 text-[#6f806a]">
-            普通支出超出本预算周时自动补上；不用时，周期结束后多余部分会回到储备金。
-          </p>
-        </div>
       </section>
 
       <section className="grid grid-cols-2 gap-3">
-        <SectionShell className="p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#8b7356]">
-            <AlertTriangle size={14} />
-            待处理
+        <div className="life-buffer-card rounded-2xl border border-[#c9d7ca] bg-[#e4ecdf] p-3 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#6f806a]">
+            <Shield size={14} />
+            缓冲金
           </div>
-          <div className="mt-3 space-y-2 text-xs">
-            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-              <span>固定支出</span>
-              <b>{snapshot.pendingFixed.length}</b>
-            </div>
-            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-              <span>余额校准</span>
-              <b>{snapshot.needsCalibration ? '可做' : '-'}</b>
-            </div>
-            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-              <span>补回缺口</span>
-              <b>{snapshot.reserveGap > 0 ? formatAmount(snapshot.reserveGap) : '无'}</b>
-            </div>
+          <div className="mt-2 text-2xl font-black text-[#3f563d]">
+            {formatAmount(budget.pockets.buffer)}
           </div>
-        </SectionShell>
+          <div className="mt-3 life-soft-row rounded-lg bg-white/40 px-2 py-1.5 text-[11px] font-bold text-[#6f806a]">
+            超支时自动补上
+          </div>
+        </div>
 
-        <SectionShell className="p-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6e7c6b]">
-            <Landmark size={14} />
-            固定支出预留
+        <SectionShell className="overflow-hidden p-3">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => setSummaryCard('pending')}
+              className={`text-xs font-black ${summaryCard === 'pending' ? 'text-[#8b7356]' : 'text-stone-400'}`}
+            >
+              待处理
+            </button>
+            <button
+              onClick={() => setSummaryCard('fixed')}
+              className={`text-xs font-black ${summaryCard === 'fixed' ? 'text-[#6e7c6b]' : 'text-stone-400'}`}
+            >
+              固定预留
+            </button>
           </div>
-          <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
-            {formatAmount(budget.pockets.fixedReserved)}
+          <div
+            onTouchStart={(event) => setSummaryTouchStart(event.touches[0]?.clientX ?? null)}
+            onTouchEnd={(event) => {
+              if (summaryTouchStart === null) {
+                return;
+              }
+              const delta = (event.changedTouches[0]?.clientX ?? summaryTouchStart) - summaryTouchStart;
+              if (Math.abs(delta) > 28) {
+                setSummaryCard(delta < 0 ? 'fixed' : 'pending');
+              }
+              setSummaryTouchStart(null);
+            }}
+            className="mt-3 min-h-[104px]"
+          >
+            {summaryCard === 'pending' ? (
+              <div className="space-y-2 text-xs">
+                <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <span>固定支出</span>
+                  <b>{snapshot.pendingFixed.length}</b>
+                </div>
+                <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <span>余额校准</span>
+                  <b>{snapshot.needsCalibration ? '可做' : '-'}</b>
+                </div>
+                <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <span>补回缺口</span>
+                  <b>{snapshot.reserveGap > 0 ? formatAmount(snapshot.reserveGap) : '无'}</b>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs">
+                <div className="text-2xl font-black text-[#3e4c3b]">
+                  {formatAmount(budget.pockets.fixedReserved)}
+                </div>
+                <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <span>本期固定项</span>
+                  <b>{budget.fixedExpenses.filter((item) => item.isActive).length}</b>
+                </div>
+                <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <span>待确认</span>
+                  <b>{snapshot.pendingFixed.length}</b>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="mt-3 space-y-2 text-xs">
-            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-              <span>本期固定项</span>
-              <b>{budget.fixedExpenses.filter((item) => item.isActive).length}</b>
-            </div>
-            <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-              <span>待确认</span>
-              <b>{snapshot.pendingFixed.length}</b>
-            </div>
+          <div className="mt-2 flex justify-center gap-1">
+            <span className={`h-1.5 w-1.5 rounded-full ${summaryCard === 'pending' ? 'bg-[#8aa0a2]' : 'bg-stone-300'}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${summaryCard === 'fixed' ? 'bg-[#8aa0a2]' : 'bg-stone-300'}`} />
           </div>
         </SectionShell>
       </section>
 
-      <section className="grid grid-cols-2 gap-2">
+      <section className="grid grid-cols-4 gap-2">
         <button
           onClick={() => openPanel('expense')}
-          className={`${panelButtonClass} bg-[#3f4842] text-white`}
+          className={`${quickActionClass} bg-[#3f4842] text-white`}
         >
           <ReceiptText size={16} /> 记支出
         </button>
         <button
           onClick={() => openPanel('income')}
-          className={`${panelButtonClass} bg-[#8aa0a2] text-white`}
+          className={`${quickActionClass} bg-[#8aa0a2] text-white`}
         >
           <CircleDollarSign size={16} /> 收入分配
         </button>
         <button
           onClick={() => openPanel('calibration')}
-          className={`${panelButtonClass} bg-[#e8dfd1] text-[#65594c]`}
+          className={`${quickActionClass} bg-[#e8dfd1] text-[#65594c]`}
         >
-          <RefreshCw size={16} /> 余额校准
+          <RefreshCw size={16} /> 校准
         </button>
         <button
           onClick={() => openPanel('fixed')}
-          className={`${panelButtonClass} bg-[#eee8dd] text-[#65594c]`}
+          className={`${quickActionClass} bg-[#eee8dd] text-[#65594c]`}
         >
           <Landmark size={16} /> 固定支出
         </button>
       </section>
 
+      <SectionShell className="p-3">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xs font-black text-stone-500">
+            <CalendarDays size={14} />
+            本周期支出节奏
+          </h2>
+          <span className="text-[10px] text-stone-400">按周</span>
+        </div>
+        <div className="mt-3 flex h-28 items-end gap-2">
+          {(currentCycleSummary?.weeks ?? []).map((item) => {
+            const weekStatus = getWeekStatus(item.startDate, item.endDate);
+            const spentPercent =
+              item.allowance > 0
+                ? Math.min(100, Math.round((item.spent / item.allowance) * 100))
+                : 0;
+            const barHeight = weekStatus === 'future' ? 48 : Math.max(18, spentPercent);
+
+            return (
+              <button
+                key={`${item.startDate}-${item.endDate}`}
+                onClick={() => openPanel('cycle')}
+                className="flex min-w-0 flex-1 flex-col items-center gap-1"
+                title={`第 ${item.index + 1} 周`}
+              >
+                <div className="flex h-20 w-full items-end rounded-xl bg-[#f8f4ec] px-1.5 pb-1.5">
+                  <div
+                    className={`w-full rounded-lg ${
+                      weekStatus === 'future'
+                        ? 'bg-[#d9b76c]/65'
+                        : weekStatus === 'current'
+                          ? 'bg-[#6aaebe]'
+                          : 'bg-[#8ba889]'
+                    }`}
+                    style={{ height: `${barHeight}%` }}
+                  />
+                </div>
+                <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
+                  W{item.index + 1}
+                </span>
+              </button>
+            );
+          })}
+          {(currentCycleSummary?.weeks.length ?? 0) === 0 && (
+            <div className="flex h-full w-full items-center justify-center rounded-xl bg-[#f8f4ec] text-xs font-bold text-stone-500">
+              收入分配后显示周期节奏
+            </div>
+          )}
+        </div>
+      </SectionShell>
+
       {panel === 'cycle' && (
-        <div id="life-panel-cycle">
-          <SectionShell className="p-4">
-            <PanelTitle icon={<CalendarDays size={16} />} title="周期详情" />
+        <BottomSheet
+          icon={<CalendarDays size={16} />}
+          title="周期详情"
+          onClose={() => setPanel(null)}
+        >
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
                 <div className="text-stone-500">本预算周剩余</div>
@@ -665,14 +763,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                 </div>
               </div>
             )}
-          </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       {panel === 'settings' && (
-        <div id="life-panel-settings">
-        <SectionShell className="p-4">
-          <PanelTitle icon={<Settings size={16} />} title={budget.initialized ? '预算设置' : '初始设置'} />
+        <BottomSheet
+          icon={<Settings size={16} />}
+          title={budget.initialized ? '预算设置' : '初始设置'}
+          onClose={() => setPanel(null)}
+        >
           {!budget.initialized && (
             <div className="life-help mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
               填写建议：可消费余额填你现在准备用来日常花的钱；缓冲金可先填 0 或 100；储备金填你已经攒下、可用于大额/兜底的钱。
@@ -769,14 +868,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
               已保存设置
             </div>
           )}
-        </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       {panel === 'income' && (
-        <div id="life-panel-income">
-        <SectionShell className="p-4">
-          <PanelTitle icon={<CircleDollarSign size={16} />} title="收入分配" />
+        <BottomSheet
+          icon={<CircleDollarSign size={16} />}
+          title="收入分配"
+          onClose={() => setPanel(null)}
+        >
           <SegmentedChoices
             value={incomeForm.incomeKind}
             options={[
@@ -799,14 +899,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             </div>
           )}
           <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
-        </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       {panel === 'expense' && (
-        <div id="life-panel-expense">
-        <SectionShell className="p-4">
-          <PanelTitle icon={<ReceiptText size={16} />} title="记支出" />
+        <BottomSheet
+          icon={<ReceiptText size={16} />}
+          title="记支出"
+          onClose={() => setPanel(null)}
+        >
           <div className="mt-3 grid grid-cols-5 gap-2">
             {[
               ['daily', '日常', <Wallet size={14} />],
@@ -845,14 +946,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             </div>
           )}
           <SubmitButton onClick={handleExpenseSubmit} label="记录支出" />
-        </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       {panel === 'calibration' && (
-        <div id="life-panel-calibration">
-        <SectionShell className="p-4">
-          <PanelTitle icon={<RefreshCw size={16} />} title="余额校准" />
+        <BottomSheet
+          icon={<RefreshCw size={16} />}
+          title="余额校准"
+          onClose={() => setPanel(null)}
+        >
           <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
             当前账面可消费余额为 {formatAmount(actualBookBalance)}。只填你现在准备用来日常花的钱合计，差额会自动修正。
           </div>
@@ -860,14 +962,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
             <NumberField label="当前可消费余额" value={calibrationAmount} onChange={setCalibrationAmount} />
           </div>
           <SubmitButton onClick={handleCalibrationSubmit} label="完成校准" />
-        </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       {panel === 'fixed' && (
-        <div id="life-panel-fixed">
-        <SectionShell className="p-4">
-          <PanelTitle icon={<Landmark size={16} />} title="固定支出" />
+        <BottomSheet
+          icon={<Landmark size={16} />}
+          title="固定支出"
+          onClose={() => setPanel(null)}
+        >
           <div className="mt-3 grid grid-cols-[1.4fr_1fr_0.8fr] gap-2">
             <input
               value={fixedForm.name}
@@ -927,20 +1030,27 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
               </li>
             )}
           </ul>
-        </SectionShell>
-        </div>
+        </BottomSheet>
       )}
 
       <SectionShell className="p-3">
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xs font-black text-stone-500">
+          <button
+            onClick={() => openPanel('events')}
+            className="flex items-center gap-2 text-xs font-black text-stone-500"
+          >
             <ReceiptText size={14} />
             最近关键事件
-          </h2>
-          <span className="text-[10px] text-stone-400">最近 10 条</span>
+          </button>
+          <button
+            onClick={() => openPanel('events')}
+            className="text-[10px] font-bold text-stone-400"
+          >
+            查看全部
+          </button>
         </div>
         <ul className="mt-3 space-y-2">
-          {recentEvents.map((transaction) => (
+          {recentEvents.slice(0, 3).map((transaction) => (
             <li
               key={transaction.id}
               className="life-event-row flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
@@ -973,6 +1083,48 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           )}
         </ul>
       </SectionShell>
+
+      {panel === 'events' && (
+        <BottomSheet
+          icon={<ReceiptText size={16} />}
+          title="最近关键事件"
+          onClose={() => setPanel(null)}
+        >
+          <ul className="space-y-2">
+            {recentEvents.map((transaction) => (
+              <li
+                key={transaction.id}
+                className="life-event-row flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
+              >
+                <div>
+                  <div className="text-xs font-bold text-stone-800">
+                    {transaction.type === 'income'
+                      ? incomeKindLabels[transaction.incomeKind ?? 'casual']
+                      : categoryLabels[transaction.category ?? 'other']}
+                    <span className="ml-2 font-medium text-stone-500">{transaction.desc}</span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-stone-400">
+                    {formatDisplayDate(transaction.date)}
+                  </div>
+                </div>
+                <div
+                  className={`text-xs font-black ${
+                    transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
+                  }`}
+                >
+                  {transaction.type === 'income' ? '+' : '-'}
+                  {formatAmount(transaction.amount)}
+                </div>
+              </li>
+            ))}
+            {recentEvents.length === 0 && (
+              <li className="rounded-xl bg-stone-50 px-3 py-4 text-center text-xs text-stone-400">
+                暂无记录
+              </li>
+            )}
+          </ul>
+        </BottomSheet>
+      )}
 
       <SectionShell className="p-3">
         <button
