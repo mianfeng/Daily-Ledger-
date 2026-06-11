@@ -12,7 +12,6 @@ import {
   ReceiptText,
   RefreshCw,
   Settings,
-  Shield,
   Tag,
   Upload,
   Utensils,
@@ -45,6 +44,7 @@ interface DailyLedgerProps {
   data: DailyData;
   setData: React.Dispatch<React.SetStateAction<DailyData>>;
   theme: 'light' | 'dark';
+  appControls?: React.ReactNode;
 }
 
 type Panel =
@@ -134,7 +134,12 @@ const BottomSheet: React.FC<{
   </div>
 );
 
-export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }) => {
+export const DailyLedger: React.FC<DailyLedgerProps> = ({
+  appControls,
+  data,
+  setData,
+  theme,
+}) => {
   const today = getTodayDate();
   const snapshot = useMemo(() => getBudgetSnapshot(data, today), [data, today]);
   const { budget, cycle, week } = snapshot;
@@ -196,6 +201,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
   );
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
+  const weeklyChartMax = Math.max(
+    1,
+    ...(currentCycleSummary?.weeks ?? []).flatMap((item) => [
+      item.allowance,
+      item.spent,
+    ]),
+  );
 
   const getWeekStatus = (startDate: string, endDate: string) => {
     if (startDate > today) {
@@ -455,10 +467,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
                 {snapshot.isExtended ? '延长期' : cycle ? '进行中' : '未开始'}
               </div>
             </button>
-            <div className="rounded-xl bg-white/45 px-3 py-2">
-              <div className="text-[#657b7a]">可消费池</div>
+            <div className="life-week-buffer-chip rounded-xl bg-white/45 px-3 py-2">
+              <div className="text-[#657b7a]">缓冲金</div>
               <div className="font-black text-[#30413f]">
-                {formatAmount(actualBookBalance)}
+                {formatAmount(budget.pockets.buffer)}
               </div>
             </div>
           </div>
@@ -467,18 +479,19 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
       </section>
 
       <section className="grid grid-cols-2 gap-3">
-        <div className="life-buffer-card rounded-2xl border border-[#c9d7ca] bg-[#e4ecdf] p-3 shadow-sm">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6f806a]">
-            <Shield size={14} />
-            缓冲金
+        <button
+          onClick={() => openPanel('expense')}
+          className="life-primary-entry rounded-2xl border border-[#7d999d] bg-[#4f7f8c] p-3 text-left text-white shadow-sm transition active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-2 text-xs font-bold text-white/85">
+            <ReceiptText size={15} />
+            快速记录
           </div>
-          <div className="mt-2 text-2xl font-black text-[#3f563d]">
-            {formatAmount(budget.pockets.buffer)}
+          <div className="mt-2 text-2xl font-black">记一笔</div>
+          <div className="mt-3 rounded-lg bg-white/18 px-2 py-1.5 text-[11px] font-bold">
+            支出优先入口
           </div>
-          <div className="mt-3 life-soft-row rounded-lg bg-white/40 px-2 py-1.5 text-[11px] font-bold text-[#6f806a]">
-            超支时自动补上
-          </div>
-        </div>
+        </button>
 
         <SectionShell className="overflow-hidden p-3">
           <div className="flex items-center justify-between gap-2">
@@ -547,13 +560,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
         </SectionShell>
       </section>
 
-      <section className="grid grid-cols-4 gap-2">
-        <button
-          onClick={() => openPanel('expense')}
-          className={`${quickActionClass} bg-[#3f4842] text-white`}
-        >
-          <ReceiptText size={16} /> 记支出
-        </button>
+      <section className="grid grid-cols-3 gap-2">
         <button
           onClick={() => openPanel('income')}
           className={`${quickActionClass} bg-[#8aa0a2] text-white`}
@@ -582,46 +589,60 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           </h2>
           <span className="text-[10px] text-stone-400">按周</span>
         </div>
-        <div className="mt-3 flex h-28 items-end gap-2">
-          {(currentCycleSummary?.weeks ?? []).map((item) => {
-            const weekStatus = getWeekStatus(item.startDate, item.endDate);
-            const spentPercent =
-              item.allowance > 0
-                ? Math.min(100, Math.round((item.spent / item.allowance) * 100))
-                : 0;
-            const barHeight = weekStatus === 'future' ? 48 : Math.max(18, spentPercent);
-
-            return (
-              <button
-                key={`${item.startDate}-${item.endDate}`}
-                onClick={() => openPanel('cycle')}
-                className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                title={`第 ${item.index + 1} 周`}
-              >
-                <div className="flex h-20 w-full items-end rounded-xl bg-[#f8f4ec] px-1.5 pb-1.5">
-                  <div
-                    className={`w-full rounded-lg ${
-                      weekStatus === 'future'
-                        ? 'bg-[#d9b76c]/65'
-                        : weekStatus === 'current'
-                          ? 'bg-[#6aaebe]'
-                          : 'bg-[#8ba889]'
-                    }`}
-                    style={{ height: `${barHeight}%` }}
-                  />
-                </div>
-                <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
-                  W{item.index + 1}
-                </span>
-              </button>
-            );
-          })}
-          {(currentCycleSummary?.weeks.length ?? 0) === 0 && (
-            <div className="flex h-full w-full items-center justify-center rounded-xl bg-[#f8f4ec] text-xs font-bold text-stone-500">
-              收入分配后显示周期节奏
+        {(currentCycleSummary?.weeks.length ?? 0) > 0 ? (
+          <div className="mt-3 flex h-36 gap-2">
+            <div className="flex w-12 flex-col justify-between pb-5 pt-5 text-right text-[9px] font-bold text-stone-400">
+              <span>{formatAmount(weeklyChartMax)}</span>
+              <span>¥ 0</span>
             </div>
-          )}
-        </div>
+            <div className="relative flex min-w-0 flex-1 items-end gap-2 border-b border-l border-stone-200 pb-5 pl-2">
+              <div className="pointer-events-none absolute left-2 right-0 top-5 border-t border-dashed border-stone-200" />
+              {(currentCycleSummary?.weeks ?? []).map((item) => {
+                const weekStatus = getWeekStatus(item.startDate, item.endDate);
+                const displayValue = weekStatus === 'future' ? item.allowance : item.spent;
+                const barHeight = Math.max(
+                  8,
+                  Math.round((displayValue / weeklyChartMax) * 100),
+                );
+
+                return (
+                  <button
+                    key={`${item.startDate}-${item.endDate}`}
+                    onClick={() => openPanel('cycle')}
+                    className="relative z-10 flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                    title={`第 ${item.index + 1} 周`}
+                  >
+                    <span className="text-[9px] font-bold text-stone-400">
+                      {formatAmount(displayValue)}
+                    </span>
+                    <div className="flex h-20 w-full items-end rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
+                      <div
+                        className={`w-full rounded-md ${
+                          weekStatus === 'future'
+                            ? 'bg-[#d9b76c]/65'
+                            : weekStatus === 'current'
+                              ? 'bg-[#6aaebe]'
+                              : 'bg-[#8ba889]'
+                        }`}
+                        style={{ height: `${barHeight}%` }}
+                      />
+                    </div>
+                    <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
+                      W{item.index + 1}
+                    </span>
+                  </button>
+                );
+              })}
+              <span className="absolute bottom-0 right-0 translate-y-5 text-[10px] font-bold text-stone-400">
+                周
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex h-24 w-full items-center justify-center rounded-xl bg-[#f8f4ec] text-xs font-bold text-stone-500">
+            收入分配后显示周期节奏
+          </div>
+        )}
       </SectionShell>
 
       {panel === 'cycle' && (
@@ -866,6 +887,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({ data, setData, theme }
           {settingsSaved && (
             <div className="mt-2 text-center text-xs font-bold text-[#6f8b6b]">
               已保存设置
+            </div>
+          )}
+          {appControls && (
+            <div className="mt-4 border-t border-stone-200 pt-3">
+              <div className="mb-2 text-xs font-black text-stone-500">账本与外观</div>
+              {appControls}
             </div>
           )}
         </BottomSheet>

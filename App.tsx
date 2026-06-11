@@ -110,6 +110,42 @@ const App: React.FC = () => {
     }
   };
 
+  const appControls = (
+    <div className="flex flex-wrap gap-2">
+      <button
+        onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors ${
+          theme === 'dark'
+            ? 'bg-white/10 text-stone-100 hover:bg-white/15'
+            : 'bg-[#e9dcc4] text-[#5d4d37] hover:bg-[#dfcda9]'
+        }`}
+      >
+        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+        {theme === 'dark' ? '日间' : '夜间'}
+      </button>
+      <button
+        onClick={handleExportBackup}
+        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors ${
+          theme === 'dark'
+            ? 'bg-white/10 text-stone-100 hover:bg-white/15'
+            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+        }`}
+      >
+        <Download size={14} /> 导出整站
+      </button>
+      <label className="flex items-center gap-2 px-3 py-2 text-xs text-white bg-stone-800 rounded-lg hover:bg-stone-900 transition-colors cursor-pointer">
+        <Upload size={14} /> 恢复整站
+        <input
+          ref={backupInputRef}
+          type="file"
+          hidden
+          accept=".json"
+          onChange={handleImportBackup}
+        />
+      </label>
+    </div>
+  );
+
   return (
     <div
       className={`flex min-h-screen transition-colors ${
@@ -174,60 +210,31 @@ const App: React.FC = () => {
       </nav>
 
       <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto w-full pb-20 md:pb-8 overflow-y-auto h-screen scrollbar-hide">
-        <div
-          className={`mb-4 md:mb-6 rounded-2xl px-4 py-3 shadow-sm transition-colors ${
+        {currentView === ViewType.COPPER && (
+          <div
+            className={`mb-4 md:mb-6 rounded-2xl px-4 py-3 shadow-sm transition-colors ${
             theme === 'dark'
               ? 'border border-white/10 bg-[#20261f] text-stone-100'
               : 'border border-stone-200 bg-white/90 text-stone-800'
-          }`}
-        >
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-stone-100' : 'text-stone-700'}`}>本地账本</div>
-              <div className={`text-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-                数据保存在当前浏览器。换设备前请导出整站备份，再到新设备恢复。
+            }`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-stone-100' : 'text-stone-700'}`}>本地账本</div>
+                <div className={`text-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                  数据保存在当前浏览器。换设备前请导出整站备份，再到新设备恢复。
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-                className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-white/10 text-stone-100 hover:bg-white/15'
-                    : 'bg-[#e9dcc4] text-[#5d4d37] hover:bg-[#dfcda9]'
-                }`}
-              >
-                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                {theme === 'dark' ? '日间' : '夜间'}
-              </button>
-              <button
-                onClick={handleExportBackup}
-                className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-white/10 text-stone-100 hover:bg-white/15'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                <Download size={14} /> 导出整站
-              </button>
-              <label className="flex items-center gap-2 px-3 py-2 text-xs text-white bg-stone-800 rounded-lg hover:bg-stone-900 transition-colors cursor-pointer">
-                <Upload size={14} /> 恢复整站
-                <input
-                  ref={backupInputRef}
-                  type="file"
-                  hidden
-                  accept=".json"
-                  onChange={handleImportBackup}
-                />
-              </label>
+              {appControls}
             </div>
           </div>
-        </div>
+        )}
 
         {currentView === ViewType.COPPER ? (
           <CopperShop data={ledger.copper} setData={setCopperData} />
         ) : (
           <DailyLedger
+            appControls={appControls}
             data={ledger.daily}
             setData={setDailyData}
             theme={theme}
