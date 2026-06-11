@@ -594,18 +594,18 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xs font-black text-stone-500">
             <CalendarDays size={14} />
-            每周已花 / 未来预算
+            每周预算消耗
           </h2>
           <span className="text-[10px] text-stone-400">按周</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold text-stone-400">
           <span className="flex items-center gap-1">
             <i className="h-2 w-2 rounded-full bg-[#8ba889]" />
-            历史已花
+            已花
           </span>
           <span className="flex items-center gap-1">
-            <i className="h-2 w-2 rounded-full bg-[#6aaebe]" />
-            当前已花
+            <i className="h-2 w-2 rounded-full bg-[#dce8e6]" />
+            剩余
           </span>
           <span className="flex items-center gap-1">
             <i className="h-2 w-2 rounded-full bg-[#d9b76c]" />
@@ -613,42 +613,51 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           </span>
         </div>
         {(currentCycleSummary?.weeks.length ?? 0) > 0 ? (
-          <div className="mt-3 flex h-36 gap-2">
-            <div className="flex w-12 flex-col justify-between pb-5 pt-5 text-right text-[9px] font-bold text-stone-400">
-              <span>{formatAmount(weeklyChartMax)}</span>
-              <span>¥ 0</span>
-            </div>
-            <div className="relative flex min-w-0 flex-1 items-end gap-2 border-b border-l border-stone-200 pb-5 pl-2">
-              <div className="pointer-events-none absolute left-2 right-0 top-5 border-t border-dashed border-stone-200" />
+          <>
+            <div className="mt-3 flex h-28 items-end gap-2 border-b border-stone-200 pb-2">
               {(currentCycleSummary?.weeks ?? []).map((item) => {
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
-                const displayValue = weekStatus === 'future' ? item.allowance : item.spent;
-                const barHeight = Math.max(
+                const spentValue = weekStatus === 'future' ? 0 : item.spent;
+                const remainingValue = Math.max(0, item.allowance - spentValue);
+                const totalHeight = Math.max(
                   8,
-                  Math.round((displayValue / weeklyChartMax) * 100),
+                  Math.round((item.allowance / weeklyChartMax) * 100),
                 );
+                const spentHeight =
+                  item.allowance > 0
+                    ? Math.max(0, Math.round((spentValue / item.allowance) * 100))
+                    : 0;
+                const remainingHeight = Math.max(0, 100 - spentHeight);
 
                 return (
                   <button
                     key={`${item.startDate}-${item.endDate}`}
                     onClick={() => openPanel('cycle')}
-                    className="relative z-10 flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                    className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
                     title={`第 ${item.index + 1} 周`}
                   >
-                    <div className="flex h-20 w-full items-end rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
-                      <div
-                        className={`flex w-full items-center justify-center rounded-md px-0.5 text-[9px] font-black text-white ${
-                          weekStatus === 'future'
-                            ? 'bg-[#d9b76c]/65'
-                            : weekStatus === 'current'
-                              ? 'bg-[#6aaebe]'
-                              : 'bg-[#8ba889]'
-                        }`}
-                        style={{ height: `${barHeight}%` }}
-                      >
-                        <span className="[writing-mode:vertical-rl]">
-                          {formatAmount(displayValue)}
-                        </span>
+                    <div className="flex h-20 w-full items-end">
+                      <div className="flex w-full flex-col overflow-hidden rounded-lg bg-[#f8f4ec]" style={{ height: `${totalHeight}%` }}>
+                        {weekStatus === 'future' ? (
+                          <div className="flex h-full items-center justify-center bg-[#d9b76c]/65 px-0.5 text-[9px] font-black text-white">
+                            预算
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              className="bg-[#dce8e6]"
+                              style={{ height: `${remainingHeight}%` }}
+                            />
+                            <div
+                              className={`flex items-center justify-center px-0.5 text-[9px] font-black text-white ${
+                                weekStatus === 'current' ? 'bg-[#6aaebe]' : 'bg-[#8ba889]'
+                              }`}
+                              style={{ height: `${spentHeight}%` }}
+                            >
+                              {spentValue > 0 ? '已花' : ''}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                     <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
@@ -657,11 +666,28 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                   </button>
                 );
               })}
-              <span className="absolute bottom-0 right-0 translate-y-5 text-[10px] font-bold text-stone-400">
-                周
-              </span>
             </div>
-          </div>
+            <div className="mt-2 grid gap-1 text-[10px] font-bold text-stone-500">
+              {(currentCycleSummary?.weeks ?? []).map((item) => {
+                const weekStatus = getWeekStatus(item.startDate, item.endDate);
+                const spentValue = weekStatus === 'future' ? 0 : item.spent;
+                const remainingValue = Math.max(0, item.allowance - spentValue);
+
+                return (
+                  <button
+                    key={`${item.startDate}-${item.endDate}-data`}
+                    onClick={() => openPanel('cycle')}
+                    className="life-soft-row grid grid-cols-[3rem_1fr_1fr_1fr] items-center rounded-lg bg-[#f8f4ec] px-2 py-1.5 text-left"
+                  >
+                    <span>W{item.index + 1}</span>
+                    <span>预算 {formatAmount(item.allowance)}</span>
+                    <span>已花 {formatAmount(spentValue)}</span>
+                    <span>{weekStatus === 'future' ? '未来' : `剩 ${formatAmount(remainingValue)}`}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <div className="mt-3 flex h-24 w-full items-center justify-center rounded-xl bg-[#f8f4ec] text-xs font-bold text-stone-500">
             收入分配后显示周期节奏
