@@ -16,6 +16,34 @@ const THEME_STORAGE_KEY = 'dailyLedgerTheme';
 
 type AppTheme = 'light' | 'dark';
 
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#141815] p-4 text-stone-100">
+          <div className="rounded-2xl border border-white/10 bg-[#202820] p-4">
+            <div className="text-lg font-black">页面加载失败</div>
+            <div className="mt-2 text-sm text-stone-300">
+              请刷新页面。如果仍然失败，先导出备份后再清理浏览器缓存。
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.DAILY);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -147,6 +175,7 @@ const App: React.FC = () => {
   );
 
   return (
+    <AppErrorBoundary>
     <div
       className={`flex min-h-screen transition-colors ${
         theme === 'dark' ? 'bg-[#141815] text-stone-100' : 'bg-[#F3F1E8] text-stone-800'
@@ -242,6 +271,7 @@ const App: React.FC = () => {
         )}
       </main>
     </div>
+    </AppErrorBoundary>
   );
 };
 
