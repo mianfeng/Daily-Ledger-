@@ -585,9 +585,23 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xs font-black text-stone-500">
             <CalendarDays size={14} />
-            本周期支出节奏
+            每周已花 / 未来预算
           </h2>
           <span className="text-[10px] text-stone-400">按周</span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold text-stone-400">
+          <span className="flex items-center gap-1">
+            <i className="h-2 w-2 rounded-full bg-[#8ba889]" />
+            历史已花
+          </span>
+          <span className="flex items-center gap-1">
+            <i className="h-2 w-2 rounded-full bg-[#6aaebe]" />
+            当前已花
+          </span>
+          <span className="flex items-center gap-1">
+            <i className="h-2 w-2 rounded-full bg-[#d9b76c]" />
+            未来预算
+          </span>
         </div>
         {(currentCycleSummary?.weeks.length ?? 0) > 0 ? (
           <div className="mt-3 flex h-36 gap-2">
@@ -612,12 +626,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     className="relative z-10 flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
                     title={`第 ${item.index + 1} 周`}
                   >
-                    <span className="text-[9px] font-bold text-stone-400">
-                      {formatAmount(displayValue)}
-                    </span>
                     <div className="flex h-20 w-full items-end rounded-lg bg-[#f8f4ec] px-1.5 pb-1.5">
                       <div
-                        className={`w-full rounded-md ${
+                        className={`flex w-full items-center justify-center rounded-md px-0.5 text-[9px] font-black text-white ${
                           weekStatus === 'future'
                             ? 'bg-[#d9b76c]/65'
                             : weekStatus === 'current'
@@ -625,7 +636,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                               : 'bg-[#8ba889]'
                         }`}
                         style={{ height: `${barHeight}%` }}
-                      />
+                      >
+                        <span className="[writing-mode:vertical-rl]">
+                          {formatAmount(displayValue)}
+                        </span>
+                      </div>
                     </div>
                     <span className={`text-[10px] font-bold ${weekStatus === 'current' ? 'text-[#3f4842]' : 'text-stone-400'}`}>
                       W{item.index + 1}
