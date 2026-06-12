@@ -303,3 +303,126 @@ body {
     linear-gradient(135deg, rgba(82, 139, 153, 0.96), rgba(57, 105, 113, 0.98)),
     #4f7f8c;
 }
+
+.copper-shop {
+  --copper-text: #26342f;
+  --copper-muted: #6f766f;
+  --copper-surface: rgba(255, 255, 255, 0.9);
+  --copper-soft: #fff7ea;
+  --copper-border: rgba(77, 91, 82, 0.15);
+  --copper-blue: #8aa0a2;
+  --copper-green: #8fb795;
+  --copper-amber: #d2a76d;
+  --copper-red: #cf7f73;
+}
+
+.copper-shop-dark {
+  --copper-text: #edf2ea;
+  --copper-muted: #c0cbc2;
+  --copper-surface: #202820;
+  --copper-soft: #2a3329;
+  --copper-border: rgba(255, 255, 255, 0.12);
+  --copper-blue: #6fa9b8;
+  --copper-green: #83bd8b;
+  --copper-amber: #d8b763;
+  --copper-red: #dc8b82;
+}
+
+.copper-shop,
+.copper-shop h1,
+.copper-shop h2,
+.copper-shop h3 {
+  color: var(--copper-text);
+}
+
+.copper-shop .bg-white,
+.copper-shop .bg-white\/80,
+.copper-shop .bg-white\/90 {
+  background-color: var(--copper-surface);
+}
+
+.copper-shop .bg-stone-50,
+.copper-shop .bg-stone-100 {
+  background-color: var(--copper-soft);
+}
+
+.copper-shop .border-stone-100,
+.copper-shop .border-stone-200,
+.copper-shop .border-stone-300 {
+  border-color: var(--copper-border);
+}
+
+.copper-shop .text-stone-300,
+.copper-shop .text-stone-400,
+.copper-shop .text-stone-500,
+.copper-shop .text-stone-600,
+.copper-shop .text-\[\#8b8175\] {
+  color: var(--copper-muted);
+}
+
+.copper-shop .text-stone-700,
+.copper-shop .text-stone-800,
+.copper-shop .text-amber-900,
+.copper-shop .text-\[\#3f4842\] {
+  color: var(--copper-text);
+}
+
+.copper-shop .bg-gradient-to-r {
+  background:
+    linear-gradient(135deg, rgba(138, 160, 162, 0.96), rgba(111, 168, 141, 0.94)),
+    var(--copper-blue);
+  border: 1px solid rgba(77, 91, 82, 0.12);
+}
+
+.copper-shop-dark .bg-gradient-to-r {
+  background:
+    linear-gradient(135deg, rgba(43, 93, 111, 0.96), rgba(49, 91, 65, 0.96)),
+    #17343a;
+}
+
+.copper-shop input,
+.copper-sheet input {
+  border-color: var(--copper-border);
+  color: var(--copper-text);
+}
+
+.copper-shop input::placeholder,
+.copper-sheet input::placeholder {
+  color: #8a958d;
+}
+
+.copper-shop-dark input,
+.copper-shop-dark .copper-sheet input {
+  background: #172017;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--copper-text);
+}
+
+.copper-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(13, 18, 15, 0.52);
+  animation: sheetIn 0.18s ease-out;
+}
+
+.copper-sheet {
+  width: min(100%, 40rem);
+  max-height: min(82vh, 720px);
+  overflow-y: auto;
+  border: 1px solid var(--copper-border);
+  border-radius: 24px;
+  background: var(--copper-surface);
+  color: var(--copper-text);
+  padding: 14px 16px 18px;
+  box-shadow: 0 24px 64px rgba(21, 26, 22, 0.34);
+  animation: sheetSlideUp 0.22s ease-out;
+}
+
+.copper-shop-dark .copper-sheet {
+  background: #202820;
+}

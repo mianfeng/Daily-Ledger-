@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Archive,
   ArrowRightCircle,
+  Briefcase,
   Calendar,
   Coins,
   Download,
@@ -13,6 +14,7 @@ import {
   TrendingUp,
   Upload,
   Wallet,
+  X,
 } from 'lucide-react';
 import {
   Bar,
@@ -69,9 +71,10 @@ type CopperTrendMode = 'flow' | 'inventory';
 interface CopperShopProps {
   data: CopperData;
   setData: React.Dispatch<React.SetStateAction<CopperData>>;
+  theme: 'light' | 'dark';
 }
 
-export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
+export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [ratioDraft, setRatioDraft] = useState<CopperRatios>(data.ratios);
   const [inventoryEntryAmount, setInventoryEntryAmount] = useState('');
@@ -158,6 +161,18 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
     () => data.transactions.filter((transaction) => transaction.isLegacyLocked).length,
     [data.transactions],
   );
+  const isDark = theme === 'dark';
+  const chartGridColor = isDark ? 'rgba(255,255,255,0.10)' : '#E7E1D4';
+  const chartTickColor = isDark ? '#BFC9C1' : '#7D7165';
+  const tooltipStyle = {
+    background: isDark ? '#202820' : 'rgba(255, 255, 255, 0.96)',
+    borderRadius: '10px',
+    border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(77,91,82,0.12)',
+    boxShadow: '0 18px 34px -22px rgba(0, 0, 0, 0.45)',
+    color: isDark ? '#EDF2EA' : '#26342F',
+    fontSize: '11px',
+    padding: '6px 8px',
+  };
 
   const handleAddTransaction = () => {
     const amount = Number(form.amount);
@@ -332,26 +347,47 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
   };
 
   return (
-    <div className="space-y-4 animate-fade-in pb-10">
-      <div className="flex justify-between items-center border-b pb-3 border-stone-200">
-        <h1 className="text-xl font-bold text-amber-900 flex items-center gap-2">
-          <div className="relative w-6 h-6">
-            <div className="absolute inset-0 bg-amber-700 rounded-full"></div>
-            <div className="absolute inset-1.5 bg-[#F5F5F0] rounded-sm"></div>
+    <div className={`copper-shop copper-shop-${theme} space-y-4 animate-fade-in pb-10`}>
+      <div className="flex justify-between items-center gap-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8b8175]">
+            Copper Business
           </div>
-          铜钱分账
-        </h1>
+          <h1 className="mt-1 text-2xl font-black text-[#3f4842] flex items-center gap-2">
+            <span className="rounded-xl bg-[#8aa0a2] p-2 text-white shadow-sm">
+              <Briefcase size={20} />
+            </span>
+            铜钱生意
+          </h1>
+        </div>
         <button
-          onClick={() => setShowSettings((prev) => !prev)}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-600 border border-stone-300 rounded hover:bg-stone-100 transition-colors"
+          onClick={() => setShowSettings(true)}
+          className="rounded-full border border-stone-200 bg-white/80 p-2.5 text-[#70685f] shadow-sm"
+          title="配置"
         >
-          <Settings size={14} /> 配置
+          <Settings size={18} />
         </button>
       </div>
 
       {showSettings && (
-        <div className="bg-white p-4 rounded-xl shadow-lg border-t-4 border-stone-400 space-y-4">
-          <div>
+        <div className="copper-sheet-overlay" onClick={() => setShowSettings(false)}>
+        <div className="copper-sheet space-y-4" onClick={(event) => event.stopPropagation()}>
+          <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-stone-300" />
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-base font-black">
+              <Settings size={17} />
+              铜钱设置
+            </h2>
+            <button
+              onClick={() => setShowSettings(false)}
+              className="rounded-full border border-stone-200 bg-white/80 p-2 text-stone-500"
+              title="关闭"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
             <h3 className="font-bold text-sm mb-3">利润分配比例 (总和须为100)</h3>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
@@ -385,13 +421,13 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
             </div>
             <button
               onClick={handleSaveSettings}
-              className="w-full bg-amber-700 text-white py-1.5 rounded hover:bg-amber-800 text-sm"
+              className="w-full bg-[#4f7f8c] text-white py-2 rounded-xl hover:bg-[#426f79] text-sm font-bold"
             >
               保存比例
             </button>
           </div>
 
-          <div className="pt-4 border-t border-stone-100">
+          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
             <h3 className="font-bold text-sm mb-3">库存成本补录</h3>
             <div className="flex flex-col md:flex-row gap-2">
               <input
@@ -417,7 +453,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-stone-100">
+          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
             <h3 className="font-bold text-sm mb-3">盘点设置总额</h3>
             <div className="flex flex-col md:flex-row gap-2">
               <input
@@ -443,7 +479,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
             </div>
           </div>
 
-          <div className="pt-3 border-t flex gap-2">
+          <div className="pt-1 flex gap-2">
             <button
               onClick={() => exportCopperToExcel(data)}
               className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
@@ -455,6 +491,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
               <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
             </label>
           </div>
+        </div>
         </div>
       )}
 
@@ -682,19 +719,19 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
                     data={trendSummary.flowData}
                     margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
                     <XAxis
                       dataKey="shortDate"
                       axisLine={false}
                       interval="preserveStartEnd"
                       minTickGap={18}
-                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tick={{ fontSize: 9, fill: chartTickColor }}
                       tickLine={false}
                     />
                     <YAxis
                       axisLine={false}
                       tickFormatter={(value) => formatCompactAmount(Number(value))}
-                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tick={{ fontSize: 9, fill: chartTickColor }}
                       tickLine={false}
                       width={34}
                     />
@@ -704,18 +741,12 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
                         name,
                       ]}
                       labelFormatter={(label) => `日期: ${label}`}
-                      contentStyle={{
-                        borderRadius: '8px',
-                        border: 'none',
-                        boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
-                        fontSize: '11px',
-                        padding: '6px 8px',
-                      }}
+                      contentStyle={tooltipStyle}
                     />
                     <Bar
                       dataKey="income"
                       name="收入"
-                      fill="#10B981"
+                      fill="#6FA88D"
                       radius={[4, 4, 0, 0]}
                       maxBarSize={14}
                     />
@@ -723,7 +754,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
                       type="monotone"
                       dataKey="profitTrend"
                       name="利润均线"
-                      stroke="#2563EB"
+                      stroke="#C58E62"
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 3 }}
@@ -734,39 +765,33 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
                     data={chartData}
                     margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
                     <XAxis
                       dataKey="shortDate"
                       axisLine={false}
                       interval="preserveStartEnd"
                       minTickGap={18}
-                      tick={{ fontSize: 9, fill: '#9CA3AF' }}
+                      tick={{ fontSize: 9, fill: chartTickColor }}
                       tickLine={false}
                     />
                     <YAxis
                       axisLine={false}
                       domain={['auto', 'auto']}
                       tickFormatter={(value) => formatCompactAmount(Number(value))}
-                      tick={{ fontSize: 9, fill: '#D97706' }}
+                      tick={{ fontSize: 9, fill: chartTickColor }}
                       tickLine={false}
                       width={34}
                     />
                     <Tooltip
                       formatter={(value: number) => formatMoney(Number(value))}
                       labelFormatter={(label) => `日期: ${label}`}
-                      contentStyle={{
-                        borderRadius: '8px',
-                        border: 'none',
-                        boxShadow: '0 10px 24px -16px rgba(0, 0, 0, 0.35)',
-                        fontSize: '11px',
-                        padding: '6px 8px',
-                      }}
+                      contentStyle={tooltipStyle}
                     />
                     <Line
                       type="monotone"
                       dataKey="inventoryCost"
                       name="库存成本"
-                      stroke="#D97706"
+                      stroke="#8AA0A2"
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 3 }}
@@ -875,7 +900,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData }) => {
                   </div>
                   <button
                     onClick={() => handleDeleteTransaction(transaction.id)}
-                    className={`p-1 rounded transition-colors opacity-0 group-hover:opacity-100 ${
+                    className={`p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
                       transaction.isLegacyLocked
                         ? 'text-stone-200 cursor-not-allowed'
                         : 'text-stone-300 hover:text-red-500'

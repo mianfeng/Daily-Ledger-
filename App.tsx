@@ -260,7 +260,7 @@ const App: React.FC = () => {
         )}
 
         {currentView === ViewType.COPPER ? (
-          <CopperShop data={ledger.copper} setData={setCopperData} />
+          <CopperShop data={ledger.copper} setData={setCopperData} theme={theme} />
         ) : (
           <DailyLedger
             appControls={appControls}
