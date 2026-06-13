@@ -5,6 +5,7 @@ import {
   DailyExpenseCategory,
   DailyIncomeKind,
   DailyTransaction,
+  DailyTransactionAllocation,
   FixedExpense,
   LifeBudgetSettings,
   LifeBudgetState,
@@ -811,7 +812,7 @@ export const allocateIncome = (
       initialized: true,
       archivedCycles: budget.currentCycle
         ? [
-            { ...budget.currentCycle, status: 'closed' },
+            { ...budget.currentCycle, status: 'closed' as const },
             ...budget.archivedCycles,
           ].slice(0, 12)
         : budget.archivedCycles,
@@ -1018,6 +1019,34 @@ export const markFixedExpensePaid = (
   };
 };
 
+const rollbackCycleMainIncome = (
+  cycle: BudgetCycle,
+  transaction: DailyTransaction,
+  allocation: DailyTransactionAllocation,
+) => {
+  if (transaction.type !== 'income' || transaction.incomeKind !== 'main') {
+    return cycle;
+  }
+
+  const nextMainIncome = roundAmount(Math.max(0, cycle.mainIncome - transaction.amount));
+  if (nextMainIncome <= 0 && normalizeDateInput(transaction.date) === cycle.startDate) {
+    return null;
+  }
+
+  let reserveRollback = roundAmount(Math.max(0, allocation.reserve));
+  const reserveDepositRollback = Math.min(cycle.reserveDeposit, reserveRollback);
+  reserveRollback = roundAmount(reserveRollback - reserveDepositRollback);
+  const reserveRecoveryRollback = Math.min(cycle.reserveRecovery, reserveRollback);
+
+  return {
+    ...cycle,
+    mainIncome: nextMainIncome,
+    reserveDeposit: roundAmount(Math.max(0, cycle.reserveDeposit - reserveDepositRollback)),
+    reserveRecovery: roundAmount(Math.max(0, cycle.reserveRecovery - reserveRecoveryRollback)),
+    startingBuffer: roundAmount(Math.max(0, cycle.startingBuffer - allocation.buffer)),
+  };
+};
+
 export const deleteDailyTransaction = (
   data: DailyData,
   transactionId: number,
@@ -1041,8 +1070,16 @@ export const deleteDailyTransaction = (
   };
 
   const direction = transaction.type === 'income' ? -1 : 1;
+  const nextCurrentCycle = budget.currentCycle
+    ? rollbackCycleMainIncome(budget.currentCycle, transaction, allocation)
+    : null;
+  const nextArchivedCycles = budget.archivedCycles
+    .map((cycle) => rollbackCycleMainIncome(cycle, transaction, allocation))
+    .filter((cycle): cycle is BudgetCycle => cycle !== null);
   const nextBudget: LifeBudgetState = {
     ...budget,
+    currentCycle: nextCurrentCycle,
+    archivedCycles: nextArchivedCycles,
     pockets: {
       ...budget.pockets,
       spendable: roundAmount(

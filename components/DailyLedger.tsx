@@ -190,6 +190,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       ? Math.min(100, Math.round((budget.pockets.reserve / snapshot.reserveMinimum) * 100))
       : 100;
   const actualBookBalance = snapshot.weekRemaining + budget.pockets.buffer;
+  const cycleTotalBalance =
+    snapshot.weekRemaining +
+    budget.pockets.buffer +
+    budget.pockets.reserve +
+    budget.pockets.fixedReserved;
   const shouldRecommendLarge =
     parseAmount(expenseForm.amount) >= budget.settings.largeExpenseAbsoluteThreshold ||
     (week?.allowance ?? 0) > 0 &&
@@ -454,6 +459,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 {week
                   ? `${formatDisplayDate(week.startDate)} - ${formatDisplayDate(week.endDate)}`
                   : '收入分配后生成预算周'}
+              </div>
+              <div className="mt-1 text-[11px] font-bold text-[#657b7a]">
+                周期总余额 {formatAmount(cycleTotalBalance)}
               </div>
             </div>
             <div className="rounded-2xl bg-white/55 px-3 py-2 text-right">
