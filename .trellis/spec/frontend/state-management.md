@@ -123,6 +123,10 @@ writeLocalLedgerData(currentData);
   - `buffer` changes `LifeBudgetState.pockets.buffer`
   - `reserve` changes `LifeBudgetState.pockets.reserve`
   - `fixed` changes `LifeBudgetState.pockets.fixedReserved`
+- Prepaid/future expenses keep `date` as the payment date and store
+  `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
+  `effectiveDate`, while pocket deduction and rollback still use the original
+  `allocation`.
 - Any transaction that mutates more than pockets must store enough metadata to reverse the extra state:
   - fixed-expense payment transactions store `fixedExpenseId`
   - main-income transactions that start a new cycle store `previousCycle` and `previousPockets`

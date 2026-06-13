@@ -173,6 +173,8 @@ export const exportDailyToExcel = (
       备注: transaction.desc,
       分类: transaction.category ?? '',
       收入类型: transaction.incomeKind ?? '',
+      费用时点: transaction.expenseTiming ?? '',
+      归属日期: transaction.effectiveDate ?? '',
       分配_周: transaction.allocation?.week ?? '',
       分配_缓冲: transaction.allocation?.buffer ?? '',
       分配_预支: transaction.allocation?.advance ?? '',
@@ -199,6 +201,8 @@ export const exportDailyToExcel = (
         备注: transaction.desc,
         分类: transaction.category ?? '',
         收入类型: transaction.incomeKind ?? '',
+        费用时点: transaction.expenseTiming ?? '',
+        归属日期: transaction.effectiveDate ?? '',
       })),
   );
 
@@ -246,6 +250,8 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
         ...normalized,
         category: (row['分类'] ?? row.category) as Transaction['category'],
         incomeKind: (row['收入类型'] ?? row.incomeKind) as Transaction['incomeKind'],
+        expenseTiming: (row['费用时点'] ?? row.expenseTiming) as Transaction['expenseTiming'],
+        effectiveDate: (row['归属日期'] ?? row.effectiveDate) as Transaction['effectiveDate'],
         allocation: hasAllocation
           ? {
               week: allocationValues.week ?? 0,

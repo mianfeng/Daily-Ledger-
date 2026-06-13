@@ -170,8 +170,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
     date: today,
+    effectiveDate: today,
     desc: '',
     category: 'daily' as DailyExpenseCategory,
+    isPrepaid: false,
   });
   const [calibrationAmount, setCalibrationAmount] = useState('');
   const [fixedForm, setFixedForm] = useState({
@@ -189,12 +191,14 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     snapshot.reserveMinimum > 0
       ? Math.min(100, Math.round((budget.pockets.reserve / snapshot.reserveMinimum) * 100))
       : 100;
-  const actualBookBalance = snapshot.weekRemaining + budget.pockets.buffer;
+  const actualBookBalance = snapshot.calibratableBalance;
   const shouldRecommendLarge =
-    parseAmount(expenseForm.amount) >= budget.settings.largeExpenseAbsoluteThreshold ||
-    (week?.allowance ?? 0) > 0 &&
+    !expenseForm.isPrepaid &&
+    (parseAmount(expenseForm.amount) >= budget.settings.largeExpenseAbsoluteThreshold ||
+      (week?.allowance ?? 0) > 0 &&
       parseAmount(expenseForm.amount) >=
-        (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate;
+        (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate);
+  const prepaidHintTotal = snapshot.prepaidInCycle + snapshot.upcomingPrepaid;
 
   const recentEvents = useMemo(
     () =>
@@ -203,6 +207,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         .slice(0, 10),
     [data.transactions],
   );
+  const getTransactionKindLabel = (transaction: DailyData['transactions'][number]) =>
+    transaction.type === 'income'
+      ? incomeKindLabels[transaction.incomeKind ?? 'casual']
+      : transaction.expenseTiming === 'prepaid'
+        ? '提前支付'
+        : categoryLabels[transaction.category ?? 'other'];
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
   const cycleVisibleBalance = currentCycleSummary?.balance ?? 0;
@@ -287,6 +297,22 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       return;
     }
 
+    if (
+      expenseForm.isPrepaid &&
+      normalizeDateInput(expenseForm.effectiveDate) < normalizeDateInput(expenseForm.date)
+    ) {
+      alert('归属日期不能早于付款日期');
+      return;
+    }
+
+    if (
+      expenseForm.isPrepaid &&
+      amount > budget.pockets.buffer + budget.pockets.reserve &&
+      !window.confirm('缓冲金和储备金不足，差额会从当前可用余额扣除，仍然记录吗？')
+    ) {
+      return;
+    }
+
     const category =
       shouldRecommendLarge && expenseForm.category !== 'large'
         ? window.confirm('这笔支出较大，要按“大额支出”处理吗？')
@@ -308,9 +334,18 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         category,
         date: expenseForm.date,
         desc: expenseForm.desc,
+        effectiveDate: expenseForm.isPrepaid ? expenseForm.effectiveDate : undefined,
+        expenseTiming: expenseForm.isPrepaid ? 'prepaid' : undefined,
       }),
     );
-    setExpenseForm((prev) => ({ ...prev, amount: '', desc: '', category: 'daily' }));
+    setExpenseForm((prev) => ({
+      ...prev,
+      amount: '',
+      desc: '',
+      category: 'daily',
+      isPrepaid: false,
+      effectiveDate: prev.date,
+    }));
     setPanel(null);
   };
 
@@ -496,6 +531,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </div>
             </div>
           </div>
+          {prepaidHintTotal > 0 && (
+            <button
+              onClick={() => openPanel('cycle')}
+              className="mt-3 flex w-full items-center justify-between rounded-xl bg-white/40 px-3 py-2 text-left text-[11px] font-bold text-[#657b7a]"
+            >
+              <span>提前支付</span>
+              <span>{formatAmount(prepaidHintTotal)}</span>
+            </button>
+          )}
         </div>
 
       </section>
@@ -626,7 +670,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             <div className="mt-3 flex h-28 items-end gap-2 border-b border-stone-200 pb-2">
               {(currentCycleSummary?.weeks ?? []).map((item) => {
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
-                const spentValue = weekStatus === 'future' ? 0 : item.spent;
+                const spentValue =
+                  weekStatus === 'future' ? item.prepaidSpent : item.spent;
                 const remainingValue = Math.max(0, item.allowance - spentValue);
                 const totalHeight = Math.max(
                   8,
@@ -670,7 +715,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             <div className="mt-2 grid gap-1 text-[10px] font-bold text-stone-500">
               {(currentCycleSummary?.weeks ?? []).map((item) => {
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
-                const spentValue = weekStatus === 'future' ? 0 : item.spent;
+                const spentValue =
+                  weekStatus === 'future' ? item.prepaidSpent : item.spent;
                 const remainingValue = Math.max(0, item.allowance - spentValue);
 
                 return (
@@ -681,7 +727,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                   >
                     <span>W{item.index + 1}</span>
                     <span>预算 {formatAmount(item.allowance)}</span>
-                    <span>已花 {formatAmount(spentValue)}</span>
+                    <span>{weekStatus === 'future' ? '提前' : '已花'} {formatAmount(spentValue)}</span>
                     <span>{weekStatus === 'future' ? '未来' : `剩 ${formatAmount(remainingValue)}`}</span>
                   </button>
                 );
@@ -735,7 +781,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                   <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">周期收入</span>
-                      <b className="block">{formatAmount(cycle.mainIncome)}</b>
+                      <b className="block">
+                        {formatAmount(currentCycleSummary?.mainIncome ?? cycle.mainIncome)}
+                        <span className="mx-1 text-stone-400">+</span>
+                        {formatAmount(currentCycleSummary?.otherIncome ?? 0)}
+                      </b>
                     </div>
                     <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">日常预算</span>
@@ -750,6 +800,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                       <b className="block">{formatAmount((currentCycleSummary?.reserveChange ?? 0))}</b>
                     </div>
                   </div>
+                  {(currentCycleSummary?.prepaidTotal ?? 0) > 0 && (
+                    <div className="mt-2 rounded-xl bg-[#eef4f1] px-3 py-2 text-[11px] font-bold text-[#55736c]">
+                      周期总开销中，提前支付 {formatAmount(currentCycleSummary?.prepaidTotal ?? 0)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4">
@@ -775,7 +830,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                           </div>
                           {weekStatus === 'future' ? (
                             <div className="mt-2 rounded-lg bg-[#f8f4ec] px-2 py-1.5 text-[10px] font-bold text-stone-500">
-                              未来周，只显示预算，不计算余额。
+                              未来周显示预算；已记录提前支付 {formatAmount(item.prepaidSpent)}。
                             </div>
                           ) : (
                             <>
@@ -798,6 +853,28 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     })}
                   </div>
                 </div>
+
+                {(currentCycleSummary?.prepaidTransactions.length ?? 0) > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-xs font-black text-stone-500">提前支付</h3>
+                    <div className="mt-2 space-y-2">
+                      {(currentCycleSummary?.prepaidTransactions ?? []).map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="life-event-row flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 text-xs"
+                        >
+                          <div>
+                            <b>{transaction.desc || categoryLabels[transaction.category ?? 'other']}</b>
+                            <div className="mt-0.5 text-[10px] text-stone-500">
+                              付款 {formatDisplayDate(transaction.date)} · 归属 {formatDisplayDate(transaction.effectiveDate ?? transaction.date)}
+                            </div>
+                          </div>
+                          <b className="text-[#b66b5d]">{formatAmount(transaction.amount)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="life-help mt-3 rounded-xl bg-[#f3f0e9] px-3 py-3 text-xs leading-5 text-stone-600">
@@ -809,7 +886,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               <div className="mt-4">
                 <h3 className="text-xs font-black text-stone-500">最近周期</h3>
                 <div className="mt-2 space-y-2">
-                  {cycleSummaries.slice(1, 5).map(({ cycle: item, balance, budget, reserveChange }) => {
+                  {cycleSummaries.slice(1, 5).map(({ cycle: item, balance, budget, reserveChange, otherIncome, prepaidTotal }) => {
                     const isFutureCycle = item.startDate > today;
                     return (
                     <div
@@ -819,7 +896,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                       <div>
                         <b>{formatDisplayDate(item.startDate)} - {formatDisplayDate(item.plannedEndDate)}</b>
                         <div className="mt-0.5 text-[10px] text-stone-500">
-                          收入 {formatAmount(item.mainIncome)} · {isFutureCycle ? '预算' : '结余'} {formatAmount(isFutureCycle ? budget : balance)}
+                          收入 {formatAmount(item.mainIncome)} + {formatAmount(otherIncome)} · {isFutureCycle ? '预算' : '结余'} {formatAmount(isFutureCycle ? budget : balance)}
+                          {prepaidTotal > 0 ? ` · 提前 ${formatAmount(prepaidTotal)}` : ''}
                         </div>
                       </div>
                       <div className="text-right">
@@ -1019,9 +1097,54 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_2fr]">
             <NumberField label="金额" value={expenseForm.amount} onChange={(amount) => setExpenseForm((prev) => ({ ...prev, amount }))} />
-            <DateField label="日期" value={expenseForm.date} onChange={(date) => setExpenseForm((prev) => ({ ...prev, date }))} />
+            <DateField
+              label={expenseForm.isPrepaid ? '付款日期' : '日期'}
+              value={expenseForm.date}
+              onChange={(date) =>
+                setExpenseForm((prev) => ({
+                  ...prev,
+                  date,
+                  effectiveDate:
+                    prev.isPrepaid && normalizeDateInput(prev.effectiveDate) < normalizeDateInput(date)
+                      ? date
+                      : prev.effectiveDate,
+                }))
+              }
+            />
             <TextField label="备注" value={expenseForm.desc} onChange={(desc) => setExpenseForm((prev) => ({ ...prev, desc }))} placeholder="可选" />
           </div>
+          <label className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs font-bold text-stone-600">
+            <span>
+              未来开销
+              <span className="ml-2 font-medium text-stone-500">从缓冲金扣，不计入本周已用</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={expenseForm.isPrepaid}
+              onChange={(event) =>
+                setExpenseForm((prev) => ({
+                  ...prev,
+                  isPrepaid: event.target.checked,
+                  effectiveDate: event.target.checked ? prev.date : prev.effectiveDate,
+                }))
+              }
+              className="h-4 w-4 accent-[#8aa0a2]"
+            />
+          </label>
+          {expenseForm.isPrepaid && (
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <DateField
+                label="归属日期"
+                value={expenseForm.effectiveDate}
+                onChange={(effectiveDate) =>
+                  setExpenseForm((prev) => ({ ...prev, effectiveDate }))
+                }
+              />
+              <div className="rounded-xl bg-[#eef4f1] px-3 py-2 text-xs leading-5 text-[#55736c]">
+                归属日期用于决定在哪个周期显示“提前支付”。付款会立即从缓冲金扣，不够时从储备金补。
+              </div>
+            </div>
+          )}
           {shouldRecommendLarge && expenseForm.category !== 'large' && (
             <div className="mt-3 rounded-xl bg-[#f8ece8] px-3 py-2 text-xs font-bold text-[#9b5b4e]">
               这笔金额较大，提交时会询问是否按大额支出处理。
@@ -1038,7 +1161,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           onClose={() => setPanel(null)}
         >
           <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
-            当前账面可消费余额为 {formatAmount(actualBookBalance)}。只填你现在准备用来日常花的钱合计，差额会自动修正。
+            当前账面可消费余额为 {formatAmount(actualBookBalance)}。填写你现在除储备金外还能动用的钱，包含固定支出预留，差额会自动修正。
           </div>
           <div className="mt-3">
             <NumberField label="当前可消费余额" value={calibrationAmount} onChange={setCalibrationAmount} />
@@ -1081,7 +1204,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </button>
             </div>
             <div className="mt-2 text-[10px] font-bold text-stone-500">
-              固定预留只从当前可消费余额搬入，超过可搬金额会按上限保存。
+              固定预留从当前可消费余额搬入，不会重算已生成的每周额度。
             </div>
           </div>
 
@@ -1171,13 +1294,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             >
               <div>
                 <div className="text-xs font-bold text-stone-800">
-                  {transaction.type === 'income'
-                    ? incomeKindLabels[transaction.incomeKind ?? 'casual']
-                    : categoryLabels[transaction.category ?? 'other']}
+                  {getTransactionKindLabel(transaction)}
                   <span className="ml-2 font-medium text-stone-500">{transaction.desc}</span>
                 </div>
                 <div className="mt-0.5 text-[10px] text-stone-400">
-                  {formatDisplayDate(transaction.date)}
+                  {transaction.expenseTiming === 'prepaid'
+                    ? `付款 ${formatDisplayDate(transaction.date)} · 归属 ${formatDisplayDate(transaction.effectiveDate ?? transaction.date)}`
+                    : formatDisplayDate(transaction.date)}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1221,13 +1344,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               >
                 <div>
                   <div className="text-xs font-bold text-stone-800">
-                    {transaction.type === 'income'
-                      ? incomeKindLabels[transaction.incomeKind ?? 'casual']
-                      : categoryLabels[transaction.category ?? 'other']}
+                    {getTransactionKindLabel(transaction)}
                     <span className="ml-2 font-medium text-stone-500">{transaction.desc}</span>
                   </div>
                   <div className="mt-0.5 text-[10px] text-stone-400">
-                    {formatDisplayDate(transaction.date)}
+                    {transaction.expenseTiming === 'prepaid'
+                      ? `付款 ${formatDisplayDate(transaction.date)} · 归属 ${formatDisplayDate(transaction.effectiveDate ?? transaction.date)}`
+                      : formatDisplayDate(transaction.date)}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

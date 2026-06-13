@@ -3,6 +3,7 @@ import {
   BudgetWeek,
   DailyData,
   DailyExpenseCategory,
+  DailyExpenseTiming,
   DailyIncomeKind,
   DailyTransaction,
   DailyTransactionAllocation,
@@ -83,6 +84,13 @@ const normalizeIncomeKind = (value: unknown): DailyIncomeKind | undefined => {
     value === 'refund' ||
     value === 'correction'
   ) {
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeExpenseTiming = (value: unknown): DailyExpenseTiming | undefined => {
+  if (value === 'prepaid') {
     return value;
   }
   return undefined;
@@ -388,11 +396,26 @@ export const sanitizeDailyData = (
         return normalized;
       }
 
+      const expenseTiming = normalizeExpenseTiming(item.expenseTiming);
+      const paymentDate = normalizeDateInput(normalized.date);
+      const rawEffectiveDate =
+        typeof item.effectiveDate === 'string'
+          ? normalizeDateInput(item.effectiveDate)
+          : '';
+      const effectiveDate =
+        expenseTiming === 'prepaid'
+          ? rawEffectiveDate && rawEffectiveDate >= paymentDate
+            ? rawEffectiveDate
+            : paymentDate
+          : undefined;
+
       return {
         ...normalized,
-        date: normalizeDateInput(normalized.date),
+        date: paymentDate,
         category: normalizeExpenseCategory(item.category),
         incomeKind: normalizeIncomeKind(item.incomeKind),
+        expenseTiming,
+        effectiveDate,
         allocation: normalizeAllocation(item.allocation),
         fixedExpenseId:
           item.fixedExpenseId === undefined
@@ -455,6 +478,17 @@ export const getCurrentBudgetWeek = (
   );
 };
 
+const isPrepaidExpense = (transaction: DailyTransaction) =>
+  transaction.type === 'expense' && transaction.expenseTiming === 'prepaid';
+
+const getExpenseReportDate = (transaction: DailyTransaction) =>
+  isPrepaidExpense(transaction)
+    ? normalizeDateInput(transaction.effectiveDate ?? transaction.date)
+    : normalizeDateInput(transaction.date);
+
+const getPrepaidExpenseAmount = (transaction: DailyTransaction) =>
+  isPrepaidExpense(transaction) ? transaction.amount : 0;
+
 const getWeekExpenseTotal = (
   transactions: DailyTransaction[],
   week: BudgetWeek | null,
@@ -467,16 +501,19 @@ const getWeekExpenseTotal = (
     transactions
       .filter(
         (transaction) => {
-          const transactionDate = normalizeDateInput(transaction.date);
+          const transactionDate = getExpenseReportDate(transaction);
           return (
             transaction.type === 'expense' &&
-            transaction.category !== 'large' &&
+            (isPrepaidExpense(transaction) || transaction.category !== 'large') &&
             transactionDate >= week.startDate &&
             transactionDate <= week.endDate
           );
         },
       )
       .reduce((total, transaction) => {
+        if (isPrepaidExpense(transaction)) {
+          return total + transaction.amount;
+        }
         if (transaction.category === 'fixed') {
           return (
             total +
@@ -489,11 +526,36 @@ const getWeekExpenseTotal = (
   );
 };
 
+const getWeekPrepaidExpenseTotal = (
+  transactions: DailyTransaction[],
+  week: BudgetWeek | null,
+) => {
+  if (!week) {
+    return 0;
+  }
+
+  return roundAmount(
+    transactions
+      .filter((transaction) => {
+        const transactionDate = getExpenseReportDate(transaction);
+        return (
+          isPrepaidExpense(transaction) &&
+          transactionDate >= week.startDate &&
+          transactionDate <= week.endDate
+        );
+      })
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
+};
+
 const isTransactionInCycle = (
   transaction: DailyTransaction,
   cycle: BudgetCycle,
 ) => {
-  const transactionDate = normalizeDateInput(transaction.date);
+  const transactionDate =
+    transaction.type === 'expense'
+      ? getExpenseReportDate(transaction)
+      : normalizeDateInput(transaction.date);
   return transactionDate >= cycle.startDate && transactionDate <= cycle.plannedEndDate;
 };
 
@@ -505,6 +567,10 @@ const getUsableIncomeAllocation = (transaction: DailyTransaction) =>
   );
 
 const getUsableExpenseAllocation = (transaction: DailyTransaction) => {
+  if (isPrepaidExpense(transaction)) {
+    return transaction.amount;
+  }
+
   if (transaction.category === 'large') {
     return 0;
   }
@@ -536,6 +602,41 @@ const getCycleUsableIncomeTotal = (
       }, 0),
   );
 
+const getCycleOtherIncomeTotal = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle,
+) =>
+  roundAmount(
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'income' &&
+          transaction.incomeKind !== 'main' &&
+          transaction.incomeKind !== undefined &&
+          isTransactionInCycle(transaction, cycle),
+      )
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
+
+const getCyclePrepaidExpenses = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle,
+) =>
+  transactions.filter(
+    (transaction) => isPrepaidExpense(transaction) && isTransactionInCycle(transaction, cycle),
+  );
+
+const getCyclePrepaidExpenseTotal = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle,
+) =>
+  roundAmount(
+    getCyclePrepaidExpenses(transactions, cycle).reduce(
+      (total, transaction) => total + transaction.amount,
+      0,
+    ),
+  );
+
 const getCycleLivingExpenseTotal = (
   transactions: DailyTransaction[],
   cycle: BudgetCycle | null,
@@ -558,6 +659,15 @@ const getCycleLivingExpenseTotal = (
   );
 };
 
+export const getCalibratableBalance = (data: DailyData) => {
+  const budget = getLifeBudget(data);
+  return roundAmount(
+    budget.pockets.spendable +
+      budget.pockets.buffer +
+      budget.pockets.fixedReserved,
+  );
+};
+
 export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   const budget = getLifeBudget(data);
   const cycle = budget.currentCycle;
@@ -575,11 +685,35 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
     .filter((transaction) => {
       const transactionDate = normalizeDateInput(transaction.date);
       return (
-        transaction.category === 'large' &&
+        (transaction.category === 'large' || isPrepaidExpense(transaction)) &&
+        transaction.type === 'expense' &&
+        (transaction.category === 'large' || (transaction.allocation?.reserve ?? 0) > 0) &&
         (!cycle || transactionDate <= cycle.plannedEndDate)
       );
     })
-    .reduce((total, transaction) => total + (transaction.allocation?.reserve ?? transaction.amount), 0);
+    .reduce(
+      (total, transaction) =>
+        total +
+        (transaction.category === 'large'
+          ? transaction.allocation?.reserve ?? transaction.amount
+          : transaction.allocation?.reserve ?? 0),
+      0,
+    );
+  const prepaidInCycle = cycle ? getCyclePrepaidExpenseTotal(data.transactions, cycle) : 0;
+  const upcomingPrepaid = roundAmount(
+    data.transactions
+      .filter((transaction) => {
+        if (!isPrepaidExpense(transaction)) {
+          return false;
+        }
+        const effectiveDate = getExpenseReportDate(transaction);
+        if (cycle) {
+          return effectiveDate > cycle.plannedEndDate;
+        }
+        return effectiveDate >= normalizeDateInput(today);
+      })
+      .reduce((total, transaction) => total + transaction.amount, 0),
+  );
 
   return {
     budget,
@@ -590,6 +724,9 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
     reserveMinimum,
     reserveGap,
     reserveNetChange: roundAmount(reserveIn - reserveOut),
+    prepaidInCycle,
+    upcomingPrepaid,
+    calibratableBalance: getCalibratableBalance(data),
     pendingFixed: budget.fixedExpenses.filter(
       (item) => item.isActive && item.paidCycleId !== cycle?.id,
     ),
@@ -611,7 +748,7 @@ export const getCycleExpenseTotal = (
     transactions
       .filter(
         (transaction) => {
-          const transactionDate = normalizeDateInput(transaction.date);
+          const transactionDate = getExpenseReportDate(transaction);
           return (
             transaction.type === 'expense' &&
             transactionDate >= cycle.startDate &&
@@ -630,9 +767,11 @@ export const getBudgetWeekSummaries = (
   cycle
     ? cycle.weeks.map((week) => {
         const spent = getWeekExpenseTotal(data.transactions, week);
+        const prepaidSpent = getWeekPrepaidExpenseTotal(data.transactions, week);
         return {
           ...week,
           spent,
+          prepaidSpent,
           remaining: roundAmount(Math.max(0, week.allowance - spent)),
         };
       })
@@ -648,6 +787,9 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
   return cycles.map((cycle) => {
     const livingSpent = getCycleLivingExpenseTotal(data.transactions, cycle);
     const usableIncome = getCycleUsableIncomeTotal(data.transactions, cycle);
+    const otherIncome = getCycleOtherIncomeTotal(data.transactions, cycle);
+    const prepaidTotal = getCyclePrepaidExpenseTotal(data.transactions, cycle);
+    const prepaidTransactions = getCyclePrepaidExpenses(data.transactions, cycle);
     const livingBudget = roundAmount(
       usableIncome ||
         cycle.weeks.reduce((total, week) => total + week.allowance, 0) +
@@ -656,11 +798,15 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
 
     return {
       cycle,
+      mainIncome: cycle.mainIncome,
+      otherIncome,
       spent: getCycleExpenseTotal(data.transactions, cycle),
       livingSpent,
       weeks: getBudgetWeekSummaries(data, cycle),
       balance: roundAmount(livingBudget - livingSpent),
       budget: livingBudget,
+      prepaidTotal,
+      prepaidTransactions,
       reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery),
     };
   });
@@ -993,11 +1139,15 @@ export const recordExpense = (
     category,
     date,
     desc,
+    effectiveDate,
+    expenseTiming,
   }: {
     amount: number;
     category: DailyExpenseCategory;
     date: string;
     desc: string;
+    effectiveDate?: string;
+    expenseTiming?: DailyExpenseTiming;
   },
 ): DailyData => {
   const budget = getLifeBudget(data);
@@ -1005,6 +1155,50 @@ export const recordExpense = (
   const normalizedDate = normalizeDateInput(date) || getTodayDate();
   if (safeAmount <= 0) {
     return data;
+  }
+
+  if (expenseTiming === 'prepaid') {
+    const normalizedEffectiveDate = normalizeDateInput(effectiveDate ?? normalizedDate) || normalizedDate;
+    const safeEffectiveDate =
+      normalizedEffectiveDate < normalizedDate ? normalizedDate : normalizedEffectiveDate;
+    let remaining = safeAmount;
+    const buffer = roundAmount(Math.min(remaining, budget.pockets.buffer));
+    remaining = roundAmount(remaining - buffer);
+    const reserve = roundAmount(Math.min(remaining, budget.pockets.reserve));
+    remaining = roundAmount(remaining - reserve);
+    const advance = roundAmount(Math.min(remaining, budget.pockets.spendable));
+
+    const transaction: DailyTransaction = {
+      id: createTransactionId(),
+      date: normalizedDate,
+      type: 'expense',
+      amount: safeAmount,
+      category,
+      desc: desc.trim() || '提前支付',
+      expenseTiming: 'prepaid',
+      effectiveDate: safeEffectiveDate,
+      allocation: {
+        week: 0,
+        buffer,
+        advance,
+        reserve,
+        fixed: 0,
+      },
+    };
+
+    return {
+      ...data,
+      transactions: [...data.transactions, transaction],
+      budget: {
+        ...budget,
+        pockets: {
+          ...budget.pockets,
+          spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
+          buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
+          reserve: roundAmount(Math.max(0, budget.pockets.reserve - reserve)),
+        },
+      },
+    };
   }
 
   if (category === 'large') {
@@ -1089,8 +1283,7 @@ export const calibrateSpendableBalance = (
   actualBalance: number,
   date = getTodayDate(),
 ): DailyData => {
-  const snapshot = getBudgetSnapshot(data, date);
-  const expected = roundAmount(snapshot.weekRemaining + snapshot.budget.pockets.buffer);
+  const expected = getCalibratableBalance(data);
   const delta = roundAmount(actualBalance - expected);
 
   if (Math.abs(delta) < 0.01) {

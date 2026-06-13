@@ -26,6 +26,8 @@ export type DailyExpenseCategory =
 
 export type DailyIncomeKind = 'main' | 'casual' | 'refund' | 'correction';
 
+export type DailyExpenseTiming = 'prepaid';
+
 export interface DailyTransactionAllocation {
   week: number;
   buffer: number;
@@ -40,6 +42,8 @@ export interface DailyTransaction extends BaseTransaction {
   type: 'income' | 'expense';
   category?: DailyExpenseCategory;
   incomeKind?: DailyIncomeKind;
+  expenseTiming?: DailyExpenseTiming;
+  effectiveDate?: string;
   allocation?: DailyTransactionAllocation;
   fixedExpenseId?: number;
   previousCycle?: BudgetCycle | null;
