@@ -190,10 +190,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       ? Math.min(100, Math.round((budget.pockets.reserve / snapshot.reserveMinimum) * 100))
       : 100;
   const actualBookBalance = snapshot.weekRemaining + budget.pockets.buffer;
-  const cycleVisibleBalance =
-    snapshot.weekRemaining +
-    budget.pockets.buffer +
-    budget.pockets.fixedReserved;
   const shouldRecommendLarge =
     parseAmount(expenseForm.amount) >= budget.settings.largeExpenseAbsoluteThreshold ||
     (week?.allowance ?? 0) > 0 &&
@@ -209,6 +205,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   );
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
+  const cycleVisibleBalance = currentCycleSummary?.balance ?? 0;
   const weeklyChartMax = (currentCycleSummary?.weeks ?? []).reduce(
     (maxValue, item) => Math.max(maxValue, item.allowance, item.spent),
     1,
