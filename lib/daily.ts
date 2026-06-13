@@ -279,6 +279,62 @@ const sanitizeLifeBudget = (raw: unknown): LifeBudgetState => {
   };
 };
 
+const repairCycleFromTransactions = (
+  cycle: BudgetCycle,
+  transactions: DailyTransaction[],
+) => {
+  const mainIncomeTransactions = transactions.filter((transaction) => {
+    const transactionDate = normalizeDateInput(transaction.date);
+    return (
+      transaction.type === 'income' &&
+      transaction.incomeKind === 'main' &&
+      transactionDate >= cycle.startDate &&
+      transactionDate <= cycle.plannedEndDate
+    );
+  });
+
+  if (mainIncomeTransactions.length === 0) {
+    return null;
+  }
+
+  const totals = mainIncomeTransactions.reduce(
+    (result, transaction) => ({
+      mainIncome: result.mainIncome + transaction.amount,
+      fixedReserved: result.fixedReserved + (transaction.allocation?.fixed ?? 0),
+      reserveChange: result.reserveChange + (transaction.allocation?.reserve ?? 0),
+      startingBuffer: result.startingBuffer + (transaction.allocation?.buffer ?? 0),
+    }),
+    {
+      mainIncome: 0,
+      fixedReserved: 0,
+      reserveChange: 0,
+      startingBuffer: 0,
+    },
+  );
+
+  return {
+    ...cycle,
+    mainIncome: roundAmount(totals.mainIncome),
+    fixedReserved: roundAmount(totals.fixedReserved),
+    reserveDeposit: roundAmount(totals.reserveChange),
+    reserveRecovery: 0,
+    startingBuffer: roundAmount(totals.startingBuffer),
+  };
+};
+
+const repairBudgetFromTransactions = (
+  budget: LifeBudgetState,
+  transactions: DailyTransaction[],
+): LifeBudgetState => ({
+  ...budget,
+  currentCycle: budget.currentCycle
+    ? repairCycleFromTransactions(budget.currentCycle, transactions)
+    : null,
+  archivedCycles: budget.archivedCycles
+    .map((cycle) => repairCycleFromTransactions(cycle, transactions))
+    .filter((cycle): cycle is BudgetCycle => cycle !== null),
+});
+
 export const sanitizeDailyData = (
   raw: unknown,
   fallback: DailyData,
@@ -292,33 +348,38 @@ export const sanitizeDailyData = (
     ? dailyLimitCandidate
     : fallback.dailyLimit;
   const rawTransactions = Array.isArray(raw.transactions) ? raw.transactions : [];
+  const transactions = rawTransactions
+    .map((item) => {
+      const normalized = normalizeTransaction(item, {
+        incomeDesc: '额外收入',
+        expenseDesc: '日常支出',
+      });
+      if (!normalized || !isRecord(item)) {
+        return normalized;
+      }
+
+      return {
+        ...normalized,
+        date: normalizeDateInput(normalized.date),
+        category: normalizeExpenseCategory(item.category),
+        incomeKind: normalizeIncomeKind(item.incomeKind),
+        allocation: normalizeAllocation(item.allocation),
+      };
+    })
+    .filter((item): item is Transaction => item !== null)
+    .map((transaction) => ({
+      ...transaction,
+      date: normalizeDateInput(transaction.date),
+    }));
+  const budget = repairBudgetFromTransactions(
+    sanitizeLifeBudget(raw.budget),
+    transactions,
+  );
 
   return {
     dailyLimit,
-    budget: sanitizeLifeBudget(raw.budget),
-    transactions: rawTransactions
-      .map((item) => {
-        const normalized = normalizeTransaction(item, {
-          incomeDesc: '额外收入',
-          expenseDesc: '日常支出',
-        });
-        if (!normalized || !isRecord(item)) {
-          return normalized;
-        }
-
-        return {
-          ...normalized,
-          date: normalizeDateInput(normalized.date),
-          category: normalizeExpenseCategory(item.category),
-          incomeKind: normalizeIncomeKind(item.incomeKind),
-          allocation: normalizeAllocation(item.allocation),
-        };
-      })
-      .filter((item): item is Transaction => item !== null)
-      .map((transaction) => ({
-        ...transaction,
-        date: normalizeDateInput(transaction.date),
-      })),
+    budget,
+    transactions,
   };
 };
 
