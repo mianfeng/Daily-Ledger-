@@ -32,6 +32,8 @@ export interface DailyTransactionAllocation {
   advance: number;
   reserve: number;
   fixed: number;
+  reserveDeposit?: number;
+  reserveRecovery?: number;
 }
 
 export interface DailyTransaction extends BaseTransaction {
@@ -39,6 +41,9 @@ export interface DailyTransaction extends BaseTransaction {
   category?: DailyExpenseCategory;
   incomeKind?: DailyIncomeKind;
   allocation?: DailyTransactionAllocation;
+  fixedExpenseId?: number;
+  previousCycle?: BudgetCycle | null;
+  previousPockets?: LifeBudgetPockets;
 }
 
 export interface CopperTransaction extends BaseTransaction {

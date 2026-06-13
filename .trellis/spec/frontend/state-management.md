@@ -118,6 +118,16 @@ writeLocalLedgerData(currentData);
 - `sanitizeDailyData` is responsible for filling missing budget fields with defaults.
 - Components must update the daily slice through `setData`; they must not persist directly.
 - Life budget calculations belong in `lib/daily.ts`, not scattered through the component.
+- `DailyTransaction.allocation` is the rollback ledger for pocket mutations:
+  - `week + advance` changes `LifeBudgetState.pockets.spendable`
+  - `buffer` changes `LifeBudgetState.pockets.buffer`
+  - `reserve` changes `LifeBudgetState.pockets.reserve`
+  - `fixed` changes `LifeBudgetState.pockets.fixedReserved`
+- Any transaction that mutates more than pockets must store enough metadata to reverse the extra state:
+  - fixed-expense payment transactions store `fixedExpenseId`
+  - main-income transactions that start a new cycle store `previousCycle` and `previousPockets`
+  - main-income transactions store `allocation.reserveDeposit` and `allocation.reserveRecovery` when reserve growth is split
+- Daily Excel "完整备份" must preserve the full `DailyData` shape, not only visible rows. If row sheets are kept for readability, import should prefer the full-state sheet when present.
 
 ### 4. Validation & Error Matrix
 
@@ -137,6 +147,12 @@ writeLocalLedgerData(currentData);
 
 - Build/type-check should cover old and new `DailyData` shapes.
 - Manual verification should cover initialization, main income allocation, normal expenses, large expenses, calibration, and fixed expense payment.
+- Regression verification for rollback changes should cover:
+  - deleting a current cycle-opening main income restores the previous cycle and pocket baseline
+  - deleting a historical cycle-opening main income does not subtract overwritten weekly/buffer money from the current pockets
+  - deleting a large expense restores only the actual reserve allocation that was deducted
+  - deleting one fixed payment unmarks only the matching `fixedExpenseId`
+  - Excel export/import preserves allocation, fixed-expense, and previous-cycle metadata
 
 ### 7. Wrong vs Correct
 

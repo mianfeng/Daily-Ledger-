@@ -4,6 +4,8 @@ import { sanitizeDailyData } from '../lib/daily';
 import { normalizeTransaction } from '../lib/ledger';
 import { CopperBalances, CopperBreakdown, CopperData, DailyData, Transaction } from '../types';
 
+const JSON_CHUNK_SIZE = 30000;
+
 const getExportOrigin = () =>
   typeof window === 'undefined' ? 'local' : window.location.origin;
 
@@ -34,6 +36,18 @@ const parseBoolean = (value: unknown) => {
 
   const normalized = String(value ?? '').trim().toLowerCase();
   return ['1', 'true', 'yes', 'y', '是'].includes(normalized);
+};
+
+const parseJsonValue = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 };
 
 const findSheet = (workbook: XLSX.WorkBook, names: string[]) =>
@@ -134,8 +148,20 @@ export const exportDailyToExcel = (
   month: number,
 ) => {
   const workbook = XLSX.utils.book_new();
+  const serializedState = JSON.stringify(data);
+  const stateRows = Array.from(
+    { length: Math.ceil(serializedState.length / JSON_CHUNK_SIZE) || 1 },
+    (_, index) => ({
+      序号: index + 1,
+      JSON片段: serializedState.slice(
+        index * JSON_CHUNK_SIZE,
+        (index + 1) * JSON_CHUNK_SIZE,
+      ),
+    }),
+  );
 
   appendSheet(workbook, '元数据', buildMetadataRows('生活预算'));
+  appendSheet(workbook, '完整状态', stateRows);
   appendSheet(workbook, '设置', [{ 项目: '日额度', 值: data.dailyLimit }]);
   appendSheet(
     workbook,
@@ -145,6 +171,18 @@ export const exportDailyToExcel = (
       类型: transaction.type === 'income' ? '收入' : '支出',
       金额: transaction.amount,
       备注: transaction.desc,
+      分类: transaction.category ?? '',
+      收入类型: transaction.incomeKind ?? '',
+      分配_周: transaction.allocation?.week ?? '',
+      分配_缓冲: transaction.allocation?.buffer ?? '',
+      分配_预支: transaction.allocation?.advance ?? '',
+      分配_储备: transaction.allocation?.reserve ?? '',
+      分配_固定: transaction.allocation?.fixed ?? '',
+      分配_储备存入: transaction.allocation?.reserveDeposit ?? '',
+      分配_储备补回: transaction.allocation?.reserveRecovery ?? '',
+      固定支出ID: transaction.fixedExpenseId ?? '',
+      前周期: transaction.previousCycle ? JSON.stringify(transaction.previousCycle) : '',
+      前钱袋: transaction.previousPockets ? JSON.stringify(transaction.previousPockets) : '',
     })),
   );
   appendSheet(
@@ -159,6 +197,8 @@ export const exportDailyToExcel = (
         类型: transaction.type === 'income' ? '收入' : '支出',
         金额: transaction.amount,
         备注: transaction.desc,
+        分类: transaction.category ?? '',
+        收入类型: transaction.incomeKind ?? '',
       })),
   );
 
@@ -172,8 +212,8 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: true });
 
   return rows
-    .map((row) =>
-      normalizeTransaction(
+    .map((row): Transaction | null => {
+      const normalized = normalizeTransaction(
         {
           date: row['日期'] ?? row.date,
           type: row['类型'] ?? row.type,
@@ -184,8 +224,44 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
           incomeDesc: '额外收入',
           expenseDesc: '日常支出',
         },
-      ),
-    )
+      );
+
+      if (!normalized) {
+        return null;
+      }
+
+      const allocationValues = {
+        week: parseNumber(row['分配_周']),
+        buffer: parseNumber(row['分配_缓冲']),
+        advance: parseNumber(row['分配_预支']),
+        reserve: parseNumber(row['分配_储备']),
+        fixed: parseNumber(row['分配_固定']),
+        reserveDeposit: parseNumber(row['分配_储备存入']),
+        reserveRecovery: parseNumber(row['分配_储备补回']),
+      };
+      const hasAllocation = Object.values(allocationValues).some((value) => value !== null);
+      const fixedExpenseId = parseNumber(row['固定支出ID']);
+
+      return {
+        ...normalized,
+        category: (row['分类'] ?? row.category) as Transaction['category'],
+        incomeKind: (row['收入类型'] ?? row.incomeKind) as Transaction['incomeKind'],
+        allocation: hasAllocation
+          ? {
+              week: allocationValues.week ?? 0,
+              buffer: allocationValues.buffer ?? 0,
+              advance: allocationValues.advance ?? 0,
+              reserve: allocationValues.reserve ?? 0,
+              fixed: allocationValues.fixed ?? 0,
+              reserveDeposit: allocationValues.reserveDeposit ?? undefined,
+              reserveRecovery: allocationValues.reserveRecovery ?? undefined,
+            }
+          : undefined,
+        fixedExpenseId: fixedExpenseId ?? undefined,
+        previousCycle: parseJsonValue(row['前周期']),
+        previousPockets: parseJsonValue(row['前钱袋']),
+      };
+    })
     .filter((transaction): transaction is Transaction => transaction !== null);
 };
 
@@ -327,6 +403,22 @@ export const parseDailyImportWorkbook = (
   workbook: XLSX.WorkBook,
   fallback: DailyData,
 ) => {
+  const stateSheetName = findSheet(workbook, ['完整状态']);
+  if (stateSheetName) {
+    const stateRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      workbook.Sheets[stateSheetName],
+      { raw: true },
+    );
+    const serializedState = stateRows
+      .sort((left, right) => Number(left['序号'] ?? 0) - Number(right['序号'] ?? 0))
+      .map((row) => String(row['JSON片段'] ?? ''))
+      .join('');
+    const parsedState = parseJsonValue(serializedState);
+    if (parsedState) {
+      return sanitizeDailyData(parsedState, fallback);
+    }
+  }
+
   const settingsSheetName = findSheet(workbook, ['设置']);
   const recordSheetName = findSheet(workbook, ['全部记录', '记录', '当月记录']);
 

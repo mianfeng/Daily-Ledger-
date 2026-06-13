@@ -914,6 +914,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               />
             </label>
           </div>
+          {budget.initialized && (
+            <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
+              设置只影响之后的收入分配和提醒线，已经生成的预算周不会自动重算。
+            </div>
+          )}
           <button
             onClick={() => {
               if (!budget.initialized) {
@@ -1074,6 +1079,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               >
                 保存
               </button>
+            </div>
+            <div className="mt-2 text-[10px] font-bold text-stone-500">
+              固定预留只从当前可消费余额搬入，超过可搬金额会按上限保存。
             </div>
           </div>
 
