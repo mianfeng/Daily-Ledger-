@@ -28,6 +28,20 @@ body {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+@keyframes lifeFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.life-budget.animate-fade-in {
+  animation: lifeFadeIn 0.24s ease-out forwards;
+}
+
 @keyframes sheetIn {
   from {
     opacity: 0;
@@ -260,7 +274,7 @@ body {
 .life-sheet-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 120;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -284,6 +298,18 @@ body {
 
 .life-budget-dark .life-sheet {
   background: #202820;
+}
+
+@media (max-width: 767px) {
+  .life-sheet-overlay {
+    align-items: flex-start;
+    padding: max(44px, env(safe-area-inset-top)) 18px
+      calc(132px + env(safe-area-inset-bottom));
+  }
+
+  .life-sheet {
+    max-height: calc(100dvh - 176px - env(safe-area-inset-bottom));
+  }
 }
 
 .life-action-button {
