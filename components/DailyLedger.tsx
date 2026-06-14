@@ -36,6 +36,7 @@ import {
   recordExpense,
 } from '../lib/daily';
 import {
+  BudgetCycle,
   DailyData,
   DailyExpenseCategory,
   DailyIncomeKind,
@@ -79,6 +80,30 @@ const inputToRate = (value: string, fallback: number) => {
     return fallback;
   }
   return Math.max(0, Math.min(100, parsed)) / 100;
+};
+
+const addLocalDays = (date: string, days: number) => {
+  const value = new Date(`${normalizeDateInput(date)}T00:00:00`);
+  value.setDate(value.getDate() + days);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+};
+
+const findBudgetWeekForDate = (cycle: BudgetCycle | null | undefined, date: string) => {
+  const normalizedDate = normalizeDateInput(date);
+  return cycle?.weeks.find(
+    (week) => normalizedDate >= week.startDate && normalizedDate <= week.endDate,
+  );
+};
+
+const getDefaultPrepaidEffectiveDate = (
+  paymentDate: string,
+  cycle: BudgetCycle | null | undefined,
+) => {
+  const normalizedPaymentDate = normalizeDateInput(paymentDate) || getTodayDate();
+  const paymentWeek = findBudgetWeekForDate(cycle, normalizedPaymentDate);
+  return paymentWeek
+    ? addLocalDays(paymentWeek.endDate, 1)
+    : addLocalDays(normalizedPaymentDate, 1);
 };
 
 const categoryLabels: Record<DailyExpenseCategory, string> = {
@@ -299,9 +324,21 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
     if (
       expenseForm.isPrepaid &&
-      normalizeDateInput(expenseForm.effectiveDate) < normalizeDateInput(expenseForm.date)
+      normalizeDateInput(expenseForm.effectiveDate) <= normalizeDateInput(expenseForm.date)
     ) {
-      alert('归属日期不能早于付款日期');
+      alert('未来开销的归属日期要晚于付款日期');
+      return;
+    }
+
+    const paymentWeek = findBudgetWeekForDate(cycle, expenseForm.date);
+    const effectiveWeek = findBudgetWeekForDate(cycle, expenseForm.effectiveDate);
+    if (
+      expenseForm.isPrepaid &&
+      paymentWeek &&
+      effectiveWeek &&
+      paymentWeek.index === effectiveWeek.index
+    ) {
+      alert('归属日期仍在付款所在预算周，会计入本周已用。请选下一预算周或更晚日期。');
       return;
     }
 
@@ -344,7 +381,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       desc: '',
       category: 'daily',
       isPrepaid: false,
-      effectiveDate: prev.date,
+      effectiveDate: getDefaultPrepaidEffectiveDate(prev.date, cycle),
     }));
     setPanel(null);
   };
@@ -1105,8 +1142,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                   ...prev,
                   date,
                   effectiveDate:
-                    prev.isPrepaid && normalizeDateInput(prev.effectiveDate) < normalizeDateInput(date)
-                      ? date
+                    prev.isPrepaid &&
+                    normalizeDateInput(prev.effectiveDate) <
+                      getDefaultPrepaidEffectiveDate(date, cycle)
+                      ? getDefaultPrepaidEffectiveDate(date, cycle)
                       : prev.effectiveDate,
                 }))
               }
@@ -1116,7 +1155,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           <label className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs font-bold text-stone-600">
             <span>
               未来开销
-              <span className="ml-2 font-medium text-stone-500">从缓冲金扣，不计入本周已用</span>
+              <span className="ml-2 font-medium text-stone-500">从缓冲金扣，不计入付款周已用</span>
             </span>
             <input
               type="checkbox"
@@ -1125,7 +1164,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 setExpenseForm((prev) => ({
                   ...prev,
                   isPrepaid: event.target.checked,
-                  effectiveDate: event.target.checked ? prev.date : prev.effectiveDate,
+                  effectiveDate: event.target.checked
+                    ? getDefaultPrepaidEffectiveDate(prev.date, cycle)
+                    : prev.effectiveDate,
                 }))
               }
               className="h-4 w-4 accent-[#8aa0a2]"
@@ -1141,7 +1182,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 }
               />
               <div className="rounded-xl bg-[#eef4f1] px-3 py-2 text-xs leading-5 text-[#55736c]">
-                归属日期用于决定在哪个周期显示“提前支付”。付款会立即从缓冲金扣，不够时从储备金补。
+                归属日期用于决定在哪个预算周显示“提前支付”。付款会立即从缓冲金扣，不够时从储备金补。
               </div>
             </div>
           )}
