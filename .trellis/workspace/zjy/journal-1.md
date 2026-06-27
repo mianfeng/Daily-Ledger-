@@ -71,3 +71,36 @@ Implemented prepaid future expenses with payment date and effective date, correc
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Pending copper sale confirmation
+
+**Date**: 2026-06-27
+**Task**: Pending copper sale confirmation
+**Branch**: `codex/inventory-ledger`
+
+### Summary
+
+Implemented pending copper sale pre-recording with manual confirm, cancel rollback, 10-day local auto-confirm, transaction-list status actions, monthly pending totals, and Excel metadata preservation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f7d0a91` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
