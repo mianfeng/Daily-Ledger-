@@ -7,7 +7,7 @@ import {
   CopperTransaction,
 } from '../types';
 import { createTransactionId, normalizeTransaction } from './ledger';
-import { formatDisplayDate, getMonthKey, normalizeDateInput } from './date';
+import { formatDisplayDate, getMonthKey, getTodayDate, normalizeDateInput } from './date';
 
 const COPPER_ACCOUNTS: CopperAccount[] = ['liquid', 'reserve'];
 
@@ -21,6 +21,44 @@ const toFiniteNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+const addDays = (date: string, days: number) => {
+  const value = new Date(`${normalizeDateInput(date)}T00:00:00`);
+  value.setDate(value.getDate() + days);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+};
+
+const normalizeConfirmationStatus = (value: unknown) => {
+  if (value === 'pending' || value === '待确认') {
+    return 'pending' as const;
+  }
+
+  if (value === 'confirmed' || value === '已确认') {
+    return 'confirmed' as const;
+  }
+
+  if (value === 'cancelled' || value === '已取消') {
+    return 'cancelled' as const;
+  }
+
+  return undefined;
+};
+
+export const isCopperPendingTransaction = (transaction: CopperTransaction) =>
+  transaction.type === 'income' && transaction.confirmationStatus === 'pending';
+
+export const isCopperCancelledTransaction = (transaction: CopperTransaction) =>
+  transaction.confirmationStatus === 'cancelled';
+
+export const getCopperPendingDueDate = (transaction: CopperTransaction) =>
+  addDays(transaction.date, 10);
+
+export const shouldAutoConfirmCopperTransaction = (
+  transaction: CopperTransaction,
+  today = getTodayDate(),
+) =>
+  isCopperPendingTransaction(transaction) &&
+  normalizeDateInput(today) >= getCopperPendingDueDate(transaction);
 
 export const createEmptyCopperBreakdown = (): CopperBreakdown => ({
   liquid: 0,
@@ -164,6 +202,28 @@ const getLegacyCashAllocation = (
   return undefined;
 };
 
+export const autoConfirmCopperPendingTransactions = (
+  data: CopperData,
+  today = getTodayDate(),
+): CopperData => {
+  let changed = false;
+  const normalizedToday = normalizeDateInput(today) || getTodayDate();
+  const transactions = data.transactions.map((transaction) => {
+    if (!shouldAutoConfirmCopperTransaction(transaction, normalizedToday)) {
+      return transaction;
+    }
+
+    changed = true;
+    return {
+      ...transaction,
+      confirmationStatus: 'confirmed' as const,
+      confirmedAt: normalizedToday,
+    };
+  });
+
+  return changed ? { ...data, transactions } : data;
+};
+
 export const sanitizeCopperData = (
   raw: unknown,
   fallback: CopperData,
@@ -208,6 +268,11 @@ export const sanitizeCopperData = (
       const inventoryDeltaCandidate = toFiniteNumber(
         item.inventoryDelta ?? item['库存变化'],
       );
+      const confirmationStatus = normalizeConfirmationStatus(
+        item.confirmationStatus ?? item['确认状态'],
+      );
+      const confirmedAt = normalizeDateInput(String(item.confirmedAt ?? item['确认日期'] ?? ''));
+      const cancelledAt = normalizeDateInput(String(item.cancelledAt ?? item['取消日期'] ?? ''));
 
       return {
         ...normalized,
@@ -223,6 +288,12 @@ export const sanitizeCopperData = (
             : roundCurrency(inventoryDeltaCandidate),
         ratiosSnapshot: normalizeRatiosSnapshot(item.ratiosSnapshot),
         isLegacyLocked: !cashAllocation,
+        confirmationStatus:
+          normalized.type === 'income' ? confirmationStatus : undefined,
+        confirmedAt:
+          normalized.type === 'income' && confirmedAt ? confirmedAt : undefined,
+        cancelledAt:
+          normalized.type === 'income' && cancelledAt ? cancelledAt : undefined,
       };
     })
     .filter((item): item is CopperTransaction => item !== null)
@@ -231,12 +302,12 @@ export const sanitizeCopperData = (
       date: normalizeDateInput(transaction.date),
     }));
 
-  return {
+  return autoConfirmCopperPendingTransactions({
     ratios,
     balances,
     inventoryCost,
     transactions,
-  };
+  });
 };
 
 export const applyCopperCashAllocation = (
@@ -297,12 +368,14 @@ export const createCopperIncomeTransaction = ({
   cost,
   date,
   desc,
+  isPending = false,
   ratios,
 }: {
   amount: number;
   cost: number;
   date: string;
   desc: string;
+  isPending?: boolean;
   ratios: CopperRatios;
 }): CopperTransaction => {
   const roundedAmount = roundCurrency(amount);
@@ -320,6 +393,7 @@ export const createCopperIncomeTransaction = ({
     cashAllocation: buildIncomeCashAllocation(roundedAmount, roundedCost, ratios),
     inventoryDelta: roundCurrency(-roundedCost),
     ratiosSnapshot: { ...ratios },
+    confirmationStatus: isPending ? 'pending' : undefined,
   };
 };
 
@@ -392,16 +466,72 @@ export const applyCopperTransaction = (
 export const rollbackCopperTransaction = (
   data: CopperData,
   transaction: CopperTransaction,
+): CopperData => {
+  if (isCopperCancelledTransaction(transaction)) {
+    return {
+      ...data,
+      transactions: data.transactions.filter((item) => item.id !== transaction.id),
+    };
+  }
+
+  return {
+    ...data,
+    balances: transaction.cashAllocation
+      ? applyCopperCashAllocation(data.balances, transaction.cashAllocation, 'rollback')
+      : data.balances,
+    inventoryCost: roundCurrency(
+      data.inventoryCost - (transaction.inventoryDelta ?? 0),
+    ),
+    transactions: data.transactions.filter((item) => item.id !== transaction.id),
+  };
+};
+
+export const confirmCopperPendingTransaction = (
+  data: CopperData,
+  transactionId: number,
+  confirmedAt = getTodayDate(),
 ): CopperData => ({
   ...data,
-  balances: transaction.cashAllocation
-    ? applyCopperCashAllocation(data.balances, transaction.cashAllocation, 'rollback')
-    : data.balances,
-  inventoryCost: roundCurrency(
-    data.inventoryCost - (transaction.inventoryDelta ?? 0),
+  transactions: data.transactions.map((transaction) =>
+    transaction.id === transactionId && isCopperPendingTransaction(transaction)
+      ? {
+          ...transaction,
+          confirmationStatus: 'confirmed' as const,
+          confirmedAt: normalizeDateInput(confirmedAt) || getTodayDate(),
+        }
+      : transaction,
   ),
-  transactions: data.transactions.filter((item) => item.id !== transaction.id),
 });
+
+export const cancelCopperPendingTransaction = (
+  data: CopperData,
+  transactionId: number,
+  cancelledAt = getTodayDate(),
+): CopperData => {
+  const transaction = data.transactions.find((item) => item.id === transactionId);
+  if (!transaction || !isCopperPendingTransaction(transaction)) {
+    return data;
+  }
+
+  return {
+    ...data,
+    balances: transaction.cashAllocation
+      ? applyCopperCashAllocation(data.balances, transaction.cashAllocation, 'rollback')
+      : data.balances,
+    inventoryCost: roundCurrency(
+      data.inventoryCost - (transaction.inventoryDelta ?? 0),
+    ),
+    transactions: data.transactions.map((item) =>
+      item.id === transactionId
+        ? {
+            ...item,
+            confirmationStatus: 'cancelled' as const,
+            cancelledAt: normalizeDateInput(cancelledAt) || getTodayDate(),
+          }
+        : item,
+    ),
+  };
+};
 
 export const getCopperCashTotal = (balances: CopperBalances) =>
   roundCurrency(balances.liquid + balances.reserve);
@@ -417,6 +547,9 @@ export const getCopperMonthlyStats = (transactions: CopperTransaction[]) => {
       cost: number;
       income: number;
       inventoryAdjustment: number;
+      pendingIncome: number;
+      pendingProfit: number;
+      pendingCount: number;
       profit: number;
       purchase: number;
     }
@@ -424,7 +557,7 @@ export const getCopperMonthlyStats = (transactions: CopperTransaction[]) => {
 
   for (const transaction of transactions) {
     const monthKey = getMonthKey(transaction.date);
-    if (!monthKey) {
+    if (!monthKey || isCopperCancelledTransaction(transaction)) {
       continue;
     }
 
@@ -434,6 +567,9 @@ export const getCopperMonthlyStats = (transactions: CopperTransaction[]) => {
         cost: 0,
         income: 0,
         inventoryAdjustment: 0,
+        pendingIncome: 0,
+        pendingProfit: 0,
+        pendingCount: 0,
         profit: 0,
         purchase: 0,
       };
@@ -454,6 +590,15 @@ export const getCopperMonthlyStats = (transactions: CopperTransaction[]) => {
       stats[monthKey].profit = roundCurrency(
         stats[monthKey].profit + (transaction.profit ?? transaction.amount),
       );
+      if (isCopperPendingTransaction(transaction)) {
+        stats[monthKey].pendingIncome = roundCurrency(
+          stats[monthKey].pendingIncome + transaction.amount,
+        );
+        stats[monthKey].pendingProfit = roundCurrency(
+          stats[monthKey].pendingProfit + (transaction.profit ?? transaction.amount),
+        );
+        stats[monthKey].pendingCount += 1;
+      }
     } else if (transaction.type === 'expense') {
       stats[monthKey].purchase = roundCurrency(
         stats[monthKey].purchase + transaction.amount,
@@ -483,7 +628,7 @@ export const getCopperChartData = (
 
   for (const transaction of transactions) {
     const date = normalizeDateInput(transaction.date);
-    if (!date) {
+    if (!date || isCopperCancelledTransaction(transaction)) {
       continue;
     }
 
@@ -549,3 +694,17 @@ export const getCopperTransactionKindLabel = (transaction: CopperTransaction) =>
 
 export const formatCopperTransactionDate = (value: string) =>
   formatDisplayDate(value);
+
+export const getCopperPendingSummary = (transactions: CopperTransaction[]) => {
+  const pending = transactions.filter(isCopperPendingTransaction);
+  return {
+    amount: roundCurrency(
+      pending.reduce((total, transaction) => total + transaction.amount, 0),
+    ),
+    count: pending.length,
+    oldestDueDate:
+      pending
+        .map((transaction) => getCopperPendingDueDate(transaction))
+        .sort((left, right) => left.localeCompare(right))[0] ?? null,
+  };
+};

@@ -136,6 +136,9 @@ export const exportCopperToExcel = (data: CopperData) => {
       比例_流动: transaction.ratiosSnapshot?.liquid ?? '',
       比例_存储: transaction.ratiosSnapshot?.reserve ?? '',
       历史锁定: transaction.isLegacyLocked ? '是' : '',
+      确认状态: transaction.confirmationStatus ?? '',
+      确认日期: transaction.confirmedAt ?? '',
+      取消日期: transaction.cancelledAt ?? '',
     })),
   );
 
@@ -370,6 +373,9 @@ const parseCopperTransactionSheet = (sheet: XLSX.WorkSheet) => {
       inventoryDelta: row['库存变化'] ?? row.inventoryDelta,
       ratiosSnapshot: parseBreakdown(row, '比例'),
       isLegacyLocked: parseBoolean(row['历史锁定']),
+      confirmationStatus: row['确认状态'] ?? row.confirmationStatus,
+      confirmedAt: row['确认日期'] ?? row.confirmedAt,
+      cancelledAt: row['取消日期'] ?? row.cancelledAt,
     });
   }
 

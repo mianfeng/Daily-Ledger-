@@ -60,6 +60,9 @@ export interface CopperTransaction extends BaseTransaction {
   previousInventoryCost?: number;
   nextInventoryCost?: number;
   isLegacyLocked?: boolean;
+  confirmationStatus?: 'pending' | 'confirmed' | 'cancelled';
+  confirmedAt?: string;
+  cancelledAt?: string;
 }
 
 export type Transaction = DailyTransaction;

@@ -93,6 +93,34 @@ writeLocalLedgerData(currentData);
 
 ---
 
+## Scenario: Copper Transaction State
+
+### 1. Scope / Trigger
+
+- Trigger: the copper ledger stores business transactions with cash allocation and inventory cost effects.
+- Applies when changing `CopperData`, copper backup compatibility, transaction rollback, or pending sale behavior.
+
+### 2. Contracts
+
+- `CopperTransaction.cashAllocation` and `inventoryDelta` are the rollback ledger for cash and inventory changes.
+- Pending copper sales are still applied immediately to cash balances and inventory cost.
+- Confirming a pending copper sale only changes confirmation metadata; it must not change balances or inventory cost.
+- Cancelling a pending copper sale must rollback the original cash allocation and inventory delta exactly once, then keep the transaction as cancelled history.
+- Cancelled copper sales must not count in income, profit, charts, monthly stats, or active balance calculations.
+- Auto-confirm for pending copper sales is evaluated locally when the app loads or copper data is sanitized; no backend scheduler is available.
+
+### 3. Tests Required
+
+- Regression verification for pending sales should cover:
+  - pending sale create applies the same cash and inventory effects as a normal sale
+  - manual confirm changes status without changing balances
+  - auto-confirm after 10 natural days changes status without changing balances
+  - cancel rolls back cash and inventory and removes the sale from stats/charts
+  - deleting a cancelled transaction does not rollback a second time
+  - Excel export/import preserves confirmation status and dates
+
+---
+
 ## Scenario: Life Budget Daily State
 
 ### 1. Scope / Trigger

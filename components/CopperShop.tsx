@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Archive,
   ArrowRightCircle,
   Briefcase,
   Calendar,
+  Check,
   Coins,
   Download,
   Lock,
   Package,
+  RotateCcw,
   Settings,
   Table,
   Trash2,
@@ -29,7 +30,10 @@ import {
 import * as XLSX from 'xlsx';
 import { DEFAULT_COPPER_DATA } from '../lib/appData';
 import {
+  autoConfirmCopperPendingTransactions,
   applyCopperTransaction,
+  cancelCopperPendingTransaction,
+  confirmCopperPendingTransaction,
   createCopperExpenseTransaction,
   createCopperIncomeTransaction,
   createInventoryAdjustmentTransaction,
@@ -37,8 +41,11 @@ import {
   getCopperCashTotal,
   getCopperChartData,
   getCopperMonthlyStats,
+  getCopperPendingDueDate,
   getCopperTransactionKindLabel,
   getTotalCopperAssets,
+  isCopperCancelledTransaction,
+  isCopperPendingTransaction,
   rollbackCopperTransaction,
 } from '../lib/copper';
 import { getTodayDate } from '../lib/date';
@@ -82,19 +89,26 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
   const [inventoryDraft, setInventoryDraft] = useState(String(data.inventoryCost));
   const [inventoryAdjustmentDesc, setInventoryAdjustmentDesc] = useState('');
   const [trendMode, setTrendMode] = useState<CopperTrendMode>('flow');
+  const [showCancelledTransactions, setShowCancelledTransactions] = useState(false);
   const [form, setForm] = useState<{
     amount: string;
     cost: string;
     date: string;
     desc: string;
+    isPending: boolean;
     type: 'income' | 'expense';
   }>({
     amount: '',
     cost: '',
     desc: '',
+    isPending: true,
     type: 'income',
     date: getTodayDate(),
   });
+
+  useEffect(() => {
+    setData((prev) => autoConfirmCopperPendingTransactions(prev));
+  }, [data.transactions, setData]);
 
   useEffect(() => {
     if (showSettings) {
@@ -161,6 +175,17 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     () => data.transactions.filter((transaction) => transaction.isLegacyLocked).length,
     [data.transactions],
   );
+  const recentTransactions = useMemo(
+    () =>
+      [...data.transactions]
+        .filter(
+          (transaction) =>
+            showCancelledTransactions || !isCopperCancelledTransaction(transaction),
+        )
+        .reverse()
+        .slice(0, 10),
+    [data.transactions, showCancelledTransactions],
+  );
   const isDark = theme === 'dark';
   const chartGridColor = isDark ? 'rgba(255,255,255,0.10)' : '#E7E1D4';
   const chartTickColor = isDark ? '#BFC9C1' : '#7D7165';
@@ -206,6 +231,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             cost,
             date: form.date,
             desc: form.desc,
+            isPending: form.isPending,
             ratios: prev.ratios,
           }),
         ),
@@ -229,7 +255,13 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       );
     }
 
-    setForm((prev) => ({ ...prev, amount: '', cost: '', desc: '' }));
+    setForm((prev) => ({
+      ...prev,
+      amount: '',
+      cost: '',
+      desc: '',
+      isPending: prev.type === 'income' ? true : prev.isPending,
+    }));
   };
 
   const handleDeleteTransaction = (id: number) => {
@@ -255,6 +287,18 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     }
 
     setData((prev) => rollbackCopperTransaction(prev, transaction));
+  };
+
+  const handleConfirmPending = (id: number) => {
+    setData((prev) => confirmCopperPendingTransaction(prev, id));
+  };
+
+  const handleCancelPending = (id: number) => {
+    if (!window.confirm('确定取消这笔待确认销售吗？资金和库存成本会回滚，记录会保留为已取消。')) {
+      return;
+    }
+
+    setData((prev) => cancelCopperPendingTransaction(prev, id));
   };
 
   const handleSaveSettings = () => {
@@ -564,7 +608,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
         <div className="flex items-center gap-2 bg-stone-50 p-1 rounded-lg">
           <div className="flex bg-white rounded-md shadow-sm border border-stone-100 overflow-hidden">
             <button
-              onClick={() => setForm((prev) => ({ ...prev, type: 'income' }))}
+              onClick={() => setForm((prev) => ({ ...prev, isPending: true, type: 'income' }))}
               className={`px-3 py-1.5 text-xs font-bold transition-colors ${
                 form.type === 'income'
                   ? 'bg-emerald-50 text-emerald-600'
@@ -575,7 +619,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             </button>
             <div className="w-px bg-stone-100"></div>
             <button
-              onClick={() => setForm((prev) => ({ ...prev, type: 'expense' }))}
+              onClick={() => setForm((prev) => ({ ...prev, isPending: false, type: 'expense' }))}
               className={`px-3 py-1.5 text-xs font-bold transition-colors ${
                 form.type === 'expense'
                   ? 'bg-red-50 text-red-500'
@@ -601,6 +645,20 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             />
           </div>
         </div>
+
+        {form.type === 'income' && (
+          <label className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-800 md:w-24">
+            <span>待确认</span>
+            <input
+              type="checkbox"
+              checked={form.isPending}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, isPending: event.target.checked }))
+              }
+              className="h-4 w-4 accent-amber-700"
+            />
+          </label>
+        )}
 
         <div className="flex flex-1 items-center gap-2 bg-stone-50 p-1 rounded-lg">
           <input
@@ -827,6 +885,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                   <th className="px-3 py-1.5 text-emerald-600">收入</th>
                   <th className="px-3 py-1.5">成本</th>
                   <th className="px-3 py-1.5 text-blue-600">毛利润</th>
+                  <th className="px-3 py-1.5 text-amber-600">待确认</th>
                   <th className="px-3 py-1.5 text-red-500">进货</th>
                   <th className="px-3 py-1.5 text-right">现金变化</th>
                 </tr>
@@ -839,6 +898,11 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                     <td className="px-3 py-1.5 text-stone-600">{stat.cost.toFixed(2)}</td>
                     <td className={`px-3 py-1.5 font-bold ${stat.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                       {formatSigned(stat.profit)}
+                    </td>
+                    <td className="px-3 py-1.5 text-amber-700">
+                      {stat.pendingCount > 0
+                        ? `${stat.pendingCount}笔 / ${stat.pendingIncome.toFixed(2)}`
+                        : '-'}
                     </td>
                     <td className="px-3 py-1.5 text-red-500">-{stat.purchase.toFixed(2)}</td>
                     <td className={`px-3 py-1.5 text-right font-bold ${stat.cashNet >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
@@ -853,13 +917,23 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       )}
 
       <div>
-        <h2 className="text-[10px] font-bold text-stone-400 mb-2 uppercase tracking-wider">
-          Recent Transactions
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+            Recent Transactions
+          </h2>
+          <button
+            onClick={() => setShowCancelledTransactions((prev) => !prev)}
+            className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold text-stone-500"
+          >
+            {showCancelledTransactions ? '隐藏已取消' : '显示已取消'}
+          </button>
+        </div>
         <ul className="space-y-1.5">
-          {[...data.transactions].reverse().slice(0, 10).map((transaction) => {
+          {recentTransactions.map((transaction) => {
             const isIncome = transaction.type === 'income';
             const isAdjustment = transaction.type === 'inventory_adjustment';
+            const isPending = isCopperPendingTransaction(transaction);
+            const isCancelled = isCopperCancelledTransaction(transaction);
             const amountLabel = isAdjustment
               ? formatSigned(transaction.inventoryDelta ?? 0)
               : `${isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}`;
@@ -867,7 +941,9 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             return (
               <li
                 key={transaction.id}
-                className="bg-white px-3 py-2 rounded-lg shadow-sm flex justify-between items-center border border-stone-100 group"
+                className={`bg-white px-3 py-2 rounded-lg shadow-sm flex justify-between items-center border group ${
+                  isCancelled ? 'border-stone-200 opacity-70' : 'border-stone-100'
+                }`}
               >
                 <div>
                   <div className="font-medium text-stone-800 text-xs">{transaction.desc}</div>
@@ -881,6 +957,16 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                         成本 {(transaction.cost ?? 0).toFixed(2)} / 利润 {formatSigned(transaction.profit ?? transaction.amount)}
                       </span>
                     )}
+                    {isPending && (
+                      <span className="px-1 bg-amber-50 rounded text-amber-700 scale-90 origin-left">
+                        待确认 · {formatCopperTransactionDate(getCopperPendingDueDate(transaction))}自动
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="px-1 bg-stone-100 rounded text-stone-500 scale-90 origin-left">
+                        已取消
+                      </span>
+                    )}
                     {transaction.isLegacyLocked && (
                       <span className="px-1 bg-amber-50 rounded text-amber-700 scale-90 origin-left">
                         历史锁定
@@ -890,7 +976,9 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-xs font-bold ${
-                    isAdjustment
+                    isCancelled
+                      ? 'text-stone-400 line-through'
+                      : isAdjustment
                       ? 'text-amber-700'
                       : isIncome
                         ? 'text-emerald-600'
@@ -898,22 +986,41 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                   }`}>
                     {amountLabel}
                   </div>
-                  <button
-                    onClick={() => handleDeleteTransaction(transaction.id)}
-                    className={`p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
-                      transaction.isLegacyLocked
-                        ? 'text-stone-200 cursor-not-allowed'
-                        : 'text-stone-300 hover:text-red-500'
-                    }`}
-                    title={transaction.isLegacyLocked ? '历史锁定记录不可删除' : '删除'}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {isPending ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleConfirmPending(transaction.id)}
+                        className="rounded bg-emerald-50 p-1 text-emerald-700"
+                        title="确认"
+                      >
+                        <Check size={12} />
+                      </button>
+                      <button
+                        onClick={() => handleCancelPending(transaction.id)}
+                        className="rounded bg-stone-100 p-1 text-stone-500"
+                        title="取消"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleDeleteTransaction(transaction.id)}
+                      className={`p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
+                        transaction.isLegacyLocked
+                          ? 'text-stone-200 cursor-not-allowed'
+                          : 'text-stone-300 hover:text-red-500'
+                      }`}
+                      title={transaction.isLegacyLocked ? '历史锁定记录不可删除' : '删除'}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
               </li>
             );
           })}
-          {data.transactions.length === 0 && (
+          {recentTransactions.length === 0 && (
             <li className="text-center text-stone-400 py-4 text-xs">暂无记录</li>
           )}
         </ul>
