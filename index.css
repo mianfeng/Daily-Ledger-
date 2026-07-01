@@ -238,8 +238,10 @@ body {
 
 .life-budget-dark .text-stone-800,
 .life-budget-dark .text-\[\#3f4842\],
+.life-budget-dark .text-\[\#30413f\],
 .life-budget-dark .text-\[\#3e4c3b\],
 .life-budget-dark .text-\[\#4c554e\],
+.life-budget-dark .text-\[\#657b7a\],
 .life-budget-dark .text-\[\#6e7c6b\],
 .life-budget-dark .text-\[\#8b7356\],
 .life-budget-dark .text-\[\#65594c\] {
@@ -322,6 +324,40 @@ body {
 
 .life-budget-dark .life-week-buffer-chip {
   background: rgba(76, 126, 80, 0.72);
+}
+
+.life-cycle-total {
+  background: #e9f1ef;
+  border-color: rgba(138, 160, 162, 0.3);
+  color: #30413f;
+}
+
+.life-cycle-status,
+.life-cycle-primary-balance,
+.life-cycle-chip {
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.life-cycle-reserve-balance {
+  background: rgba(255, 255, 255, 0.42);
+  color: #657b7a;
+}
+
+.life-budget-dark .life-cycle-total {
+  background: #1d302e;
+  border-color: rgba(137, 186, 187, 0.28);
+  color: #eef6f1;
+}
+
+.life-budget-dark .life-cycle-status,
+.life-budget-dark .life-cycle-primary-balance,
+.life-budget-dark .life-cycle-chip {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.life-budget-dark .life-cycle-reserve-balance {
+  background: rgba(255, 255, 255, 0.045);
+  color: #bfd0cb;
 }
 
 .life-primary-entry {

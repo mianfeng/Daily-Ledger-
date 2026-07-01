@@ -155,6 +155,12 @@ writeLocalLedgerData(currentData);
   `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original
   `allocation`.
+- Cycle-detail usable balance displays should derive from current pockets:
+  - `本周期日常剩余` = `LifeBudgetState.pockets.spendable`
+  - `可动用余额` = `spendable + buffer + fixedReserved`
+  - `总金额` = `可动用余额 + reserve`
+  Do not add the cycle summary `balance` to `buffer`, because reporting
+  balances may already include buffer-like usable allocations.
 - Any transaction that mutates more than pockets must store enough metadata to reverse the extra state:
   - fixed-expense payment transactions store `fixedExpenseId`
   - main-income transactions that start a new cycle store `previousCycle` and `previousPockets`

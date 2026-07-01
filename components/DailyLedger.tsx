@@ -176,6 +176,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [summaryCard, setSummaryCard] = useState<'pending' | 'fixed'>('pending');
   const [summaryTouchStart, setSummaryTouchStart] = useState<number | null>(null);
+  const [showCycleWeeks, setShowCycleWeeks] = useState(false);
 
   const [setupForm, setSetupForm] = useState({
     spendable: String(budget.pockets.spendable || ''),
@@ -241,6 +242,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const cycleSummaries = useMemo(() => getBudgetCycleSummaries(data), [data]);
   const currentCycleSummary = cycleSummaries[0];
   const cycleVisibleBalance = currentCycleSummary?.balance ?? 0;
+  const cycleDailyRemaining = budget.pockets.spendable;
+  const cycleUsableBalance =
+    cycleDailyRemaining + budget.pockets.buffer + budget.pockets.fixedReserved;
+  const cycleTotalBalance = cycleUsableBalance + budget.pockets.reserve;
+  const weekSpent = week
+    ? Math.max(0, (week.allowance ?? 0) - snapshot.weekRemaining)
+    : 0;
   const weeklyChartMax = (currentCycleSummary?.weeks ?? []).reduce(
     (maxValue, item) => Math.max(maxValue, item.allowance, item.spent),
     1,
@@ -258,6 +266,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
   const openPanel = (nextPanel: Panel) => {
     setSettingsSaved(false);
+    if (nextPanel === 'cycle') {
+      setShowCycleWeeks(false);
+    }
     setPanel((prev) => (prev === nextPanel ? null : nextPanel));
   };
 
@@ -784,28 +795,88 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           title="周期详情"
           onClose={() => setPanel(null)}
         >
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
-                <div className="text-stone-500">本预算周剩余</div>
-                <b className="text-base">{formatAmount(snapshot.weekRemaining)}</b>
-              </div>
-              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
-                <div className="text-stone-500">缓冲金</div>
-                <b className="text-base">{formatAmount(budget.pockets.buffer)}</b>
-              </div>
-              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
-                <div className="text-stone-500">固定支出预留</div>
-                <b className="text-base">{formatAmount(budget.pockets.fixedReserved)}</b>
-              </div>
-              <div className="life-soft-row rounded-xl bg-[#f8f4ec] px-3 py-2">
-                <div className="text-stone-500">储备金</div>
-                <b className="text-base">{formatAmount(budget.pockets.reserve)}</b>
-              </div>
-            </div>
-
             {cycle ? (
               <>
-                <div className="mt-4 rounded-2xl border border-stone-200 p-3">
+                <section className="life-cycle-total mt-3 rounded-2xl border p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-black text-[#657b7a]">总金额</div>
+                      <div className="mt-1 text-3xl font-black tracking-normal">
+                        {formatAmount(cycleTotalBalance)}
+                      </div>
+                      <div className="mt-1 text-[10px] font-bold text-[#657b7a]">
+                        总金额 = 可动用余额 + 储备金
+                      </div>
+                    </div>
+                    <div className="life-cycle-status rounded-full px-2.5 py-1 text-[10px] font-black">
+                      {snapshot.isExtended ? '延长期' : cycle.status === 'closed' ? '已结束' : '进行中'}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-[1.3fr_0.9fr] gap-2">
+                    <div className="life-cycle-primary-balance rounded-xl px-3 py-2">
+                      <div className="text-[10px] font-bold text-[#657b7a]">可动用余额</div>
+                      <b className="mt-0.5 block text-xl">{formatAmount(cycleUsableBalance)}</b>
+                      <div className="mt-1 text-[10px] font-bold text-[#657b7a]">
+                        周期内可调度，不等于本周可花
+                      </div>
+                    </div>
+                    <div className="life-cycle-reserve-balance rounded-xl px-3 py-2">
+                      <div className="text-[10px] font-bold">储备金</div>
+                      <b className="mt-0.5 block text-lg">{formatAmount(budget.pockets.reserve)}</b>
+                      <div className="mt-1 text-[10px] font-bold">不计入日常可花</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-3 gap-1.5 text-[10px] font-bold">
+                    <div className="life-cycle-chip rounded-lg px-2 py-1.5">
+                      <span className="block text-[#657b7a]">本周期日常剩余</span>
+                      <b className="mt-0.5 block text-sm text-[#30413f]">{formatAmount(cycleDailyRemaining)}</b>
+                    </div>
+                    <div className="life-cycle-chip rounded-lg px-2 py-1.5">
+                      <span className="block text-[#657b7a]">缓冲金</span>
+                      <b className="mt-0.5 block text-sm text-[#30413f]">{formatAmount(budget.pockets.buffer)}</b>
+                    </div>
+                    <div className="life-cycle-chip rounded-lg px-2 py-1.5">
+                      <span className="block text-[#657b7a]">固定预留</span>
+                      <b className="mt-0.5 block text-sm text-[#30413f]">{formatAmount(budget.pockets.fixedReserved)}</b>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[10px] font-bold text-[#657b7a]">
+                    可动用余额 = 本周期日常剩余 + 缓冲金 + 固定预留
+                  </div>
+                </section>
+
+                <section className="mt-3 rounded-xl border border-stone-200 bg-[#f8f4ec] px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black text-[#4c554e]">本周提醒</div>
+                      <div className="mt-0.5 text-[10px] font-bold text-stone-500">
+                        {week
+                          ? `${formatDisplayDate(week.startDate)} - ${formatDisplayDate(week.endDate)}`
+                          : '暂无本周预算'}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-bold text-stone-500">本周剩余</div>
+                      <b className="text-lg text-[#30413f]">{formatAmount(snapshot.weekRemaining)}</b>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e5dc]">
+                    <div
+                      className="h-full rounded-full bg-[#8aa0a2]"
+                      style={{
+                        width: `${week && week.allowance > 0 ? Math.min(100, Math.round((weekSpent / week.allowance) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between text-[10px] font-bold text-stone-500">
+                    <span>预算 {formatAmount(week?.allowance ?? 0)}</span>
+                    <span>已花 {formatAmount(weekSpent)}</span>
+                  </div>
+                </section>
+
+                <section className="mt-3 rounded-xl border border-stone-200 p-3">
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <div>
                       <div className="font-black text-[#4c554e]">当前周期</div>
@@ -815,8 +886,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     </div>
                     <b>{snapshot.isExtended ? '延长期' : cycle.status === 'closed' ? '已结束' : '进行中'}</b>
                   </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">周期收入</span>
                       <b className="block">
                         {formatAmount(currentCycleSummary?.mainIncome ?? cycle.mainIncome)}
@@ -829,10 +900,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                       <b className="block">{formatAmount(currentCycleSummary?.budget ?? 0)}</b>
                     </div>
                     <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-                      <span className="text-stone-500">日常结余</span>
-                      <b className="block">{formatAmount(currentCycleSummary?.balance ?? 0)}</b>
-                    </div>
-                    <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                       <span className="text-stone-500">储备增长</span>
                       <b className="block">{formatAmount((currentCycleSummary?.reserveChange ?? 0))}</b>
                     </div>
@@ -842,53 +909,63 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                       周期总开销中，提前支付 {formatAmount(currentCycleSummary?.prepaidTotal ?? 0)}
                     </div>
                   )}
-                </div>
+                </section>
 
                 <div className="mt-4">
-                  <h3 className="text-xs font-black text-stone-500">本周期每周情况</h3>
-                  <div className="mt-2 space-y-2">
-                    {(currentCycleSummary?.weeks ?? []).map((item) => {
-                      const weekStatus = getWeekStatus(item.startDate, item.endDate);
-                      const headline =
-                        weekStatus === 'future'
-                          ? `预算 ${formatAmount(item.allowance)}`
-                          : `余额 ${formatAmount(item.remaining)}`;
+                  <button
+                    onClick={() => setShowCycleWeeks((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-left text-xs font-black text-[#4c554e]"
+                  >
+                    <span>本周期每周明细</span>
+                    <span className="text-stone-500">
+                      {showCycleWeeks ? '收起' : `查看 ${(currentCycleSummary?.weeks.length ?? 0)} 周`}
+                    </span>
+                  </button>
+                  {showCycleWeeks && (
+                    <div className="mt-2 space-y-2">
+                      {(currentCycleSummary?.weeks ?? []).map((item) => {
+                        const weekStatus = getWeekStatus(item.startDate, item.endDate);
+                        const headline =
+                          weekStatus === 'future'
+                            ? `预算 ${formatAmount(item.allowance)}`
+                            : `余额 ${formatAmount(item.remaining)}`;
 
-                      return (
-                        <div
-                          key={`${item.startDate}-${item.endDate}`}
-                          className="life-event-row rounded-xl bg-stone-50 px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-2 text-xs">
-                            <b>
-                              第 {item.index + 1} 周 · {formatDisplayDate(item.startDate)} - {formatDisplayDate(item.endDate)}
-                            </b>
-                            <span className="shrink-0 text-stone-500">{headline}</span>
-                          </div>
-                          {weekStatus === 'future' ? (
-                            <div className="mt-2 rounded-lg bg-[#f8f4ec] px-2 py-1.5 text-[10px] font-bold text-stone-500">
-                              未来周显示预算；已记录提前支付 {formatAmount(item.prepaidSpent)}。
+                        return (
+                          <div
+                            key={`${item.startDate}-${item.endDate}`}
+                            className="life-event-row rounded-xl bg-stone-50 px-3 py-2"
+                          >
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <b>
+                                第 {item.index + 1} 周 · {formatDisplayDate(item.startDate)} - {formatDisplayDate(item.endDate)}
+                              </b>
+                              <span className="shrink-0 text-stone-500">{headline}</span>
                             </div>
-                          ) : (
-                            <>
-                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
-                                <div
-                                  className="h-full rounded-full bg-[#8aa0a2]"
-                                  style={{
-                                    width: `${item.allowance > 0 ? Math.min(100, Math.round((item.spent / item.allowance) * 100)) : 0}%`,
-                                  }}
-                                />
+                            {weekStatus === 'future' ? (
+                              <div className="mt-2 rounded-lg bg-[#f8f4ec] px-2 py-1.5 text-[10px] font-bold text-stone-500">
+                                未来周显示预算；已记录提前支付 {formatAmount(item.prepaidSpent)}。
                               </div>
-                              <div className="mt-1 flex justify-between text-[10px] text-stone-500">
-                                <span>预算 {formatAmount(item.allowance)}</span>
-                                <span>已花 {formatAmount(item.spent)}</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                            ) : (
+                              <>
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
+                                  <div
+                                    className="h-full rounded-full bg-[#8aa0a2]"
+                                    style={{
+                                      width: `${item.allowance > 0 ? Math.min(100, Math.round((item.spent / item.allowance) * 100)) : 0}%`,
+                                    }}
+                                  />
+                                </div>
+                                <div className="mt-1 flex justify-between text-[10px] text-stone-500">
+                                  <span>预算 {formatAmount(item.allowance)}</span>
+                                  <span>已花 {formatAmount(item.spent)}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {(currentCycleSummary?.prepaidTransactions.length ?? 0) > 0 && (
