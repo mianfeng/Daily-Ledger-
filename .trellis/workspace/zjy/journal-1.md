@@ -104,3 +104,36 @@ Implemented pending copper sale pre-recording with manual confirm, cancel rollba
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Life budget cycle detail redesign
+
+**Date**: 2026-07-01
+**Task**: Life budget cycle detail redesign
+**Branch**: `codex/inventory-ledger`
+
+### Summary
+
+Redesigned the life budget cycle detail popup around total amount, usable balance, reserve, current-week reminder, and collapsed weekly details; documented the pocket-derived balance contract and verified typecheck/build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f7c2d02` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
