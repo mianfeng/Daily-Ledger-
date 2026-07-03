@@ -171,11 +171,17 @@ export const exportDailyToExcel = (
     '全部记录',
     data.transactions.map((transaction) => ({
       日期: transaction.date,
-      类型: transaction.type === 'income' ? '收入' : '支出',
+      类型:
+        transaction.type === 'income'
+          ? '收入'
+          : transaction.type === 'expense'
+            ? '支出'
+            : '系统结转',
       金额: transaction.amount,
       备注: transaction.desc,
       分类: transaction.category ?? '',
       收入类型: transaction.incomeKind ?? '',
+      转移类型: transaction.transferKind ?? '',
       费用时点: transaction.expenseTiming ?? '',
       归属日期: transaction.effectiveDate ?? '',
       分配_周: transaction.allocation?.week ?? '',
@@ -186,6 +192,8 @@ export const exportDailyToExcel = (
       分配_储备存入: transaction.allocation?.reserveDeposit ?? '',
       分配_储备补回: transaction.allocation?.reserveRecovery ?? '',
       固定支出ID: transaction.fixedExpenseId ?? '',
+      周期ID: transaction.cycleId ?? '',
+      周序号: transaction.weekIndex ?? '',
       前周期: transaction.previousCycle ? JSON.stringify(transaction.previousCycle) : '',
       前钱袋: transaction.previousPockets ? JSON.stringify(transaction.previousPockets) : '',
     })),
@@ -199,11 +207,17 @@ export const exportDailyToExcel = (
       )
       .map((transaction) => ({
         日期: transaction.date,
-        类型: transaction.type === 'income' ? '收入' : '支出',
+        类型:
+          transaction.type === 'income'
+            ? '收入'
+            : transaction.type === 'expense'
+              ? '支出'
+              : '系统结转',
         金额: transaction.amount,
         备注: transaction.desc,
         分类: transaction.category ?? '',
         收入类型: transaction.incomeKind ?? '',
+        转移类型: transaction.transferKind ?? '',
         费用时点: transaction.expenseTiming ?? '',
         归属日期: transaction.effectiveDate ?? '',
       })),
@@ -248,11 +262,14 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
       };
       const hasAllocation = Object.values(allocationValues).some((value) => value !== null);
       const fixedExpenseId = parseNumber(row['固定支出ID']);
+      const cycleId = parseNumber(row['周期ID'] ?? row.cycleId);
+      const weekIndex = parseNumber(row['周序号'] ?? row.weekIndex);
 
       return {
         ...normalized,
         category: (row['分类'] ?? row.category) as Transaction['category'],
         incomeKind: (row['收入类型'] ?? row.incomeKind) as Transaction['incomeKind'],
+        transferKind: (row['转移类型'] ?? row.transferKind) as Transaction['transferKind'],
         expenseTiming: (row['费用时点'] ?? row.expenseTiming) as Transaction['expenseTiming'],
         effectiveDate: (row['归属日期'] ?? row.effectiveDate) as Transaction['effectiveDate'],
         allocation: hasAllocation
@@ -267,6 +284,8 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
             }
           : undefined,
         fixedExpenseId: fixedExpenseId ?? undefined,
+        cycleId: cycleId ?? undefined,
+        weekIndex: weekIndex ?? undefined,
         previousCycle: parseJsonValue(row['前周期']),
         previousPockets: parseJsonValue(row['前钱袋']),
       };

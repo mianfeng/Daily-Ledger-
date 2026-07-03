@@ -1,5 +1,12 @@
-import { Transaction } from '../types';
 import { parseSpreadsheetDate } from './date';
+
+export interface NormalizedTransaction {
+  id: number;
+  date: string;
+  type: 'income' | 'expense' | 'transfer';
+  amount: number;
+  desc: string;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -18,6 +25,10 @@ const normalizeType = (value: unknown) => {
     return 'expense' as const;
   }
 
+  if (value === 'transfer' || value === '系统结转' || value === '内部转移') {
+    return 'transfer' as const;
+  }
+
   return null;
 };
 
@@ -26,7 +37,7 @@ export const createTransactionId = () => Date.now() + Math.random();
 export const normalizeTransaction = (
   raw: unknown,
   defaults: { incomeDesc: string; expenseDesc: string },
-): Transaction | null => {
+): NormalizedTransaction | null => {
   if (!isRecord(raw)) {
     return null;
   }
@@ -45,7 +56,9 @@ export const normalizeTransaction = (
       ? descCandidate.trim()
       : type === 'income'
         ? defaults.incomeDesc
-        : defaults.expenseDesc;
+        : type === 'expense'
+          ? defaults.expenseDesc
+          : '系统结转';
 
   const idCandidate = toFiniteNumber(raw.id);
 

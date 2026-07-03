@@ -151,6 +151,11 @@ writeLocalLedgerData(currentData);
   - `buffer` changes `LifeBudgetState.pockets.buffer`
   - `reserve` changes `LifeBudgetState.pockets.reserve`
   - `fixed` changes `LifeBudgetState.pockets.fixedReserved`
+- `DailyTransaction.type === "transfer"` represents an internal life-budget pocket transfer:
+  - it must be visible in history for auditability
+  - it must not count as income, expense, week spending, or cycle spending
+  - weekly rollover transfers subtract `allocation.week` from spendable and add `allocation.buffer` / `allocation.reserve` to the matching pockets
+  - cycle rollover transfers may use a negative `allocation.buffer` to move part of buffer into reserve
 - Prepaid/future expenses keep `date` as the payment date and store
   `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original

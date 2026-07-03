@@ -257,7 +257,7 @@ export const sanitizeCopperData = (
         expenseDesc: '进货支出',
       });
 
-      if (!normalized) {
+      if (!normalized || normalized.type === 'transfer') {
         return null;
       }
 

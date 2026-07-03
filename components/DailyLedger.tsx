@@ -25,6 +25,7 @@ import { formatDisplayDate, getTodayDate, normalizeDateInput } from '../lib/date
 import {
   addFixedExpense,
   adjustFixedReserved,
+  applyDueBudgetRollovers,
   allocateIncome,
   deleteDailyTransaction,
   getBudgetCycleSummaries,
@@ -40,6 +41,7 @@ import {
   DailyData,
   DailyExpenseCategory,
   DailyIncomeKind,
+  DailyTransaction,
   LifeBudgetSettings,
 } from '../types';
 import { exportDailyToExcel, parseDailyImportWorkbook } from '../utils/excel';
@@ -82,6 +84,22 @@ const inputToRate = (value: string, fallback: number) => {
   return Math.max(0, Math.min(100, parsed)) / 100;
 };
 
+const formatTransactionAmount = (transaction: DailyTransaction) => {
+  if (transaction.type === 'transfer') {
+    return `转 ${formatAmount(transaction.amount)}`;
+  }
+
+  return `${transaction.type === 'income' ? '+' : '-'}${formatAmount(transaction.amount)}`;
+};
+
+const getTransactionAmountClass = (transaction: DailyTransaction) => {
+  if (transaction.type === 'transfer') {
+    return 'text-[#70685f]';
+  }
+
+  return transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]';
+};
+
 const addLocalDays = (date: string, days: number) => {
   const value = new Date(`${normalizeDateInput(date)}T00:00:00`);
   value.setDate(value.getDate() + days);
@@ -122,6 +140,11 @@ const incomeKindLabels: Record<DailyIncomeKind, string> = {
   refund: '退款报销',
   correction: '余额修正',
 };
+
+const transferKindLabels = {
+  weeklyRollover: '系统结转',
+  cycleRollover: '系统结转',
+} as const;
 
 const quickActionClass =
   'life-action-button flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black shadow-sm transition active:scale-[0.98]';
@@ -185,6 +208,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     expectedPayday: String(budget.settings.expectedPayday),
     savingsRate: percentToInput(budget.settings.savingsRate),
     bufferRate: percentToInput(budget.settings.bufferRate),
+    reserveGoal: String(budget.settings.reserveGoal || ''),
+    bufferCap: String(budget.settings.bufferCap || ''),
     minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
   });
   const [incomeForm, setIncomeForm] = useState({
@@ -214,8 +239,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       ? Math.min(100, Math.round((snapshot.weekSpent / week.allowance) * 100))
       : 0;
   const reserveProgress =
-    snapshot.reserveMinimum > 0
-      ? Math.min(100, Math.round((budget.pockets.reserve / snapshot.reserveMinimum) * 100))
+    budget.settings.reserveGoal > 0
+      ? Math.min(100, Math.round((budget.pockets.reserve / budget.settings.reserveGoal) * 100))
       : 100;
   const actualBookBalance = snapshot.calibratableBalance;
   const shouldRecommendLarge =
@@ -234,7 +259,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     [data.transactions],
   );
   const getTransactionKindLabel = (transaction: DailyData['transactions'][number]) =>
-    transaction.type === 'income'
+    transaction.type === 'transfer'
+      ? transferKindLabels[transaction.transferKind ?? 'weeklyRollover']
+      : transaction.type === 'income'
       ? incomeKindLabels[transaction.incomeKind ?? 'casual']
       : transaction.expenseTiming === 'prepaid'
         ? '提前支付'
@@ -273,6 +300,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   };
 
   useEffect(() => {
+    setData((prev) => applyDueBudgetRollovers(prev, today));
+  }, [setData, today]);
+
+  useEffect(() => {
     if (panel !== 'settings') {
       return;
     }
@@ -284,6 +315,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       expectedPayday: String(budget.settings.expectedPayday),
       savingsRate: percentToInput(budget.settings.savingsRate),
       bufferRate: percentToInput(budget.settings.bufferRate),
+      reserveGoal: String(budget.settings.reserveGoal || ''),
+      bufferCap: String(budget.settings.bufferCap || ''),
       minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
     });
   }, [budget, panel]);
@@ -298,6 +331,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
           savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
           bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+          reserveGoal:
+            parseAmount(setupForm.reserveGoal) ||
+            budget.settings.reserveGoal,
+          bufferCap:
+            parseAmount(setupForm.bufferCap) ||
+            budget.settings.bufferCap,
           minimumWeeklyLiving:
             parseAmount(setupForm.minimumWeeklyLiving) ||
             budget.settings.minimumWeeklyLiving,
@@ -370,8 +409,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
     if (
       category === 'large' &&
-      budget.pockets.reserve - amount < snapshot.reserveMinimum &&
-      !window.confirm('这笔大额支出会让储备金低于最低线，仍然记录吗？')
+      amount > budget.pockets.buffer + budget.pockets.spendable &&
+      !window.confirm('缓冲金和当前可消费余额不足，仍然记录吗？')
     ) {
       return;
     }
@@ -473,16 +512,33 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   };
 
   const updateSettings = (nextSettings: Partial<LifeBudgetSettings>) => {
-    setData((prev) => ({
-      ...prev,
-      budget: {
-        ...getLifeBudget(prev),
-        settings: {
-          ...getLifeBudget(prev).settings,
-          ...nextSettings,
+    setData((prev) => {
+      const currentBudget = getLifeBudget(prev);
+      const settings = {
+        ...currentBudget.settings,
+        ...nextSettings,
+      };
+      const bufferOverflow =
+        settings.bufferCap > 0
+          ? Math.max(0, currentBudget.pockets.buffer - settings.bufferCap)
+          : currentBudget.pockets.buffer;
+
+      return {
+        ...prev,
+        budget: {
+          ...currentBudget,
+          settings,
+          pockets:
+            bufferOverflow > 0
+              ? {
+                  ...currentBudget.pockets,
+                  buffer: Math.max(0, currentBudget.pockets.buffer - bufferOverflow),
+                  reserve: currentBudget.pockets.reserve + bufferOverflow,
+                }
+              : currentBudget.pockets,
         },
-      },
-    }));
+      };
+    });
     setSettingsSaved(true);
   };
 
@@ -720,7 +776,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 const weekStatus = getWeekStatus(item.startDate, item.endDate);
                 const spentValue =
                   weekStatus === 'future' ? item.prepaidSpent : item.spent;
-                const remainingValue = Math.max(0, item.allowance - spentValue);
+                const remainingValue =
+                  weekStatus === 'future'
+                    ? Math.max(0, item.allowance - spentValue)
+                    : item.remaining;
                 const totalHeight = Math.max(
                   8,
                   Math.round((item.allowance / weeklyChartMax) * 100),
@@ -823,8 +882,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     </div>
                     <div className="life-cycle-reserve-balance rounded-xl px-3 py-2">
                       <div className="text-[10px] font-bold">储备金</div>
-                      <b className="mt-0.5 block text-lg">{formatAmount(budget.pockets.reserve)}</b>
-                      <div className="mt-1 text-[10px] font-bold">不计入日常可花</div>
+                      <b className="mt-0.5 block text-base">
+                        {formatAmount(budget.pockets.reserve)} / {formatAmount(budget.settings.reserveGoal)}
+                      </b>
+                      <div className="mt-1 text-[10px] font-bold">目标进度 {reserveProgress}%</div>
                     </div>
                   </div>
 
@@ -1050,7 +1111,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 <span className="text-[10px] font-bold text-stone-500">只在设置里查看</span>
               </div>
               <div className="mt-2 text-2xl font-black text-[#3e4c3b]">
-                {formatAmount(budget.pockets.reserve)}
+                {formatAmount(budget.pockets.reserve)} / {formatAmount(budget.settings.reserveGoal)}
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#eef0ea]">
                 <div
@@ -1062,14 +1123,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
                 <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-                  <div className="text-stone-500">最低线</div>
-                  <b>{formatAmount(snapshot.reserveMinimum)}</b>
+                  <div className="text-stone-500">目标</div>
+                  <b>{formatAmount(budget.settings.reserveGoal)}</b>
                 </div>
                 <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
-                  <div className="text-stone-500">净变化</div>
-                  <b className={snapshot.reserveNetChange >= 0 ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'}>
-                    {formatSignedAmount(snapshot.reserveNetChange)}
-                  </b>
+                  <div className="text-stone-500">最低线</div>
+                  <b>{formatAmount(snapshot.reserveMinimum)}</b>
                 </div>
                 <div className="life-soft-row rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                   <div className="text-stone-500">缺口</div>
@@ -1089,6 +1148,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             <NumberField label="预计发薪日" value={setupForm.expectedPayday} onChange={(expectedPayday) => setSetupForm((prev) => ({ ...prev, expectedPayday }))} />
             <NumberField label="储备比例 %" value={setupForm.savingsRate} onChange={(savingsRate) => setSetupForm((prev) => ({ ...prev, savingsRate }))} />
             <NumberField label="缓冲比例 %" value={setupForm.bufferRate} onChange={(bufferRate) => setSetupForm((prev) => ({ ...prev, bufferRate }))} />
+            <NumberField label="储备金目标" value={setupForm.reserveGoal} onChange={(reserveGoal) => setSetupForm((prev) => ({ ...prev, reserveGoal }))} />
+            <NumberField label="缓冲金上限" value={setupForm.bufferCap} onChange={(bufferCap) => setSetupForm((prev) => ({ ...prev, bufferCap }))} />
             <NumberField label="最低每周生活线" value={setupForm.minimumWeeklyLiving} onChange={(minimumWeeklyLiving) => setSetupForm((prev) => ({ ...prev, minimumWeeklyLiving }))} />
             <label className="text-xs font-bold text-stone-500">
               储备金最低线覆盖
@@ -1122,6 +1183,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
                 savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
                 bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+                reserveGoal:
+                  parseAmount(setupForm.reserveGoal) ||
+                  budget.settings.reserveGoal,
+                bufferCap:
+                  parseAmount(setupForm.bufferCap) ||
+                  budget.settings.bufferCap,
                 minimumWeeklyLiving:
                   parseAmount(setupForm.minimumWeeklyLiving) ||
                   budget.settings.minimumWeeklyLiving,
@@ -1423,12 +1490,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <div
-                  className={`text-xs font-black ${
-                    transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
-                  }`}
+                  className={`text-xs font-black ${getTransactionAmountClass(transaction)}`}
                 >
-                  {transaction.type === 'income' ? '+' : '-'}
-                  {formatAmount(transaction.amount)}
+                  {formatTransactionAmount(transaction)}
                 </div>
                 <button
                   onClick={() => handleDeleteTransaction(transaction.id)}
@@ -1473,12 +1537,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <div
-                    className={`text-xs font-black ${
-                      transaction.type === 'income' ? 'text-[#6f8b6b]' : 'text-[#b66b5d]'
-                    }`}
+                    className={`text-xs font-black ${getTransactionAmountClass(transaction)}`}
                   >
-                    {transaction.type === 'income' ? '+' : '-'}
-                    {formatAmount(transaction.amount)}
+                    {formatTransactionAmount(transaction)}
                   </div>
                   <button
                     onClick={() => handleDeleteTransaction(transaction.id)}

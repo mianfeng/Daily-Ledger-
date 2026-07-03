@@ -7,6 +7,7 @@ import {
   DailyIncomeKind,
   DailyTransaction,
   DailyTransactionAllocation,
+  DailyTransferKind,
   FixedExpense,
   LifeBudgetSettings,
   LifeBudgetState,
@@ -96,6 +97,13 @@ const normalizeExpenseTiming = (value: unknown): DailyExpenseTiming | undefined 
   return undefined;
 };
 
+const normalizeTransferKind = (value: unknown): DailyTransferKind | undefined => {
+  if (value === 'weeklyRollover' || value === 'cycleRollover') {
+    return value;
+  }
+  return undefined;
+};
+
 const normalizeAllocation = (raw: unknown) => {
   if (!isRecord(raw)) {
     return undefined;
@@ -125,7 +133,9 @@ export const DEFAULT_LIFE_BUDGET_SETTINGS: LifeBudgetSettings = {
   savingsRate: 0.2,
   bufferRate: 0.2,
   reserveRecoveryRate: 0.1,
-  weeklyRolloverReserveRate: 0.7,
+  weeklyRolloverReserveRate: 0.5,
+  reserveGoal: 50000,
+  bufferCap: 6000,
   minimumWeeklyLiving: 400,
   reserveMinimumOverride: null,
   largeExpenseAbsoluteThreshold: 1000,
@@ -168,6 +178,14 @@ const sanitizeSettings = (raw: unknown): LifeBudgetSettings => {
     weeklyRolloverReserveRate: clampRate(
       value.weeklyRolloverReserveRate,
       DEFAULT_LIFE_BUDGET_SETTINGS.weeklyRolloverReserveRate,
+    ),
+    reserveGoal: Math.max(
+      0,
+      toFiniteNumber(value.reserveGoal, DEFAULT_LIFE_BUDGET_SETTINGS.reserveGoal),
+    ),
+    bufferCap: Math.max(
+      0,
+      toFiniteNumber(value.bufferCap, DEFAULT_LIFE_BUDGET_SETTINGS.bufferCap),
     ),
     minimumWeeklyLiving: Math.max(
       0,
@@ -258,6 +276,12 @@ const sanitizeCycle = (raw: unknown): BudgetCycle | null => {
     return null;
   }
 
+  const rolledOverWeekIndexes = Array.isArray(raw.rolledOverWeekIndexes)
+    ? raw.rolledOverWeekIndexes
+        .map((index) => Math.max(0, Math.round(toFiniteNumber(index, -1))))
+        .filter((index) => index >= 0)
+    : [];
+
   return {
     id: toFiniteNumber(raw.id, createTransactionId()),
     startDate,
@@ -273,6 +297,7 @@ const sanitizeCycle = (raw: unknown): BudgetCycle | null => {
     reserveRecovery: roundAmount(Math.max(0, toFiniteNumber(raw.reserveRecovery, 0))),
     startingBuffer: roundAmount(Math.max(0, toFiniteNumber(raw.startingBuffer, 0))),
     weeklyAllowance: roundAmount(Math.max(0, toFiniteNumber(raw.weeklyAllowance, 0))),
+    rolledOverWeekIndexes,
     weeks,
   };
 };
@@ -414,6 +439,7 @@ export const sanitizeDailyData = (
         date: paymentDate,
         category: normalizeExpenseCategory(item.category),
         incomeKind: normalizeIncomeKind(item.incomeKind),
+        transferKind: normalizeTransferKind(item.transferKind),
         expenseTiming,
         effectiveDate,
         allocation: normalizeAllocation(item.allocation),
@@ -421,6 +447,14 @@ export const sanitizeDailyData = (
           item.fixedExpenseId === undefined
             ? undefined
             : toFiniteNumber(item.fixedExpenseId),
+        cycleId:
+          item.cycleId === undefined
+            ? undefined
+            : toFiniteNumber(item.cycleId),
+        weekIndex:
+          item.weekIndex === undefined
+            ? undefined
+            : Math.max(0, Math.round(toFiniteNumber(item.weekIndex))),
         previousCycle:
           item.previousCycle === undefined
             ? undefined
@@ -462,6 +496,27 @@ export const getReserveMinimum = (budget: LifeBudgetState) => {
   return roundAmount(fixedTotal + budget.settings.minimumWeeklyLiving * 2);
 };
 
+const splitBufferAllocation = (
+  amount: number,
+  currentBuffer: number,
+  bufferCap: number,
+) => {
+  const safeAmount = roundAmount(Math.max(0, amount));
+  const availableBufferRoom =
+    bufferCap <= 0 ? 0 : Math.max(0, roundAmount(bufferCap - currentBuffer));
+  const buffer = roundAmount(Math.min(safeAmount, availableBufferRoom));
+  const reserveOverflow = roundAmount(safeAmount - buffer);
+
+  return { buffer, reserveOverflow };
+};
+
+const addRolledOverWeekIndex = (cycle: BudgetCycle, weekIndex: number) => ({
+  ...cycle,
+  rolledOverWeekIndexes: Array.from(
+    new Set([...cycle.rolledOverWeekIndexes, weekIndex]),
+  ).sort((left, right) => left - right),
+});
+
 export const getCurrentBudgetWeek = (
   cycle: BudgetCycle | null,
   today = getTodayDate(),
@@ -488,6 +543,28 @@ const getExpenseReportDate = (transaction: DailyTransaction) =>
 
 const getPrepaidExpenseAmount = (transaction: DailyTransaction) =>
   isPrepaidExpense(transaction) ? transaction.amount : 0;
+
+const getWeekRolloverTotal = (
+  transactions: DailyTransaction[],
+  cycle: BudgetCycle | null,
+  week: BudgetWeek | null,
+) => {
+  if (!cycle || !week) {
+    return 0;
+  }
+
+  return roundAmount(
+    transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'transfer' &&
+          transaction.transferKind === 'weeklyRollover' &&
+          transaction.cycleId === cycle.id &&
+          transaction.weekIndex === week.index,
+      )
+      .reduce((total, transaction) => total + (transaction.allocation?.week ?? 0), 0),
+  );
+};
 
 const getWeekExpenseTotal = (
   transactions: DailyTransaction[],
@@ -598,7 +675,7 @@ const getCycleUsableIncomeTotal = (
       )
       .reduce((total, transaction) => {
         const usableAllocation = getUsableIncomeAllocation(transaction);
-        return total + (usableAllocation > 0 ? usableAllocation : transaction.amount);
+        return total + (transaction.allocation ? usableAllocation : transaction.amount);
       }, 0),
   );
 
@@ -673,14 +750,25 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   const cycle = budget.currentCycle;
   const week = getCurrentBudgetWeek(cycle, today);
   const weekSpent = getWeekExpenseTotal(data.transactions, week);
-  const weekRemaining = roundAmount(Math.max(0, (week?.allowance ?? 0) - weekSpent));
+  const weekRolledOver = getWeekRolloverTotal(data.transactions, cycle, week);
+  const weekRemaining = roundAmount(
+    Math.max(0, (week?.allowance ?? 0) - weekSpent - weekRolledOver),
+  );
   const reserveMinimum = getReserveMinimum(budget);
   const reserveGap = roundAmount(Math.max(0, reserveMinimum - budget.pockets.reserve));
 
   const cycleTransactions = cycle
     ? data.transactions.filter((transaction) => normalizeDateInput(transaction.date) >= cycle.startDate)
     : [];
-  const reserveIn = cycle?.reserveDeposit ?? 0;
+  const transferReserveIn = cycleTransactions
+    .filter(
+      (transaction) =>
+        transaction.type === 'transfer' &&
+        normalizeDateInput(transaction.date) >= (cycle?.startDate ?? '') &&
+        (!cycle || normalizeDateInput(transaction.date) <= cycle.plannedEndDate),
+    )
+    .reduce((total, transaction) => total + (transaction.allocation?.reserve ?? 0), 0);
+  const reserveIn = roundAmount((cycle?.reserveDeposit ?? 0) + transferReserveIn);
   const reserveOut = cycleTransactions
     .filter((transaction) => {
       const transactionDate = normalizeDateInput(transaction.date);
@@ -768,11 +856,13 @@ export const getBudgetWeekSummaries = (
     ? cycle.weeks.map((week) => {
         const spent = getWeekExpenseTotal(data.transactions, week);
         const prepaidSpent = getWeekPrepaidExpenseTotal(data.transactions, week);
+        const rolledOver = getWeekRolloverTotal(data.transactions, cycle, week);
         return {
           ...week,
           spent,
           prepaidSpent,
-          remaining: roundAmount(Math.max(0, week.allowance - spent)),
+          rolledOver,
+          remaining: roundAmount(Math.max(0, week.allowance - spent - rolledOver)),
         };
       })
     : [];
@@ -790,6 +880,22 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
     const otherIncome = getCycleOtherIncomeTotal(data.transactions, cycle);
     const prepaidTotal = getCyclePrepaidExpenseTotal(data.transactions, cycle);
     const prepaidTransactions = getCyclePrepaidExpenses(data.transactions, cycle);
+    const rolloverTotal = data.transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'transfer' &&
+          transaction.transferKind === 'weeklyRollover' &&
+          transaction.cycleId === cycle.id,
+      )
+      .reduce((total, transaction) => total + (transaction.allocation?.week ?? 0), 0);
+    const transferReserveIn = data.transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'transfer' &&
+          normalizeDateInput(transaction.date) >= cycle.startDate &&
+          normalizeDateInput(transaction.date) <= cycle.plannedEndDate,
+      )
+      .reduce((total, transaction) => total + (transaction.allocation?.reserve ?? 0), 0);
     const livingBudget = roundAmount(
       usableIncome ||
         cycle.weeks.reduce((total, week) => total + week.allowance, 0) +
@@ -803,11 +909,11 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
       spent: getCycleExpenseTotal(data.transactions, cycle),
       livingSpent,
       weeks: getBudgetWeekSummaries(data, cycle),
-      balance: roundAmount(livingBudget - livingSpent),
+      balance: roundAmount(livingBudget - livingSpent - rolloverTotal),
       budget: livingBudget,
       prepaidTotal,
       prepaidTransactions,
-      reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery),
+      reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery + transferReserveIn),
     };
   });
 };
@@ -837,6 +943,103 @@ const buildWeeks = (
   return weeks;
 };
 
+export const applyDueBudgetRollovers = (
+  data: DailyData,
+  today = getTodayDate(),
+): DailyData => {
+  const budget = getLifeBudget(data);
+  const cycle = budget.currentCycle;
+  const normalizedToday = normalizeDateInput(today) || getTodayDate();
+
+  if (!cycle) {
+    return data;
+  }
+
+  let nextData = data;
+  let nextCycle = cycle;
+  let nextPockets = budget.pockets;
+  const rolloverTransactions: DailyTransaction[] = [];
+
+  for (const week of cycle.weeks) {
+    const rolloverDate = addDays(week.endDate, 1);
+    const alreadyRolled =
+      nextCycle.rolledOverWeekIndexes.includes(week.index) ||
+      nextData.transactions.some(
+        (transaction) =>
+          transaction.type === 'transfer' &&
+          transaction.transferKind === 'weeklyRollover' &&
+          transaction.cycleId === cycle.id &&
+          transaction.weekIndex === week.index,
+      );
+
+    if (rolloverDate > normalizedToday || alreadyRolled) {
+      continue;
+    }
+
+    const spent = getWeekExpenseTotal(nextData.transactions, week);
+    const alreadyTransferred = getWeekRolloverTotal(nextData.transactions, cycle, week);
+    const remaining = roundAmount(Math.max(0, week.allowance - spent - alreadyTransferred));
+    nextCycle = addRolledOverWeekIndex(nextCycle, week.index);
+
+    if (remaining <= 0) {
+      continue;
+    }
+
+    const desiredReserve = roundAmount(remaining * budget.settings.weeklyRolloverReserveRate);
+    const desiredBuffer = roundAmount(remaining - desiredReserve);
+    const bufferAllocation = splitBufferAllocation(
+      desiredBuffer,
+      nextPockets.buffer,
+      budget.settings.bufferCap,
+    );
+    const buffer = bufferAllocation.buffer;
+    const reserve = roundAmount(desiredReserve + bufferAllocation.reserveOverflow);
+    const transaction: DailyTransaction = {
+      id: createTransactionId(),
+      date: rolloverDate,
+      type: 'transfer',
+      amount: remaining,
+      desc: `第 ${week.index + 1} 周余额结转`,
+      transferKind: 'weeklyRollover',
+      cycleId: cycle.id,
+      weekIndex: week.index,
+      allocation: {
+        week: remaining,
+        buffer,
+        advance: 0,
+        reserve,
+        fixed: 0,
+      },
+    };
+
+    rolloverTransactions.push(transaction);
+    nextData = {
+      ...nextData,
+      transactions: [...nextData.transactions, transaction],
+    };
+    nextPockets = {
+      ...nextPockets,
+      spendable: roundAmount(Math.max(0, nextPockets.spendable - remaining)),
+      buffer: roundAmount(nextPockets.buffer + buffer),
+      reserve: roundAmount(nextPockets.reserve + reserve),
+    };
+  }
+
+  if (nextCycle === cycle && rolloverTransactions.length === 0) {
+    return data;
+  }
+
+  return {
+    ...data,
+    transactions: [...data.transactions, ...rolloverTransactions],
+    budget: {
+      ...budget,
+      currentCycle: nextCycle,
+      pockets: nextPockets,
+    },
+  };
+};
+
 export const initializeLifeBudget = (
   data: DailyData,
   {
@@ -850,23 +1053,28 @@ export const initializeLifeBudget = (
     reserve: number;
     settings: Partial<LifeBudgetSettings>;
   },
-): DailyData => ({
-  ...data,
-  budget: {
-    ...DEFAULT_LIFE_BUDGET,
-    initialized: true,
-    settings: sanitizeSettings({
+): DailyData => {
+  const nextSettings = sanitizeSettings({
       ...DEFAULT_LIFE_BUDGET_SETTINGS,
       ...settings,
-    }),
+    });
+  const bufferAllocation = splitBufferAllocation(buffer, 0, nextSettings.bufferCap);
+
+  return {
+    ...data,
+    budget: {
+      ...DEFAULT_LIFE_BUDGET,
+      initialized: true,
+      settings: nextSettings,
     pockets: {
       spendable: roundAmount(Math.max(0, spendable)),
-      buffer: roundAmount(Math.max(0, buffer)),
-      reserve: roundAmount(Math.max(0, reserve)),
+        buffer: bufferAllocation.buffer,
+        reserve: roundAmount(Math.max(0, reserve) + bufferAllocation.reserveOverflow),
       fixedReserved: 0,
     },
   },
-});
+  };
+};
 
 export const addFixedExpense = (
   data: DailyData,
@@ -929,9 +1137,10 @@ export const allocateIncome = (
     incomeKind: DailyIncomeKind;
   },
 ): DailyData => {
-  const budget = getLifeBudget(data);
   const safeAmount = roundAmount(Math.max(0, amount));
   const normalizedDate = normalizeDateInput(date) || getTodayDate();
+  const rolloverData = applyDueBudgetRollovers(data, normalizedDate);
+  const budget = getLifeBudget(rolloverData);
 
   if (safeAmount <= 0) {
     return data;
@@ -947,17 +1156,22 @@ export const allocateIncome = (
   };
 
   if (incomeKind === 'casual' || incomeKind === 'correction') {
+    const bufferAllocation = splitBufferAllocation(
+      safeAmount,
+      budget.pockets.buffer,
+      budget.settings.bufferCap,
+    );
     return {
-      ...data,
+      ...rolloverData,
       transactions: [
-        ...data.transactions,
+        ...rolloverData.transactions,
         {
           ...incomeTransaction,
           allocation: {
             week: 0,
-            buffer: safeAmount,
+            buffer: bufferAllocation.buffer,
             advance: 0,
-            reserve: 0,
+            reserve: bufferAllocation.reserveOverflow,
             fixed: 0,
           },
         },
@@ -966,7 +1180,8 @@ export const allocateIncome = (
         ...budget,
         pockets: {
           ...budget.pockets,
-          buffer: roundAmount(budget.pockets.buffer + safeAmount),
+          buffer: roundAmount(budget.pockets.buffer + bufferAllocation.buffer),
+          reserve: roundAmount(budget.pockets.reserve + bufferAllocation.reserveOverflow),
         },
       },
     };
@@ -974,9 +1189,9 @@ export const allocateIncome = (
 
   if (incomeKind === 'refund') {
     return {
-      ...data,
+      ...rolloverData,
       transactions: [
-        ...data.transactions,
+        ...rolloverData.transactions,
         {
           ...incomeTransaction,
           allocation: {
@@ -1015,23 +1230,31 @@ export const allocateIncome = (
       ),
     );
     const remaining = roundAmount(Math.max(0, safeAmount - reserveDeposit - reserveRecovery));
-    const buffer = roundAmount(remaining * budget.settings.bufferRate);
-    const spendable = roundAmount(remaining - buffer);
+    const intendedBuffer = roundAmount(remaining * budget.settings.bufferRate);
+    const bufferAllocation = splitBufferAllocation(
+      intendedBuffer,
+      budget.pockets.buffer,
+      budget.settings.bufferCap,
+    );
+    const buffer = bufferAllocation.buffer;
+    const bufferOverflowReserve = bufferAllocation.reserveOverflow;
+    const spendable = roundAmount(Math.max(0, remaining - intendedBuffer));
+    const totalReserve = roundAmount(reserveDeposit + reserveRecovery + bufferOverflowReserve);
 
     return {
-      ...data,
+      ...rolloverData,
       transactions: [
-        ...data.transactions,
+        ...rolloverData.transactions,
         {
           ...incomeTransaction,
           allocation: {
             week: spendable,
             buffer,
             advance: 0,
-            reserve: reserveDeposit + reserveRecovery,
+            reserve: totalReserve,
             fixed: 0,
             reserveDeposit,
-            reserveRecovery,
+            reserveRecovery: roundAmount(reserveRecovery + bufferOverflowReserve),
           },
         },
       ],
@@ -1041,14 +1264,16 @@ export const allocateIncome = (
           ...budget.currentCycle,
           mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
           reserveDeposit: roundAmount(budget.currentCycle.reserveDeposit + reserveDeposit),
-          reserveRecovery: roundAmount(budget.currentCycle.reserveRecovery + reserveRecovery),
+          reserveRecovery: roundAmount(
+            budget.currentCycle.reserveRecovery + reserveRecovery + bufferOverflowReserve,
+          ),
           startingBuffer: roundAmount(budget.currentCycle.startingBuffer + buffer),
         },
         pockets: {
           ...budget.pockets,
           spendable: roundAmount(budget.pockets.spendable + spendable),
           buffer: roundAmount(budget.pockets.buffer + buffer),
-          reserve: roundAmount(budget.pockets.reserve + reserveDeposit + reserveRecovery),
+          reserve: roundAmount(budget.pockets.reserve + totalReserve),
         },
       },
     };
@@ -1072,7 +1297,23 @@ export const allocateIncome = (
   const weeklyAllowance = roundAmount(
     spendingPool / Math.max(1, dayUnits + budget.settings.bufferRate),
   );
-  const startingBuffer = roundAmount(weeklyAllowance * budget.settings.bufferRate);
+  const intendedStartingBuffer = roundAmount(weeklyAllowance * budget.settings.bufferRate);
+  const previousBufferReserve = budget.currentCycle
+    ? roundAmount(budget.pockets.buffer * budget.settings.weeklyRolloverReserveRate)
+    : 0;
+  const nextCycleBufferCarry = budget.currentCycle
+    ? roundAmount(Math.max(0, budget.pockets.buffer - previousBufferReserve))
+    : 0;
+  const startingBufferAllocation = splitBufferAllocation(
+    intendedStartingBuffer,
+    nextCycleBufferCarry,
+    budget.settings.bufferCap,
+  );
+  const startingBuffer = startingBufferAllocation.buffer;
+  const bufferOverflowReserve = startingBufferAllocation.reserveOverflow;
+  const totalReserve = roundAmount(
+    reserveDeposit + reserveRecovery + previousBufferReserve + bufferOverflowReserve,
+  );
   const weeks = buildWeeks(normalizedDate, plannedEndDate, weeklyAllowance);
   const spendable = roundAmount(
     weeks.reduce((total, week) => total + week.allowance, 0),
@@ -1090,13 +1331,34 @@ export const allocateIncome = (
     reserveRecovery,
     startingBuffer,
     weeklyAllowance,
+    rolledOverWeekIndexes: [],
     weeks,
   };
+  const cycleRolloverTransaction: DailyTransaction | null =
+    budget.currentCycle && previousBufferReserve > 0
+      ? {
+          id: createTransactionId(),
+          date: normalizedDate,
+          type: 'transfer',
+          amount: previousBufferReserve,
+          desc: '周期缓冲金结转',
+          transferKind: 'cycleRollover',
+          cycleId: budget.currentCycle.id,
+          allocation: {
+            week: 0,
+            buffer: roundAmount(-previousBufferReserve),
+            advance: 0,
+            reserve: previousBufferReserve,
+            fixed: 0,
+          },
+        }
+      : null;
 
   return {
-    ...data,
+    ...rolloverData,
     transactions: [
-      ...data.transactions,
+      ...rolloverData.transactions,
+      ...(cycleRolloverTransaction ? [cycleRolloverTransaction] : []),
       {
         ...incomeTransaction,
         previousCycle: budget.currentCycle,
@@ -1105,10 +1367,10 @@ export const allocateIncome = (
           week: spendable,
           buffer: startingBuffer,
           advance: 0,
-          reserve: reserveDeposit + reserveRecovery,
+          reserve: roundAmount(reserveDeposit + reserveRecovery + bufferOverflowReserve),
           fixed: fixedReserved,
           reserveDeposit,
-          reserveRecovery,
+          reserveRecovery: roundAmount(reserveRecovery + bufferOverflowReserve),
         },
       },
     ],
@@ -1124,8 +1386,8 @@ export const allocateIncome = (
       currentCycle,
       pockets: {
         spendable,
-        buffer: startingBuffer,
-        reserve: roundAmount(budget.pockets.reserve + reserveDeposit + reserveRecovery),
+        buffer: roundAmount(nextCycleBufferCarry + startingBuffer),
+        reserve: roundAmount(budget.pockets.reserve + totalReserve),
         fixedReserved: budget.pockets.fixedReserved,
       },
     },
@@ -1202,7 +1464,10 @@ export const recordExpense = (
   }
 
   if (category === 'large') {
-    const reserve = roundAmount(Math.min(safeAmount, budget.pockets.reserve));
+    let remaining = safeAmount;
+    const buffer = roundAmount(Math.min(remaining, budget.pockets.buffer));
+    remaining = roundAmount(remaining - buffer);
+    const advance = roundAmount(Math.min(remaining, budget.pockets.spendable));
     const transaction: DailyTransaction = {
       id: createTransactionId(),
       date: normalizedDate,
@@ -1212,9 +1477,9 @@ export const recordExpense = (
       desc: desc.trim() || '大额支出',
       allocation: {
         week: 0,
-        buffer: 0,
-        advance: 0,
-        reserve,
+        buffer,
+        advance,
+        reserve: 0,
         fixed: 0,
       },
     };
@@ -1226,7 +1491,8 @@ export const recordExpense = (
         ...budget,
         pockets: {
           ...budget.pockets,
-          reserve: roundAmount(Math.max(0, budget.pockets.reserve - reserve)),
+          spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
+          buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
         },
       },
     };
@@ -1427,6 +1693,17 @@ const applyAllocationToPockets = (
   transaction: DailyTransaction,
   allocation: DailyTransactionAllocation,
 ) => {
+  if (transaction.type === 'transfer') {
+    return {
+      spendable: roundAmount(
+        Math.max(0, pockets.spendable - allocation.week - allocation.advance),
+      ),
+      buffer: roundAmount(Math.max(0, pockets.buffer + allocation.buffer)),
+      reserve: roundAmount(Math.max(0, pockets.reserve + allocation.reserve)),
+      fixedReserved: roundAmount(Math.max(0, pockets.fixedReserved + allocation.fixed)),
+    };
+  }
+
   const direction = transaction.type === 'income' ? 1 : -1;
 
   return {
@@ -1474,6 +1751,20 @@ export const deleteDailyTransaction = (
     transactionOpenedCurrentCycle &&
     budget.currentCycle !== null &&
     roundAmount(Math.max(0, budget.currentCycle.mainIncome - transaction.amount)) <= 0;
+  const relatedCycleRolloverIds =
+    currentCycleOpeningDeleted && transaction.previousCycle
+      ? new Set(
+          data.transactions
+            .filter(
+              (item) =>
+                item.type === 'transfer' &&
+                item.transferKind === 'cycleRollover' &&
+                item.cycleId === transaction.previousCycle?.id &&
+                item.date === transaction.date,
+            )
+            .map((item) => item.id),
+        )
+      : new Set<number>();
   const pocketRollbackAllocation =
     transaction.previousCycle !== undefined && !transactionOpenedCurrentCycle
       ? getPersistentCycleOpeningRollbackAllocation(allocation)
@@ -1488,28 +1779,48 @@ export const deleteDailyTransaction = (
     : budget.archivedCycles
         .map((cycle) => rollbackCycleMainIncome(cycle, transaction, allocation))
         .filter((cycle): cycle is BudgetCycle => cycle !== null);
-  const rollbackPockets = {
-    ...budget.pockets,
-    spendable: roundAmount(
-      Math.max(
-        0,
-        budget.pockets.spendable +
-          direction * (pocketRollbackAllocation.week + pocketRollbackAllocation.advance),
-      ),
-    ),
-    buffer: roundAmount(
-      Math.max(0, budget.pockets.buffer + direction * pocketRollbackAllocation.buffer),
-    ),
-    reserve: roundAmount(
-      Math.max(0, budget.pockets.reserve + direction * pocketRollbackAllocation.reserve),
-    ),
-    fixedReserved: roundAmount(
-      Math.max(0, budget.pockets.fixedReserved + direction * pocketRollbackAllocation.fixed),
-    ),
-  };
+  const rollbackPockets =
+    transaction.type === 'transfer'
+      ? {
+          ...budget.pockets,
+          spendable: roundAmount(
+            budget.pockets.spendable +
+              pocketRollbackAllocation.week +
+              pocketRollbackAllocation.advance,
+          ),
+          buffer: roundAmount(
+            Math.max(0, budget.pockets.buffer - pocketRollbackAllocation.buffer),
+          ),
+          reserve: roundAmount(
+            Math.max(0, budget.pockets.reserve - pocketRollbackAllocation.reserve),
+          ),
+          fixedReserved: roundAmount(
+            Math.max(0, budget.pockets.fixedReserved - pocketRollbackAllocation.fixed),
+          ),
+        }
+      : {
+          ...budget.pockets,
+          spendable: roundAmount(
+            Math.max(
+              0,
+              budget.pockets.spendable +
+                direction * (pocketRollbackAllocation.week + pocketRollbackAllocation.advance),
+            ),
+          ),
+          buffer: roundAmount(
+            Math.max(0, budget.pockets.buffer + direction * pocketRollbackAllocation.buffer),
+          ),
+          reserve: roundAmount(
+            Math.max(0, budget.pockets.reserve + direction * pocketRollbackAllocation.reserve),
+          ),
+          fixedReserved: roundAmount(
+            Math.max(0, budget.pockets.fixedReserved + direction * pocketRollbackAllocation.fixed),
+          ),
+        };
   const restoredPockets = currentCycleOpeningDeleted && transaction.previousPockets
     ? data.transactions
         .slice(transactionIndex + 1)
+        .filter((item) => !relatedCycleRolloverIds.has(item.id))
         .reduce(
           (pockets, item) =>
             applyAllocationToPockets(
@@ -1546,7 +1857,9 @@ export const deleteDailyTransaction = (
   return {
     ...data,
     budget: nextBudget,
-    transactions: data.transactions.filter((item) => item.id !== transactionId),
+    transactions: data.transactions.filter(
+      (item) => item.id !== transactionId && !relatedCycleRolloverIds.has(item.id),
+    ),
   };
 };
 
@@ -1563,7 +1876,7 @@ export const getTransactionSummary = (transactions: Transaction[]) => {
   for (const transaction of transactions) {
     if (transaction.type === 'income') {
       income = roundAmount(income + transaction.amount);
-    } else {
+    } else if (transaction.type === 'expense') {
       expense = roundAmount(expense + transaction.amount);
     }
   }
@@ -1687,8 +2000,13 @@ export const getMonthBalanceSnapshot = (
       continue;
     }
 
-    hasTransactions = true;
-    balance += transaction.type === 'income' ? transaction.amount : -transaction.amount;
+    if (transaction.type === 'income') {
+      hasTransactions = true;
+      balance += transaction.amount;
+    } else if (transaction.type === 'expense') {
+      hasTransactions = true;
+      balance -= transaction.amount;
+    }
   }
 
   return {

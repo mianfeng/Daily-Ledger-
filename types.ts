@@ -28,6 +28,8 @@ export type DailyIncomeKind = 'main' | 'casual' | 'refund' | 'correction';
 
 export type DailyExpenseTiming = 'prepaid';
 
+export type DailyTransferKind = 'weeklyRollover' | 'cycleRollover';
+
 export interface DailyTransactionAllocation {
   week: number;
   buffer: number;
@@ -39,13 +41,16 @@ export interface DailyTransactionAllocation {
 }
 
 export interface DailyTransaction extends BaseTransaction {
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   category?: DailyExpenseCategory;
   incomeKind?: DailyIncomeKind;
+  transferKind?: DailyTransferKind;
   expenseTiming?: DailyExpenseTiming;
   effectiveDate?: string;
   allocation?: DailyTransactionAllocation;
   fixedExpenseId?: number;
+  cycleId?: number;
+  weekIndex?: number;
   previousCycle?: BudgetCycle | null;
   previousPockets?: LifeBudgetPockets;
 }
@@ -86,6 +91,8 @@ export interface LifeBudgetSettings {
   bufferRate: number;
   reserveRecoveryRate: number;
   weeklyRolloverReserveRate: number;
+  reserveGoal: number;
+  bufferCap: number;
   minimumWeeklyLiving: number;
   reserveMinimumOverride: number | null;
   largeExpenseAbsoluteThreshold: number;
@@ -118,6 +125,7 @@ export interface BudgetCycle {
   reserveRecovery: number;
   startingBuffer: number;
   weeklyAllowance: number;
+  rolledOverWeekIndexes: number[];
   weeks: BudgetWeek[];
 }
 
