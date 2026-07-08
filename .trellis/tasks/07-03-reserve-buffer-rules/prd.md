@@ -20,6 +20,7 @@
 * 用户确认大额支出扣款顺序为：缓冲金优先，不足部分从当前可消费余额扣，不动储备金。
 * 用户确认周自动结转按“到下周第一天后首次打开生活预算页时补做结转”执行；流水日期记为下一周第一天。
 * 用户确认自动结转是钱袋内部转移，只显示为“系统结转”，不计入收入/支出统计。
+* 用户确认固定支出预留与固定支出账务分离：主要收入开启新周期时，若当前固定预留为 0，则先按固定支出清单自动预留；若固定预留仍有余额，则不重复新增预留，余额会跨周期保留直到确认支付或手动调整。
 * 当前代码中大额支出 `category === 'large'` 在 `lib/daily.ts` 优先扣 `budget.pockets.reserve`，不会扣缓冲金。
 * 当前设置结构 `LifeBudgetSettings` 已有 `savingsRate`、`bufferRate`、`reserveRecoveryRate`、`weeklyRolloverReserveRate`、`reserveMinimumOverride` 等字段，但 UI 只暴露了储备比例、缓冲比例、最低每周生活线、储备金最低线覆盖。
 * 当前储备金概览在 `components/DailyLedger.tsx` 的设置面板中展示储备金余额、最低线、净变化、缺口；主周期卡片中也有“储备金”余额展示。
@@ -51,6 +52,8 @@
 * 自动结转应创建可见系统流水，例如“第 N 周余额结转”，记录进入缓冲金和储备金的金额。
 * 储备金目标只负责展示进度，不改变当前储备金最低线、缺口、补回逻辑。
 * 下一次主要收入开启新预算周期时，上一周期缓冲金余额按 50% 进入新周期缓冲金、50% 进入储备金。
+* 下一次主要收入开启新预算周期时，若当前固定预留为 0，则先按固定支出清单总额预留固定支出，再将剩余收入用于储备金、周预算和缓冲金分配。
+* 若固定预留仍有余额，新周期不重复新增固定预留；未使用的固定预留跨周期保留，不自动释放到缓冲金或储备金。
 
 ## Technical Approach
 
@@ -60,6 +63,7 @@
 * Apply buffer-cap overflow through shared allocation logic: whenever money is allocated to buffer, cap buffer at `bufferCap` and move overflow to reserve.
 * Change large-expense allocation to deduct from buffer first and spendable second, never reserve.
 * When a main income opens a new cycle, split the previous cycle buffer balance 50/50 into new cycle buffer and reserve before applying the new cycle allocation.
+* When a main income opens a new cycle, auto-reserve active fixed expenses only if `fixedReserved` is currently `0`; otherwise keep the existing fixed reserve and do not add another batch.
 
 ## Decision (ADR-lite)
 
@@ -79,6 +83,7 @@
 * [ ] 同一预算周的余额不会被重复结转。
 * [ ] 自动结转在最近流水/历史流水中可追踪。
 * [ ] 自动结转不污染收入、支出、周消费、周期消费统计。
+* [ ] 主要收入开启新周期时，固定预留为 0 才会自动预留固定支出；已有固定预留时不会重复预留。
 * [ ] 旧数据在没有新设置字段时能使用安全默认值。
 
 ## Definition of Done

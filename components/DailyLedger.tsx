@@ -250,6 +250,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       parseAmount(expenseForm.amount) >=
         (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate);
   const prepaidHintTotal = snapshot.prepaidInCycle + snapshot.upcomingPrepaid;
+  const activeFixedExpenseTotal = budget.fixedExpenses
+    .filter((item) => item.isActive)
+    .reduce((total, item) => total + item.amount, 0);
+  const willAutoReserveFixed =
+    incomeForm.incomeKind === 'main' &&
+    activeFixedExpenseTotal > 0 &&
+    budget.pockets.fixedReserved <= 0;
 
   const recentEvents = useMemo(
     () =>
@@ -350,6 +357,15 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     const amount = parseAmount(incomeForm.amount);
     if (amount <= 0) {
       alert('请输入收入金额');
+      return;
+    }
+
+    if (
+      willAutoReserveFixed &&
+      !window.confirm(
+        `本次会先预留固定支出 ${formatAmount(Math.min(amount, activeFixedExpenseTotal))}，剩余金额再分配。继续吗？`,
+      )
+    ) {
       return;
     }
 
@@ -1236,7 +1252,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           </div>
           {incomeForm.incomeKind === 'main' && (
             <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
-              主要收入会开启新的预算周期：先预留固定支出，再存入储备金，剩余自动拆成本预算周额度和缓冲金。
+              {willAutoReserveFixed
+                ? `主要收入会先预留固定支出 ${formatAmount(activeFixedExpenseTotal)}，剩余再分配。`
+                : budget.pockets.fixedReserved > 0
+                  ? `当前已有固定预留 ${formatAmount(budget.pockets.fixedReserved)}，本次不会重复新增固定预留。`
+                  : '主要收入会开启新的预算周期：剩余自动拆成储备金、本预算周额度和缓冲金。'}
             </div>
           )}
           <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
@@ -1389,7 +1409,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </button>
             </div>
             <div className="mt-2 text-[10px] font-bold text-stone-500">
-              固定预留从当前可消费余额搬入，不会重算已生成的每周额度。
+              主要收入开启新周期时，若这里为 0 会自动预留固定支出清单总额；已有预留时不会重复新增。
             </div>
           </div>
 

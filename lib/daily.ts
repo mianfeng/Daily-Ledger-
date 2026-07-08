@@ -496,6 +496,13 @@ export const getReserveMinimum = (budget: LifeBudgetState) => {
   return roundAmount(fixedTotal + budget.settings.minimumWeeklyLiving * 2);
 };
 
+const getActiveFixedExpenseTotal = (budget: LifeBudgetState) =>
+  roundAmount(
+    budget.fixedExpenses
+      .filter((item) => item.isActive)
+      .reduce((total, item) => total + item.amount, 0),
+  );
+
 const splitBufferAllocation = (
   amount: number,
   currentBuffer: number,
@@ -1281,12 +1288,18 @@ export const allocateIncome = (
 
   const plannedNextIncomeDate = getNextPayday(normalizedDate, budget.settings.expectedPayday);
   const plannedEndDate = addDays(plannedNextIncomeDate, -1);
-  const fixedReserved = 0;
+  const fixedReserveTarget = getActiveFixedExpenseTotal(budget);
+  const fixedReserved =
+    budget.pockets.fixedReserved > 0
+      ? 0
+      : roundAmount(Math.min(safeAmount, fixedReserveTarget));
   const dayUnits = daysBetweenInclusive(normalizedDate, plannedEndDate) / 7;
-  const availableAfterFixed = safeAmount;
-  const desiredReserve = roundAmount(safeAmount * budget.settings.savingsRate);
+  const availableAfterFixed = roundAmount(Math.max(0, safeAmount - fixedReserved));
+  const desiredReserve = roundAmount(availableAfterFixed * budget.settings.savingsRate);
   const reserveGap = Math.max(0, getReserveMinimum(budget) - budget.pockets.reserve);
-  const desiredRecovery = roundAmount(Math.min(reserveGap, safeAmount * budget.settings.reserveRecoveryRate));
+  const desiredRecovery = roundAmount(
+    Math.min(reserveGap, availableAfterFixed * budget.settings.reserveRecoveryRate),
+  );
   const minimumCycleLiving = budget.settings.minimumWeeklyLiving * dayUnits;
   const saveCapacity = Math.max(0, availableAfterFixed - minimumCycleLiving);
   const reserveDeposit = roundAmount(Math.min(desiredReserve, saveCapacity));
@@ -1388,7 +1401,7 @@ export const allocateIncome = (
         spendable,
         buffer: roundAmount(nextCycleBufferCarry + startingBuffer),
         reserve: roundAmount(budget.pockets.reserve + totalReserve),
-        fixedReserved: budget.pockets.fixedReserved,
+        fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
       },
     },
   };

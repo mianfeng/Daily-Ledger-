@@ -156,6 +156,10 @@ writeLocalLedgerData(currentData);
   - it must not count as income, expense, week spending, or cycle spending
   - weekly rollover transfers subtract `allocation.week` from spendable and add `allocation.buffer` / `allocation.reserve` to the matching pockets
   - cycle rollover transfers may use a negative `allocation.buffer` to move part of buffer into reserve
+- Main-income fixed expense reservation keeps money and bill events separate:
+  - when a main income opens a new cycle and `fixedReserved` is `0`, reserve the active fixed-expense total before allocating the remaining income
+  - when `fixedReserved` is already greater than `0`, carry it forward and do not create another fixed reserve batch
+  - fixed reserve remains in `LifeBudgetState.pockets.fixedReserved` across cycles until a fixed payment deducts it or the user manually adjusts it
 - Prepaid/future expenses keep `date` as the payment date and store
   `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original
