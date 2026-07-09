@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-07-09
+- **Total Sessions**: 6
+- **Last Active**: 2026-07-10
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~173 | Active |
+| `journal-1.md` | ~206 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-07-10 | Fixed amount budget settings | `34d2559` | `main` |
 | 5 | 2026-07-09 | Reserve and buffer budget rules | `06d80be`, `d7822f2` | `main` |
 | 4 | 2026-07-01 | Life budget cycle detail redesign | `f7c2d02` | `codex/inventory-ledger` |
 | 3 | 2026-06-27 | Pending copper sale confirmation | `f7d0a91` | `codex/inventory-ledger` |

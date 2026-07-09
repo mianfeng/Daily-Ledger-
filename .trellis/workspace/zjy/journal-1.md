@@ -171,3 +171,36 @@ Implemented reserve target display, buffer cap and rollover behavior, large-expe
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Fixed amount budget settings
+
+**Date**: 2026-07-10
+**Task**: Fixed amount budget settings
+**Branch**: `main`
+
+### Summary
+
+Changed life budget settings from reserve/buffer percentages to fixed cycle amounts, showed fixed reserve in settings, and updated main income allocation to fixed reserve/buffer amounts.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `34d2559` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
