@@ -137,3 +137,37 @@ Redesigned the life budget cycle detail popup around total amount, usable balanc
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Reserve and buffer budget rules
+
+**Date**: 2026-07-09
+**Task**: Reserve and buffer budget rules
+**Branch**: `main`
+
+### Summary
+
+Implemented reserve target display, buffer cap and rollover behavior, large-expense buffer-first spending, and clarified fixed reserve allocation rules for life budget.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `06d80be` | (see git log) |
+| `d7822f2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
