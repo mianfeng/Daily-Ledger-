@@ -1116,6 +1116,25 @@ export const addFixedExpense = (
   };
 };
 
+export const deleteFixedExpense = (data: DailyData, fixedExpenseId: number): DailyData => {
+  const budget = getLifeBudget(data);
+  const hasActiveFixedExpense = budget.fixedExpenses.some(
+    (item) => item.id === fixedExpenseId && item.isActive,
+  );
+
+  if (!hasActiveFixedExpense) return data;
+
+  return {
+    ...data,
+    budget: {
+      ...budget,
+      fixedExpenses: budget.fixedExpenses.map((item) =>
+        item.id === fixedExpenseId ? { ...item, isActive: false } : item,
+      ),
+    },
+  };
+};
+
 export const adjustFixedReserved = (
   data: DailyData,
   amount: number,

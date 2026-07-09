@@ -28,6 +28,7 @@ import {
   applyDueBudgetRollovers,
   allocateIncome,
   deleteDailyTransaction,
+  deleteFixedExpense,
   getBudgetCycleSummaries,
   calibrateSpendableBalance,
   getBudgetSnapshot,
@@ -240,9 +241,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       parseAmount(expenseForm.amount) >=
         (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate);
   const prepaidHintTotal = snapshot.prepaidInCycle + snapshot.upcomingPrepaid;
-  const activeFixedExpenseTotal = budget.fixedExpenses
-    .filter((item) => item.isActive)
-    .reduce((total, item) => total + item.amount, 0);
+  const activeFixedExpenses = budget.fixedExpenses.filter((item) => item.isActive);
+  const activeFixedExpenseTotal = activeFixedExpenses.reduce(
+    (total, item) => total + item.amount,
+    0,
+  );
   const willAutoReserveFixed =
     incomeForm.incomeKind === 'main' &&
     activeFixedExpenseTotal > 0 &&
@@ -474,6 +477,17 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       }),
     );
     setFixedForm({ name: '', amount: '', dueDay: '1' });
+  };
+
+  const handleDeleteFixedExpense = (fixedExpenseId: number) => {
+    const fixedExpense = activeFixedExpenses.find((item) => item.id === fixedExpenseId);
+    if (!fixedExpense) return;
+
+    if (!window.confirm(`删除固定支出“${fixedExpense.name}”吗？历史付款记录会保留。`)) {
+      return;
+    }
+
+    setData((prev) => deleteFixedExpense(prev, fixedExpenseId));
   };
 
   const handleFixedReservedSubmit = () => {
@@ -724,7 +738,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 </div>
                 <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                   <span>本期固定项</span>
-                  <b>{budget.fixedExpenses.filter((item) => item.isActive).length}</b>
+                  <b>{activeFixedExpenses.length}</b>
                 </div>
                 <div className="life-soft-row flex justify-between rounded-lg bg-[#f8f4ec] px-2 py-1.5">
                   <span>待确认</span>
@@ -1446,7 +1460,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             <Plus size={14} /> 添加固定支出
           </button>
           <ul className="mt-3 space-y-2">
-            {budget.fixedExpenses.map((item) => (
+            {activeFixedExpenses.map((item) => (
               <li
                 key={item.id}
                 className="life-event-row flex items-center justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50 px-3 py-2"
@@ -1457,20 +1471,30 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     {formatAmount(item.amount)} · 每月 {item.dueDay} 日
                   </div>
                 </div>
-                <button
-                  onClick={() => setData((prev) => markFixedExpensePaid(prev, item.id))}
-                  disabled={item.paidCycleId === cycle?.id}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                    item.paidCycleId === cycle?.id
-                      ? 'bg-[#e4ecdf] text-[#6f806a]'
-                      : 'bg-[#3f4842] text-white'
-                  }`}
-                >
-                  {item.paidCycleId === cycle?.id ? '已支付' : '标记已付'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setData((prev) => markFixedExpensePaid(prev, item.id))}
+                    disabled={item.paidCycleId === cycle?.id}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                      item.paidCycleId === cycle?.id
+                        ? 'bg-[#e4ecdf] text-[#6f806a]'
+                        : 'bg-[#3f4842] text-white'
+                    }`}
+                  >
+                    {item.paidCycleId === cycle?.id ? '已支付' : '标记已付'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFixedExpense(item.id)}
+                    className="rounded-lg bg-white p-2 text-stone-400 shadow-sm transition hover:text-red-500"
+                    title="删除固定支出"
+                    aria-label={`删除固定支出 ${item.name}`}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </li>
             ))}
-            {budget.fixedExpenses.length === 0 && (
+            {activeFixedExpenses.length === 0 && (
               <li className="rounded-xl bg-stone-50 px-3 py-4 text-center text-xs text-stone-400">
                 暂无固定支出
               </li>
