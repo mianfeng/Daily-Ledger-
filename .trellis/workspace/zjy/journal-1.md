@@ -204,3 +204,36 @@ Changed life budget settings from reserve/buffer percentages to fixed cycle amou
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: 固定支出删除功能
+
+**Date**: 2026-07-10
+**Task**: 固定支出删除功能
+**Branch**: `main`
+
+### Summary
+
+新增固定支出软删除功能：固定支出面板可确认删除 active 项，删除后从列表和后续预留统计中移除，同时保留历史付款流水引用。验证 npm run build 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4c6d471` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
