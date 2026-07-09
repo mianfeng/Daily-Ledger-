@@ -132,11 +132,13 @@ export const DEFAULT_LIFE_BUDGET_SETTINGS: LifeBudgetSettings = {
   expectedPayday: 10,
   savingsRate: 0.2,
   bufferRate: 0.2,
+  reserveFixedAmount: 10000,
+  bufferFixedAmount: 1500,
   reserveRecoveryRate: 0.1,
   weeklyRolloverReserveRate: 0.5,
   reserveGoal: 50000,
   bufferCap: 6000,
-  minimumWeeklyLiving: 400,
+  minimumWeeklyLiving: 500,
   reserveMinimumOverride: null,
   largeExpenseAbsoluteThreshold: 1000,
   largeExpenseWeeklyRate: 0.5,
@@ -171,6 +173,14 @@ const sanitizeSettings = (raw: unknown): LifeBudgetSettings => {
     ),
     savingsRate: clampRate(value.savingsRate, DEFAULT_LIFE_BUDGET_SETTINGS.savingsRate),
     bufferRate: clampRate(value.bufferRate, DEFAULT_LIFE_BUDGET_SETTINGS.bufferRate),
+    reserveFixedAmount: Math.max(
+      0,
+      toFiniteNumber(value.reserveFixedAmount, DEFAULT_LIFE_BUDGET_SETTINGS.reserveFixedAmount),
+    ),
+    bufferFixedAmount: Math.max(
+      0,
+      toFiniteNumber(value.bufferFixedAmount, DEFAULT_LIFE_BUDGET_SETTINGS.bufferFixedAmount),
+    ),
     reserveRecoveryRate: clampRate(
       value.reserveRecoveryRate,
       DEFAULT_LIFE_BUDGET_SETTINGS.reserveRecoveryRate,
@@ -1225,29 +1235,6 @@ export const allocateIncome = (
     normalizedDate >= budget.currentCycle.startDate &&
     normalizedDate <= budget.currentCycle.plannedEndDate
   ) {
-    const reserveGap = Math.max(0, getReserveMinimum(budget) - budget.pockets.reserve);
-    const reserveDeposit = roundAmount(
-      Math.min(safeAmount * budget.settings.savingsRate, safeAmount),
-    );
-    const reserveRecovery = roundAmount(
-      Math.min(
-        reserveGap,
-        Math.max(0, safeAmount - reserveDeposit),
-        safeAmount * budget.settings.reserveRecoveryRate,
-      ),
-    );
-    const remaining = roundAmount(Math.max(0, safeAmount - reserveDeposit - reserveRecovery));
-    const intendedBuffer = roundAmount(remaining * budget.settings.bufferRate);
-    const bufferAllocation = splitBufferAllocation(
-      intendedBuffer,
-      budget.pockets.buffer,
-      budget.settings.bufferCap,
-    );
-    const buffer = bufferAllocation.buffer;
-    const bufferOverflowReserve = bufferAllocation.reserveOverflow;
-    const spendable = roundAmount(Math.max(0, remaining - intendedBuffer));
-    const totalReserve = roundAmount(reserveDeposit + reserveRecovery + bufferOverflowReserve);
-
     return {
       ...rolloverData,
       transactions: [
@@ -1255,13 +1242,11 @@ export const allocateIncome = (
         {
           ...incomeTransaction,
           allocation: {
-            week: spendable,
-            buffer,
+            week: safeAmount,
+            buffer: 0,
             advance: 0,
-            reserve: totalReserve,
+            reserve: 0,
             fixed: 0,
-            reserveDeposit,
-            reserveRecovery: roundAmount(reserveRecovery + bufferOverflowReserve),
           },
         },
       ],
@@ -1270,17 +1255,10 @@ export const allocateIncome = (
         currentCycle: {
           ...budget.currentCycle,
           mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
-          reserveDeposit: roundAmount(budget.currentCycle.reserveDeposit + reserveDeposit),
-          reserveRecovery: roundAmount(
-            budget.currentCycle.reserveRecovery + reserveRecovery + bufferOverflowReserve,
-          ),
-          startingBuffer: roundAmount(budget.currentCycle.startingBuffer + buffer),
         },
         pockets: {
           ...budget.pockets,
-          spendable: roundAmount(budget.pockets.spendable + spendable),
-          buffer: roundAmount(budget.pockets.buffer + buffer),
-          reserve: roundAmount(budget.pockets.reserve + totalReserve),
+          spendable: roundAmount(budget.pockets.spendable + safeAmount),
         },
       },
     };
@@ -1295,22 +1273,18 @@ export const allocateIncome = (
       : roundAmount(Math.min(safeAmount, fixedReserveTarget));
   const dayUnits = daysBetweenInclusive(normalizedDate, plannedEndDate) / 7;
   const availableAfterFixed = roundAmount(Math.max(0, safeAmount - fixedReserved));
-  const desiredReserve = roundAmount(availableAfterFixed * budget.settings.savingsRate);
-  const reserveGap = Math.max(0, getReserveMinimum(budget) - budget.pockets.reserve);
-  const desiredRecovery = roundAmount(
-    Math.min(reserveGap, availableAfterFixed * budget.settings.reserveRecoveryRate),
+  const reserveDeposit = roundAmount(
+    Math.min(availableAfterFixed, budget.settings.reserveFixedAmount),
   );
-  const minimumCycleLiving = budget.settings.minimumWeeklyLiving * dayUnits;
-  const saveCapacity = Math.max(0, availableAfterFixed - minimumCycleLiving);
-  const reserveDeposit = roundAmount(Math.min(desiredReserve, saveCapacity));
-  const reserveRecovery = roundAmount(
-    Math.min(desiredRecovery, Math.max(0, saveCapacity - reserveDeposit)),
+  const afterReserve = roundAmount(Math.max(0, availableAfterFixed - reserveDeposit));
+  const minimumCycleLiving = roundAmount(budget.settings.minimumWeeklyLiving * dayUnits);
+  const minimumLivingPool = roundAmount(Math.min(afterReserve, minimumCycleLiving));
+  const afterMinimumLiving = roundAmount(Math.max(0, afterReserve - minimumLivingPool));
+  const intendedStartingBuffer = roundAmount(
+    Math.min(afterMinimumLiving, budget.settings.bufferFixedAmount),
   );
-  const spendingPool = Math.max(0, availableAfterFixed - reserveDeposit - reserveRecovery);
-  const weeklyAllowance = roundAmount(
-    spendingPool / Math.max(1, dayUnits + budget.settings.bufferRate),
-  );
-  const intendedStartingBuffer = roundAmount(weeklyAllowance * budget.settings.bufferRate);
+  const weeklyPool = roundAmount(Math.max(0, afterReserve - intendedStartingBuffer));
+  const weeklyAllowance = roundAmount(weeklyPool / Math.max(1, dayUnits));
   const previousBufferReserve = budget.currentCycle
     ? roundAmount(budget.pockets.buffer * budget.settings.weeklyRolloverReserveRate)
     : 0;
@@ -1325,7 +1299,7 @@ export const allocateIncome = (
   const startingBuffer = startingBufferAllocation.buffer;
   const bufferOverflowReserve = startingBufferAllocation.reserveOverflow;
   const totalReserve = roundAmount(
-    reserveDeposit + reserveRecovery + previousBufferReserve + bufferOverflowReserve,
+    reserveDeposit + previousBufferReserve + bufferOverflowReserve,
   );
   const weeks = buildWeeks(normalizedDate, plannedEndDate, weeklyAllowance);
   const spendable = roundAmount(
@@ -1341,7 +1315,7 @@ export const allocateIncome = (
     mainIncome: safeAmount,
     fixedReserved,
     reserveDeposit,
-    reserveRecovery,
+    reserveRecovery: 0,
     startingBuffer,
     weeklyAllowance,
     rolledOverWeekIndexes: [],
@@ -1380,10 +1354,10 @@ export const allocateIncome = (
           week: spendable,
           buffer: startingBuffer,
           advance: 0,
-          reserve: roundAmount(reserveDeposit + reserveRecovery + bufferOverflowReserve),
+          reserve: roundAmount(reserveDeposit + bufferOverflowReserve),
           fixed: fixedReserved,
           reserveDeposit,
-          reserveRecovery: roundAmount(reserveRecovery + bufferOverflowReserve),
+          reserveRecovery: bufferOverflowReserve,
         },
       },
     ],

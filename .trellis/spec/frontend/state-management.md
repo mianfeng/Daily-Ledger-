@@ -160,6 +160,12 @@ writeLocalLedgerData(currentData);
   - when a main income opens a new cycle and `fixedReserved` is `0`, reserve the active fixed-expense total before allocating the remaining income
   - when `fixedReserved` is already greater than `0`, carry it forward and do not create another fixed reserve batch
   - fixed reserve remains in `LifeBudgetState.pockets.fixedReserved` across cycles until a fixed payment deducts it or the user manually adjusts it
+- Main-income cycle allocation uses fixed budget amounts rather than user-facing percentages:
+  - reserve `settings.reserveFixedAmount` after fixed-expense reservation
+  - keep up to `settings.minimumWeeklyLiving` per budget-week in the weekly pool
+  - reserve `settings.bufferFixedAmount` after the minimum weekly living pool, capped by `settings.bufferCap`
+  - distribute the remaining weekly pool across the generated budget weeks
+  - legacy `savingsRate` / `bufferRate` settings may remain for stored-data compatibility, but must not be the primary UI inputs
 - Prepaid/future expenses keep `date` as the payment date and store
   `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original

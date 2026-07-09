@@ -89,6 +89,8 @@ export interface LifeBudgetSettings {
   expectedPayday: number;
   savingsRate: number;
   bufferRate: number;
+  reserveFixedAmount: number;
+  bufferFixedAmount: number;
   reserveRecoveryRate: number;
   weeklyRolloverReserveRate: number;
   reserveGoal: number;

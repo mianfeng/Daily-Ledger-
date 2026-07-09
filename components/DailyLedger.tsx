@@ -74,16 +74,6 @@ const parseAmount = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const percentToInput = (value: number) => String(Math.round(value * 100));
-
-const inputToRate = (value: string, fallback: number) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return Math.max(0, Math.min(100, parsed)) / 100;
-};
-
 const formatTransactionAmount = (transaction: DailyTransaction) => {
   if (transaction.type === 'transfer') {
     return `转 ${formatAmount(transaction.amount)}`;
@@ -206,8 +196,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     buffer: String(budget.pockets.buffer || ''),
     reserve: String(budget.pockets.reserve || ''),
     expectedPayday: String(budget.settings.expectedPayday),
-    savingsRate: percentToInput(budget.settings.savingsRate),
-    bufferRate: percentToInput(budget.settings.bufferRate),
+    reserveFixedAmount: String(budget.settings.reserveFixedAmount || ''),
+    bufferFixedAmount: String(budget.settings.bufferFixedAmount || ''),
     reserveGoal: String(budget.settings.reserveGoal || ''),
     bufferCap: String(budget.settings.bufferCap || ''),
     minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
@@ -320,8 +310,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       buffer: String(budget.pockets.buffer || ''),
       reserve: String(budget.pockets.reserve || ''),
       expectedPayday: String(budget.settings.expectedPayday),
-      savingsRate: percentToInput(budget.settings.savingsRate),
-      bufferRate: percentToInput(budget.settings.bufferRate),
+      reserveFixedAmount: String(budget.settings.reserveFixedAmount || ''),
+      bufferFixedAmount: String(budget.settings.bufferFixedAmount || ''),
       reserveGoal: String(budget.settings.reserveGoal || ''),
       bufferCap: String(budget.settings.bufferCap || ''),
       minimumWeeklyLiving: String(budget.settings.minimumWeeklyLiving),
@@ -336,8 +326,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         reserve: parseAmount(setupForm.reserve),
         settings: {
           expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
-          savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
-          bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+          reserveFixedAmount:
+            parseAmount(setupForm.reserveFixedAmount) ||
+            budget.settings.reserveFixedAmount,
+          bufferFixedAmount:
+            parseAmount(setupForm.bufferFixedAmount) ||
+            budget.settings.bufferFixedAmount,
           reserveGoal:
             parseAmount(setupForm.reserveGoal) ||
             budget.settings.reserveGoal,
@@ -1162,8 +1156,14 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </>
             )}
             <NumberField label="预计发薪日" value={setupForm.expectedPayday} onChange={(expectedPayday) => setSetupForm((prev) => ({ ...prev, expectedPayday }))} />
-            <NumberField label="储备比例 %" value={setupForm.savingsRate} onChange={(savingsRate) => setSetupForm((prev) => ({ ...prev, savingsRate }))} />
-            <NumberField label="缓冲比例 %" value={setupForm.bufferRate} onChange={(bufferRate) => setSetupForm((prev) => ({ ...prev, bufferRate }))} />
+            <NumberField label="储备固定金额" value={setupForm.reserveFixedAmount} onChange={(reserveFixedAmount) => setSetupForm((prev) => ({ ...prev, reserveFixedAmount }))} />
+            <NumberField label="缓冲固定金额" value={setupForm.bufferFixedAmount} onChange={(bufferFixedAmount) => setSetupForm((prev) => ({ ...prev, bufferFixedAmount }))} />
+            <label className="text-xs font-bold text-stone-500">
+              当前固定预留
+              <div className={`${fieldClass} mt-1 flex items-center font-black`}>
+                {formatAmount(budget.pockets.fixedReserved)}
+              </div>
+            </label>
             <NumberField label="储备金目标" value={setupForm.reserveGoal} onChange={(reserveGoal) => setSetupForm((prev) => ({ ...prev, reserveGoal }))} />
             <NumberField label="缓冲金上限" value={setupForm.bufferCap} onChange={(bufferCap) => setSetupForm((prev) => ({ ...prev, bufferCap }))} />
             <NumberField label="最低每周生活线" value={setupForm.minimumWeeklyLiving} onChange={(minimumWeeklyLiving) => setSetupForm((prev) => ({ ...prev, minimumWeeklyLiving }))} />
@@ -1197,8 +1197,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
               updateSettings({
                 expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
-                savingsRate: inputToRate(setupForm.savingsRate, budget.settings.savingsRate),
-                bufferRate: inputToRate(setupForm.bufferRate, budget.settings.bufferRate),
+                reserveFixedAmount:
+                  parseAmount(setupForm.reserveFixedAmount) ||
+                  budget.settings.reserveFixedAmount,
+                bufferFixedAmount:
+                  parseAmount(setupForm.bufferFixedAmount) ||
+                  budget.settings.bufferFixedAmount,
                 reserveGoal:
                   parseAmount(setupForm.reserveGoal) ||
                   budget.settings.reserveGoal,
