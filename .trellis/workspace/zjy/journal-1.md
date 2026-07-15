@@ -237,3 +237,36 @@ Changed life budget settings from reserve/buffer percentages to fixed cycle amou
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 修复固定预留设置上限
+
+**Date**: 2026-07-16
+**Task**: 修复固定预留设置上限
+**Branch**: `main`
+
+### Summary
+
+修复固定预留手动设置只能达到当前可消费余额的问题：调整固定预留时可先消耗可消费余额，再消耗缓冲金；减少固定预留时释放回可消费余额；储备金不参与且不创造金额。npm run build 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ac191b0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
