@@ -160,6 +160,7 @@ writeLocalLedgerData(currentData);
   - when a main income opens a new cycle and `fixedReserved` is `0`, reserve the active fixed-expense total before allocating the remaining income
   - when `fixedReserved` is already greater than `0`, carry it forward and do not create another fixed reserve batch
   - fixed reserve remains in `LifeBudgetState.pockets.fixedReserved` across cycles until a fixed payment deducts it or the user manually adjusts it
+  - manual fixed reserve adjustments may move money from spendable first, then buffer, but must not draw from reserve or create money
 - Main-income cycle allocation uses fixed budget amounts rather than user-facing percentages:
   - reserve `settings.reserveFixedAmount` after fixed-expense reservation
   - keep up to `settings.minimumWeeklyLiving` per budget-week in the weekly pool

@@ -1141,8 +1141,18 @@ export const adjustFixedReserved = (
 ): DailyData => {
   const budget = getLifeBudget(data);
   const safeAmount = roundAmount(Math.max(0, amount));
-  const movableTotal = roundAmount(budget.pockets.spendable + budget.pockets.fixedReserved);
+  const movableTotal = roundAmount(
+    budget.pockets.spendable + budget.pockets.buffer + budget.pockets.fixedReserved,
+  );
   const nextFixedReserved = roundAmount(Math.min(safeAmount, movableTotal));
+  const fixedReservedDelta = roundAmount(nextFixedReserved - budget.pockets.fixedReserved);
+  const releasedToSpendable = fixedReservedDelta < 0 ? Math.abs(fixedReservedDelta) : 0;
+  const spendableUsed = fixedReservedDelta > 0
+    ? Math.min(budget.pockets.spendable, fixedReservedDelta)
+    : 0;
+  const bufferUsed = fixedReservedDelta > 0
+    ? roundAmount(fixedReservedDelta - spendableUsed)
+    : 0;
 
   return {
     ...data,
@@ -1152,7 +1162,10 @@ export const adjustFixedReserved = (
         ...budget.pockets,
         fixedReserved: nextFixedReserved,
         spendable: roundAmount(
-          Math.max(0, movableTotal - nextFixedReserved),
+          Math.max(0, budget.pockets.spendable - spendableUsed + releasedToSpendable),
+        ),
+        buffer: roundAmount(
+          Math.max(0, budget.pockets.buffer - bufferUsed),
         ),
       },
     },
