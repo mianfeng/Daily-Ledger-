@@ -1203,6 +1203,10 @@ export const allocateIncome = (
     desc: desc.trim() || (incomeKind === 'main' ? '主要收入' : incomeKind === 'refund' ? '退款报销' : '零散收入'),
     incomeKind,
   };
+  const fixedReserveTarget = getActiveFixedExpenseTotal(budget);
+  const fixedReserveGap = roundAmount(
+    Math.max(0, fixedReserveTarget - budget.pockets.fixedReserved),
+  );
 
   if (incomeKind === 'casual' || incomeKind === 'correction') {
     const bufferAllocation = splitBufferAllocation(
@@ -1267,6 +1271,8 @@ export const allocateIncome = (
     normalizedDate >= budget.currentCycle.startDate &&
     normalizedDate <= budget.currentCycle.plannedEndDate
   ) {
+    const fixedReserved = roundAmount(Math.min(safeAmount, fixedReserveGap));
+    const spendableIncome = roundAmount(Math.max(0, safeAmount - fixedReserved));
     return {
       ...rolloverData,
       transactions: [
@@ -1274,11 +1280,11 @@ export const allocateIncome = (
         {
           ...incomeTransaction,
           allocation: {
-            week: safeAmount,
+            week: spendableIncome,
             buffer: 0,
             advance: 0,
             reserve: 0,
-            fixed: 0,
+            fixed: fixedReserved,
           },
         },
       ],
@@ -1287,10 +1293,12 @@ export const allocateIncome = (
         currentCycle: {
           ...budget.currentCycle,
           mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
+          fixedReserved: roundAmount(budget.currentCycle.fixedReserved + fixedReserved),
         },
         pockets: {
           ...budget.pockets,
-          spendable: roundAmount(budget.pockets.spendable + safeAmount),
+          spendable: roundAmount(budget.pockets.spendable + spendableIncome),
+          fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
         },
       },
     };
@@ -1298,11 +1306,7 @@ export const allocateIncome = (
 
   const plannedNextIncomeDate = getNextPayday(normalizedDate, budget.settings.expectedPayday);
   const plannedEndDate = addDays(plannedNextIncomeDate, -1);
-  const fixedReserveTarget = getActiveFixedExpenseTotal(budget);
-  const fixedReserved =
-    budget.pockets.fixedReserved > 0
-      ? 0
-      : roundAmount(Math.min(safeAmount, fixedReserveTarget));
+  const fixedReserved = roundAmount(Math.min(safeAmount, fixedReserveGap));
   const dayUnits = daysBetweenInclusive(normalizedDate, plannedEndDate) / 7;
   const availableAfterFixed = roundAmount(Math.max(0, safeAmount - fixedReserved));
   const reserveDeposit = roundAmount(
@@ -1687,6 +1691,7 @@ const rollbackCycleMainIncome = (
   return {
     ...cycle,
     mainIncome: nextMainIncome,
+    fixedReserved: roundAmount(Math.max(0, cycle.fixedReserved - allocation.fixed)),
     reserveDeposit: roundAmount(Math.max(0, cycle.reserveDeposit - reserveDepositRollback)),
     reserveRecovery: roundAmount(Math.max(0, cycle.reserveRecovery - reserveRecoveryRollback)),
     startingBuffer: roundAmount(Math.max(0, cycle.startingBuffer - allocation.buffer)),

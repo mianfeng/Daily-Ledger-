@@ -157,8 +157,8 @@ writeLocalLedgerData(currentData);
   - weekly rollover transfers subtract `allocation.week` from spendable and add `allocation.buffer` / `allocation.reserve` to the matching pockets
   - cycle rollover transfers may use a negative `allocation.buffer` to move part of buffer into reserve
 - Main-income fixed expense reservation keeps money and bill events separate:
-  - when a main income opens a new cycle and `fixedReserved` is `0`, reserve the active fixed-expense total before allocating the remaining income
-  - when `fixedReserved` is already greater than `0`, carry it forward and do not create another fixed reserve batch
+  - whenever a main income is recorded, calculate the shortfall as `max(0, active fixed-expense total - fixedReserved)` and fill that shortfall before allocating the remaining income
+  - when `fixedReserved` already covers the active fixed-expense total, carry it forward and do not create another fixed reserve batch
   - fixed reserve remains in `LifeBudgetState.pockets.fixedReserved` across cycles until a fixed payment deducts it or the user manually adjusts it
   - manual fixed reserve adjustments may move money from spendable first, then buffer, but must not draw from reserve or create money
 - Main-income cycle allocation uses fixed budget amounts rather than user-facing percentages:
@@ -202,6 +202,8 @@ writeLocalLedgerData(currentData);
 - Build/type-check should cover old and new `DailyData` shapes.
 - Manual verification should cover initialization, main income allocation, normal expenses, large expenses, calibration, and fixed expense payment.
 - Regression verification for rollback changes should cover:
+  - main income fills only the fixed-reserve shortfall, including additional main income within the current cycle
+  - deleting additional main income rolls back its fixed-reserve allocation in both pockets and the cycle summary
   - deleting a current cycle-opening main income restores the previous cycle and pocket baseline
   - deleting a historical cycle-opening main income does not subtract overwritten weekly/buffer money from the current pockets
   - deleting a large expense restores only the actual reserve allocation that was deducted

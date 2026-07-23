@@ -246,10 +246,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     (total, item) => total + item.amount,
     0,
   );
+  const fixedReserveGap = Math.max(
+    0,
+    activeFixedExpenseTotal - budget.pockets.fixedReserved,
+  );
   const willAutoReserveFixed =
     incomeForm.incomeKind === 'main' &&
-    activeFixedExpenseTotal > 0 &&
-    budget.pockets.fixedReserved <= 0;
+    fixedReserveGap > 0;
 
   const recentEvents = useMemo(
     () =>
@@ -360,7 +363,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     if (
       willAutoReserveFixed &&
       !window.confirm(
-        `本次会先预留固定支出 ${formatAmount(Math.min(amount, activeFixedExpenseTotal))}，剩余金额再分配。继续吗？`,
+        `本次会先补足固定预留缺口 ${formatAmount(Math.min(amount, fixedReserveGap))}，剩余金额再分配。继续吗？`,
       )
     ) {
       return;
@@ -1271,9 +1274,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           {incomeForm.incomeKind === 'main' && (
             <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
               {willAutoReserveFixed
-                ? `主要收入会先预留固定支出 ${formatAmount(activeFixedExpenseTotal)}，剩余再分配。`
-                : budget.pockets.fixedReserved > 0
-                  ? `当前已有固定预留 ${formatAmount(budget.pockets.fixedReserved)}，本次不会重复新增固定预留。`
+                ? `当前固定预留 ${formatAmount(budget.pockets.fixedReserved)}，主要收入会先补足缺口 ${formatAmount(fixedReserveGap)}，剩余再分配。`
+                : activeFixedExpenseTotal > 0
+                  ? `当前固定预留已覆盖固定支出目标 ${formatAmount(activeFixedExpenseTotal)}，本次不会重复新增。`
                   : '主要收入会开启新的预算周期：剩余自动拆成储备金、本预算周额度和缓冲金。'}
             </div>
           )}
@@ -1427,7 +1430,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </button>
             </div>
             <div className="mt-2 text-[10px] font-bold text-stone-500">
-              主要收入开启新周期时，若这里为 0 会自动预留固定支出清单总额；已有预留时不会重复新增。
+              主要收入到账时会优先补足固定支出清单缺口；已覆盖目标时不会重复新增。
             </div>
           </div>
 
