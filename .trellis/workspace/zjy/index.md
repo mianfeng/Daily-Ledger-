@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-07-16
+- **Total Sessions**: 9
+- **Last Active**: 2026-07-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~272 | Active |
+| `journal-1.md` | ~307 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-07-23 | 固定预留缺口与逐笔资金流向 | `c7b56f2`, `8550bce`, `4ff4c57` | `main` |
 | 8 | 2026-07-16 | 修复固定预留设置上限 | `ac191b0` | `main` |
 | 7 | 2026-07-10 | 固定支出删除功能 | `4c6d471` | `main` |
 | 6 | 2026-07-10 | Fixed amount budget settings | `34d2559` | `main` |

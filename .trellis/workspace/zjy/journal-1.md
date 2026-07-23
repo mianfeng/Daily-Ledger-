@@ -270,3 +270,38 @@ Changed life budget settings from reserve/buffer percentages to fixed cycle amou
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 固定预留缺口与逐笔资金流向
+
+**Date**: 2026-07-23
+**Task**: 固定预留缺口与逐笔资金流向
+**Branch**: `main`
+
+### Summary
+
+提交并归档固定预留缺口修复；新增生活预算逐笔资金流向详情、交易后余额快照、资金缺口、创建时间、历史渐进加载与旧数据兼容；修复铜钱流水类型窄化以恢复全仓类型检查。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7b56f2` | (see git log) |
+| `8550bce` | (see git log) |
+| `4ff4c57` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
