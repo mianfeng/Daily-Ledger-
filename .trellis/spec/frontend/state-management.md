@@ -135,6 +135,10 @@ writeLocalLedgerData(currentData);
   - `transactions: DailyTransaction[]`
 - `DailyData` may include the life budget state:
   - `budget?: LifeBudgetState`
+- `DailyTransaction` audit metadata is optional for backward compatibility:
+  - `createdAt?: string` stores the immutable ISO creation timestamp
+  - `balanceAfter?: DailyTransactionBalanceAfter` stores spendable, current-week,
+    future-week, buffer, reserve, and fixed-reserve balances after the transaction
 - `LifeBudgetState` owns:
   - settings such as payday, savings rate, buffer rate, minimum weekly living line
   - pocket balances for spendable money, buffer, reserve, and fixed-expense reserve
@@ -151,6 +155,22 @@ writeLocalLedgerData(currentData);
   - `buffer` changes `LifeBudgetState.pockets.buffer`
   - `reserve` changes `LifeBudgetState.pockets.reserve`
   - `fixed` changes `LifeBudgetState.pockets.fixedReserved`
+  - allocation fields must contain the amount actually moved; when an expense is
+    larger than all available pockets, leave the uncovered difference out of
+    `allocation` so the UI can display it as a funding gap and deletion cannot
+    restore money that was never deducted
+- `DailyTransaction.balanceAfter` is immutable, display-only audit metadata:
+  - it must not participate in current balance calculation, statistics, or deletion rollback
+  - new transactions store it after the matching pocket mutation has completed
+  - old transactions without it remain valid and show allocation flow without historical balances
+  - deleting another historical transaction must not rewrite existing snapshots
+  - compound operations that create multiple transactions must snapshot each
+    intermediate state in execution order, including multiple weekly rollovers
+    and cycle rollover followed by cycle-opening income
+- `DailyTransaction.createdAt` is immutable audit metadata:
+  - new transactions store an ISO timestamp
+  - old transactions without it remain valid
+  - same-date history sorting prefers `createdAt`, then falls back to stable stored order
 - `DailyTransaction.type === "transfer"` represents an internal life-budget pocket transfer:
   - it must be visible in history for auditability
   - it must not count as income, expense, week spending, or cycle spending
@@ -190,12 +210,20 @@ writeLocalLedgerData(currentData);
 - Invalid budget settings -> clamp to safe defaults.
 - Invalid fixed expenses or budget weeks -> drop invalid entries while keeping the rest.
 - Invalid transactions -> drop invalid entries through transaction normalization.
+- Missing or invalid `createdAt` -> keep the transaction and omit `createdAt`.
+- Missing, partial, or invalid `balanceAfter` -> keep the transaction and omit `balanceAfter`.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: old daily backup opens, then the user initializes life budget balances.
 - Base: new user starts with an uninitialized budget and empty transactions.
 - Bad: a component assumes `data.budget` always exists without going through the budget helper/default.
+- Good: a new expense stores actual allocation, an immutable post-transaction
+  snapshot, and exposes any uncovered amount as a funding gap in the detail UI.
+- Base: an imported old transaction has allocation but no audit snapshot, so its
+  detail shows flow amounts without balance labels.
+- Bad: a detail view recalculates historical balances from current settings or
+  uses `balanceAfter` to perform rollback.
 
 ### 6. Tests Required
 
@@ -209,6 +237,11 @@ writeLocalLedgerData(currentData);
   - deleting a large expense restores only the actual reserve allocation that was deducted
   - deleting one fixed payment unmarks only the matching `fixedExpenseId`
   - Excel export/import preserves allocation, fixed-expense, and previous-cycle metadata
+  - new transactions round-trip `createdAt` and `balanceAfter` through full-state backup
+  - old transactions without audit metadata still sanitize and render
+  - income, expense, fixed payment, weekly rollover, and cycle rollover store the correct post-transaction snapshot
+  - multiple rollovers created in one pass store sequential intermediate balances
+  - an expense larger than available money stores only actual allocation and reports the remaining funding gap
 
 ### 7. Wrong vs Correct
 
@@ -223,4 +256,19 @@ const reserve = data.budget.pockets.reserve;
 ```ts
 const budget = getLifeBudget(data);
 const reserve = budget.pockets.reserve;
+```
+
+#### Wrong: historical detail recalculation
+
+```ts
+// Current settings and later edits cannot reproduce the original transaction state.
+const historicalBalance = recalculateFromCurrentBudget(transaction);
+```
+
+#### Correct: immutable transaction audit data
+
+```ts
+const flow = transaction.allocation;
+const historicalBalance = transaction.balanceAfter;
+// Missing balanceAfter is valid for old data; never recompute it from current state.
 ```

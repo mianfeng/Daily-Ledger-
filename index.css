@@ -285,6 +285,11 @@ body {
   animation: sheetIn 0.18s ease-out;
 }
 
+.life-sheet-overlay-detail {
+  z-index: 140;
+  background: rgba(13, 18, 15, 0.62);
+}
+
 .life-sheet {
   width: min(100%, 40rem);
   max-height: min(82vh, 720px);

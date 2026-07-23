@@ -40,8 +40,18 @@ export interface DailyTransactionAllocation {
   reserveRecovery?: number;
 }
 
+export interface DailyTransactionBalanceAfter {
+  spendable: number;
+  weekRemaining: number;
+  futureSpendable: number;
+  buffer: number;
+  reserve: number;
+  fixedReserved: number;
+}
+
 export interface DailyTransaction extends BaseTransaction {
   type: 'income' | 'expense' | 'transfer';
+  createdAt?: string;
   category?: DailyExpenseCategory;
   incomeKind?: DailyIncomeKind;
   transferKind?: DailyTransferKind;
@@ -53,6 +63,7 @@ export interface DailyTransaction extends BaseTransaction {
   weekIndex?: number;
   previousCycle?: BudgetCycle | null;
   previousPockets?: LifeBudgetPockets;
+  balanceAfter?: DailyTransactionBalanceAfter;
 }
 
 export interface CopperTransaction extends BaseTransaction {

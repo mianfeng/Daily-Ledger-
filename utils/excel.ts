@@ -179,6 +179,7 @@ export const exportDailyToExcel = (
             : '系统结转',
       金额: transaction.amount,
       备注: transaction.desc,
+      创建时间: transaction.createdAt ?? '',
       分类: transaction.category ?? '',
       收入类型: transaction.incomeKind ?? '',
       转移类型: transaction.transferKind ?? '',
@@ -196,6 +197,7 @@ export const exportDailyToExcel = (
       周序号: transaction.weekIndex ?? '',
       前周期: transaction.previousCycle ? JSON.stringify(transaction.previousCycle) : '',
       前钱袋: transaction.previousPockets ? JSON.stringify(transaction.previousPockets) : '',
+      交易后余额: transaction.balanceAfter ? JSON.stringify(transaction.balanceAfter) : '',
     })),
   );
   appendSheet(
@@ -272,6 +274,7 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
         transferKind: (row['转移类型'] ?? row.transferKind) as Transaction['transferKind'],
         expenseTiming: (row['费用时点'] ?? row.expenseTiming) as Transaction['expenseTiming'],
         effectiveDate: (row['归属日期'] ?? row.effectiveDate) as Transaction['effectiveDate'],
+        createdAt: (row['创建时间'] ?? row.createdAt) as Transaction['createdAt'],
         allocation: hasAllocation
           ? {
               week: allocationValues.week ?? 0,
@@ -288,6 +291,7 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
         weekIndex: weekIndex ?? undefined,
         previousCycle: parseJsonValue(row['前周期']),
         previousPockets: parseJsonValue(row['前钱袋']),
+        balanceAfter: parseJsonValue(row['交易后余额'] ?? row.balanceAfter),
       };
     })
     .filter((transaction): transaction is Transaction => transaction !== null);

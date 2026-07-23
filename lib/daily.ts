@@ -7,6 +7,7 @@ import {
   DailyIncomeKind,
   DailyTransaction,
   DailyTransactionAllocation,
+  DailyTransactionBalanceAfter,
   DailyTransferKind,
   FixedExpense,
   LifeBudgetSettings,
@@ -126,6 +127,40 @@ const normalizeAllocation = (raw: unknown) => {
   }
 
   return allocation;
+};
+
+const normalizeCreatedAt = (value: unknown) => {
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) {
+    return undefined;
+  }
+  return new Date(value).toISOString();
+};
+
+const normalizeBalanceAfter = (raw: unknown): DailyTransactionBalanceAfter | undefined => {
+  if (!isRecord(raw)) {
+    return undefined;
+  }
+
+  const keys: Array<keyof DailyTransactionBalanceAfter> = [
+    'spendable',
+    'weekRemaining',
+    'futureSpendable',
+    'buffer',
+    'reserve',
+    'fixedReserved',
+  ];
+  if (keys.some((key) => !Number.isFinite(Number(raw[key])))) {
+    return undefined;
+  }
+
+  return {
+    spendable: roundAmount(Math.max(0, Number(raw.spendable))),
+    weekRemaining: roundAmount(Math.max(0, Number(raw.weekRemaining))),
+    futureSpendable: roundAmount(Math.max(0, Number(raw.futureSpendable))),
+    buffer: roundAmount(Math.max(0, Number(raw.buffer))),
+    reserve: roundAmount(Math.max(0, Number(raw.reserve))),
+    fixedReserved: roundAmount(Math.max(0, Number(raw.fixedReserved))),
+  };
 };
 
 export const DEFAULT_LIFE_BUDGET_SETTINGS: LifeBudgetSettings = {
@@ -453,6 +488,8 @@ export const sanitizeDailyData = (
         expenseTiming,
         effectiveDate,
         allocation: normalizeAllocation(item.allocation),
+        createdAt: normalizeCreatedAt(item.createdAt),
+        balanceAfter: normalizeBalanceAfter(item.balanceAfter),
         fixedExpenseId:
           item.fixedExpenseId === undefined
             ? undefined
@@ -841,6 +878,51 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   };
 };
 
+const getTransactionBalanceAfter = (
+  data: DailyData,
+  balanceDate: string,
+): DailyTransactionBalanceAfter => {
+  const budget = getLifeBudget(data);
+  const snapshot = getBudgetSnapshot(data, balanceDate);
+
+  return {
+    spendable: roundAmount(Math.max(0, budget.pockets.spendable)),
+    weekRemaining: snapshot.weekRemaining,
+    futureSpendable: roundAmount(
+      Math.max(0, budget.pockets.spendable - snapshot.weekRemaining),
+    ),
+    buffer: roundAmount(Math.max(0, budget.pockets.buffer)),
+    reserve: roundAmount(Math.max(0, budget.pockets.reserve)),
+    fixedReserved: roundAmount(Math.max(0, budget.pockets.fixedReserved)),
+  };
+};
+
+const appendTransactionWithAudit = (
+  data: DailyData,
+  transaction: DailyTransaction,
+  budget: LifeBudgetState,
+  balanceDate = transaction.date,
+): DailyData => {
+  const transactionWithTime: DailyTransaction = {
+    ...transaction,
+    createdAt: transaction.createdAt ?? new Date().toISOString(),
+  };
+  const nextData: DailyData = {
+    ...data,
+    budget,
+    transactions: [...data.transactions, transactionWithTime],
+  };
+  const auditedTransaction: DailyTransaction = {
+    ...transactionWithTime,
+    balanceAfter: getTransactionBalanceAfter(nextData, balanceDate),
+  };
+
+  return {
+    ...nextData,
+    transactions: [...data.transactions, auditedTransaction],
+  };
+};
+
 export const getCycleExpenseTotal = (
   transactions: DailyTransaction[],
   cycle: BudgetCycle | null,
@@ -975,7 +1057,7 @@ export const applyDueBudgetRollovers = (
   let nextData = data;
   let nextCycle = cycle;
   let nextPockets = budget.pockets;
-  const rolloverTransactions: DailyTransaction[] = [];
+  let changed = false;
 
   for (const week of cycle.weeks) {
     const rolloverDate = addDays(week.endDate, 1);
@@ -997,6 +1079,7 @@ export const applyDueBudgetRollovers = (
     const alreadyTransferred = getWeekRolloverTotal(nextData.transactions, cycle, week);
     const remaining = roundAmount(Math.max(0, week.allowance - spent - alreadyTransferred));
     nextCycle = addRolledOverWeekIndex(nextCycle, week.index);
+    changed = true;
 
     if (remaining <= 0) {
       continue;
@@ -1029,26 +1112,30 @@ export const applyDueBudgetRollovers = (
       },
     };
 
-    rolloverTransactions.push(transaction);
-    nextData = {
-      ...nextData,
-      transactions: [...nextData.transactions, transaction],
-    };
     nextPockets = {
       ...nextPockets,
       spendable: roundAmount(Math.max(0, nextPockets.spendable - remaining)),
       buffer: roundAmount(nextPockets.buffer + buffer),
       reserve: roundAmount(nextPockets.reserve + reserve),
     };
+    nextData = appendTransactionWithAudit(
+      nextData,
+      transaction,
+      {
+        ...budget,
+        currentCycle: nextCycle,
+        pockets: nextPockets,
+      },
+      week.endDate,
+    );
   }
 
-  if (nextCycle === cycle && rolloverTransactions.length === 0) {
+  if (!changed) {
     return data;
   }
 
   return {
-    ...data,
-    transactions: [...data.transactions, ...rolloverTransactions],
+    ...nextData,
     budget: {
       ...budget,
       currentCycle: nextCycle,
@@ -1214,56 +1301,48 @@ export const allocateIncome = (
       budget.pockets.buffer,
       budget.settings.bufferCap,
     );
-    return {
-      ...rolloverData,
-      transactions: [
-        ...rolloverData.transactions,
-        {
-          ...incomeTransaction,
-          allocation: {
-            week: 0,
-            buffer: bufferAllocation.buffer,
-            advance: 0,
-            reserve: bufferAllocation.reserveOverflow,
-            fixed: 0,
-          },
-        },
-      ],
-      budget: {
-        ...budget,
-        pockets: {
-          ...budget.pockets,
-          buffer: roundAmount(budget.pockets.buffer + bufferAllocation.buffer),
-          reserve: roundAmount(budget.pockets.reserve + bufferAllocation.reserveOverflow),
-        },
+    const allocation: DailyTransactionAllocation = {
+      week: 0,
+      buffer: bufferAllocation.buffer,
+      advance: 0,
+      reserve: bufferAllocation.reserveOverflow,
+      fixed: 0,
+    };
+    const nextBudget: LifeBudgetState = {
+      ...budget,
+      pockets: {
+        ...budget.pockets,
+        buffer: roundAmount(budget.pockets.buffer + bufferAllocation.buffer),
+        reserve: roundAmount(budget.pockets.reserve + bufferAllocation.reserveOverflow),
       },
     };
+    return appendTransactionWithAudit(
+      rolloverData,
+      { ...incomeTransaction, allocation },
+      nextBudget,
+    );
   }
 
   if (incomeKind === 'refund') {
-    return {
-      ...rolloverData,
-      transactions: [
-        ...rolloverData.transactions,
-        {
-          ...incomeTransaction,
-          allocation: {
-            week: safeAmount,
-            buffer: 0,
-            advance: 0,
-            reserve: 0,
-            fixed: 0,
-          },
-        },
-      ],
-      budget: {
-        ...budget,
-        pockets: {
-          ...budget.pockets,
-          spendable: roundAmount(budget.pockets.spendable + safeAmount),
-        },
+    const allocation: DailyTransactionAllocation = {
+      week: safeAmount,
+      buffer: 0,
+      advance: 0,
+      reserve: 0,
+      fixed: 0,
+    };
+    const nextBudget: LifeBudgetState = {
+      ...budget,
+      pockets: {
+        ...budget.pockets,
+        spendable: roundAmount(budget.pockets.spendable + safeAmount),
       },
     };
+    return appendTransactionWithAudit(
+      rolloverData,
+      { ...incomeTransaction, allocation },
+      nextBudget,
+    );
   }
 
   if (
@@ -1273,35 +1352,31 @@ export const allocateIncome = (
   ) {
     const fixedReserved = roundAmount(Math.min(safeAmount, fixedReserveGap));
     const spendableIncome = roundAmount(Math.max(0, safeAmount - fixedReserved));
-    return {
-      ...rolloverData,
-      transactions: [
-        ...rolloverData.transactions,
-        {
-          ...incomeTransaction,
-          allocation: {
-            week: spendableIncome,
-            buffer: 0,
-            advance: 0,
-            reserve: 0,
-            fixed: fixedReserved,
-          },
-        },
-      ],
-      budget: {
-        ...budget,
-        currentCycle: {
-          ...budget.currentCycle,
-          mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
-          fixedReserved: roundAmount(budget.currentCycle.fixedReserved + fixedReserved),
-        },
-        pockets: {
-          ...budget.pockets,
-          spendable: roundAmount(budget.pockets.spendable + spendableIncome),
-          fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
-        },
+    const allocation: DailyTransactionAllocation = {
+      week: spendableIncome,
+      buffer: 0,
+      advance: 0,
+      reserve: 0,
+      fixed: fixedReserved,
+    };
+    const nextBudget: LifeBudgetState = {
+      ...budget,
+      currentCycle: {
+        ...budget.currentCycle,
+        mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
+        fixedReserved: roundAmount(budget.currentCycle.fixedReserved + fixedReserved),
+      },
+      pockets: {
+        ...budget.pockets,
+        spendable: roundAmount(budget.pockets.spendable + spendableIncome),
+        fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
       },
     };
+    return appendTransactionWithAudit(
+      rolloverData,
+      { ...incomeTransaction, allocation },
+      nextBudget,
+    );
   }
 
   const plannedNextIncomeDate = getNextPayday(normalizedDate, budget.settings.expectedPayday);
@@ -1376,45 +1451,57 @@ export const allocateIncome = (
           },
         }
       : null;
-
-  return {
-    ...rolloverData,
-    transactions: [
-      ...rolloverData.transactions,
-      ...(cycleRolloverTransaction ? [cycleRolloverTransaction] : []),
-      {
-        ...incomeTransaction,
-        previousCycle: budget.currentCycle,
-        previousPockets: budget.pockets,
-        allocation: {
-          week: spendable,
-          buffer: startingBuffer,
-          advance: 0,
-          reserve: roundAmount(reserveDeposit + bufferOverflowReserve),
-          fixed: fixedReserved,
-          reserveDeposit,
-          reserveRecovery: bufferOverflowReserve,
-        },
-      },
-    ],
-    budget: {
-      ...budget,
-      initialized: true,
-      archivedCycles: budget.currentCycle
-        ? [
-            { ...budget.currentCycle, status: 'closed' as const },
-            ...budget.archivedCycles,
-          ].slice(0, 12)
-        : budget.archivedCycles,
-      currentCycle,
-      pockets: {
-        spendable,
-        buffer: roundAmount(nextCycleBufferCarry + startingBuffer),
-        reserve: roundAmount(budget.pockets.reserve + totalReserve),
-        fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
-      },
+  const rolloverBudget: LifeBudgetState = {
+    ...budget,
+    pockets: {
+      ...budget.pockets,
+      buffer: nextCycleBufferCarry,
+      reserve: roundAmount(budget.pockets.reserve + previousBufferReserve),
     },
   };
+  const dataAfterCycleRollover = cycleRolloverTransaction
+    ? appendTransactionWithAudit(
+        rolloverData,
+        cycleRolloverTransaction,
+        rolloverBudget,
+      )
+    : rolloverData;
+  const incomeAllocation: DailyTransactionAllocation = {
+    week: spendable,
+    buffer: startingBuffer,
+    advance: 0,
+    reserve: roundAmount(reserveDeposit + bufferOverflowReserve),
+    fixed: fixedReserved,
+    reserveDeposit,
+    reserveRecovery: bufferOverflowReserve,
+  };
+  const nextBudget: LifeBudgetState = {
+    ...budget,
+    initialized: true,
+    archivedCycles: budget.currentCycle
+      ? [
+          { ...budget.currentCycle, status: 'closed' as const },
+          ...budget.archivedCycles,
+        ].slice(0, 12)
+      : budget.archivedCycles,
+    currentCycle,
+    pockets: {
+      spendable,
+      buffer: roundAmount(nextCycleBufferCarry + startingBuffer),
+      reserve: roundAmount(budget.pockets.reserve + totalReserve),
+      fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
+    },
+  };
+  return appendTransactionWithAudit(
+    dataAfterCycleRollover,
+    {
+      ...incomeTransaction,
+      previousCycle: budget.currentCycle,
+      previousPockets: budget.pockets,
+      allocation: incomeAllocation,
+    },
+    nextBudget,
+  );
 };
 
 export const recordExpense = (
@@ -1470,20 +1557,16 @@ export const recordExpense = (
         fixed: 0,
       },
     };
-
-    return {
-      ...data,
-      transactions: [...data.transactions, transaction],
-      budget: {
-        ...budget,
-        pockets: {
-          ...budget.pockets,
-          spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
-          buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
-          reserve: roundAmount(Math.max(0, budget.pockets.reserve - reserve)),
-        },
+    const nextBudget: LifeBudgetState = {
+      ...budget,
+      pockets: {
+        ...budget.pockets,
+        spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
+        buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
+        reserve: roundAmount(Math.max(0, budget.pockets.reserve - reserve)),
       },
     };
+    return appendTransactionWithAudit(data, transaction, nextBudget);
   }
 
   if (category === 'large') {
@@ -1506,19 +1589,15 @@ export const recordExpense = (
         fixed: 0,
       },
     };
-
-    return {
-      ...data,
-      transactions: [...data.transactions, transaction],
-      budget: {
-        ...budget,
-        pockets: {
-          ...budget.pockets,
-          spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
-          buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
-        },
+    const nextBudget: LifeBudgetState = {
+      ...budget,
+      pockets: {
+        ...budget.pockets,
+        spendable: roundAmount(Math.max(0, budget.pockets.spendable - advance)),
+        buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
       },
     };
+    return appendTransactionWithAudit(data, transaction, nextBudget);
   }
 
   const snapshot = getBudgetSnapshot(data, normalizedDate);
@@ -1527,7 +1606,9 @@ export const recordExpense = (
   remaining = roundAmount(remaining - week);
   const buffer = roundAmount(Math.min(remaining, budget.pockets.buffer));
   remaining = roundAmount(remaining - buffer);
-  const advance = remaining;
+  const advance = roundAmount(
+    Math.min(remaining, Math.max(0, budget.pockets.spendable - week)),
+  );
 
   const transaction: DailyTransaction = {
     id: createTransactionId(),
@@ -1553,18 +1634,15 @@ export const recordExpense = (
     },
   };
 
-  return {
-    ...data,
-    transactions: [...data.transactions, transaction],
-    budget: {
-      ...budget,
-      pockets: {
-        ...budget.pockets,
-        spendable: roundAmount(Math.max(0, budget.pockets.spendable - week - advance)),
-        buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
-      },
+  const nextBudget: LifeBudgetState = {
+    ...budget,
+    pockets: {
+      ...budget.pockets,
+      spendable: roundAmount(Math.max(0, budget.pockets.spendable - week - advance)),
+      buffer: roundAmount(Math.max(0, budget.pockets.buffer - buffer)),
     },
   };
+  return appendTransactionWithAudit(data, transaction, nextBudget);
 };
 
 export const calibrateSpendableBalance = (
@@ -1629,37 +1707,39 @@ export const markFixedExpensePaid = (
   remaining = roundAmount(remaining - transaction.allocation.week);
   transaction.allocation.buffer = roundAmount(Math.min(remaining, budget.pockets.buffer));
   remaining = roundAmount(remaining - transaction.allocation.buffer);
-  transaction.allocation.advance = remaining;
+  transaction.allocation.advance = roundAmount(
+    Math.min(
+      remaining,
+      Math.max(0, budget.pockets.spendable - transaction.allocation.week),
+    ),
+  );
 
-  return {
-    ...data,
-    transactions: [...data.transactions, transaction],
-    budget: {
-      ...budget,
-      pockets: {
-        ...budget.pockets,
-        fixedReserved: roundAmount(Math.max(0, budget.pockets.fixedReserved - transaction.allocation.fixed)),
-        spendable: roundAmount(
-          Math.max(
-            0,
-            budget.pockets.spendable -
-              transaction.allocation.week -
-              transaction.allocation.advance,
-          ),
+  const nextBudget: LifeBudgetState = {
+    ...budget,
+    pockets: {
+      ...budget.pockets,
+      fixedReserved: roundAmount(Math.max(0, budget.pockets.fixedReserved - transaction.allocation.fixed)),
+      spendable: roundAmount(
+        Math.max(
+          0,
+          budget.pockets.spendable -
+            transaction.allocation.week -
+            transaction.allocation.advance,
         ),
-        buffer: roundAmount(Math.max(0, budget.pockets.buffer - transaction.allocation.buffer)),
-      },
-      fixedExpenses: budget.fixedExpenses.map((item) =>
-        item.id === fixedExpense.id
-          ? {
-              ...item,
-              paidCycleId: budget.currentCycle?.id,
-              paidDate: transaction.date,
-            }
-          : item,
       ),
+      buffer: roundAmount(Math.max(0, budget.pockets.buffer - transaction.allocation.buffer)),
     },
+    fixedExpenses: budget.fixedExpenses.map((item) =>
+      item.id === fixedExpense.id
+        ? {
+            ...item,
+            paidCycleId: budget.currentCycle?.id,
+            paidDate: transaction.date,
+          }
+        : item,
+    ),
   };
+  return appendTransactionWithAudit(data, transaction, nextBudget);
 };
 
 const rollbackCycleMainIncome = (
