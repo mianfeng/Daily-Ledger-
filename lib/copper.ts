@@ -276,6 +276,7 @@ export const sanitizeCopperData = (
 
       return {
         ...normalized,
+        type: normalized.type,
         cost: normalized.type === 'income' ? roundCurrency(cost) : undefined,
         profit:
           normalized.type === 'income'
