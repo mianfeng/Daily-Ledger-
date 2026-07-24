@@ -305,3 +305,36 @@ Changed life budget settings from reserve/buffer percentages to fixed cycle amou
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: 交易资金过程详情
+
+**Date**: 2026-07-24
+**Task**: 交易资金过程详情
+**Branch**: `main`
+
+### Summary
+
+保存交易前后余额快照，重构资金流向弹窗为详情与过程两栏，并完成移动端明暗主题和复合结转验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4925d0e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
