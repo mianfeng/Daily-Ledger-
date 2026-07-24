@@ -236,6 +236,7 @@ body {
   border-color: var(--life-border);
 }
 
+.life-budget-dark .text-stone-700,
 .life-budget-dark .text-stone-800,
 .life-budget-dark .text-\[\#3f4842\],
 .life-budget-dark .text-\[\#30413f\],
