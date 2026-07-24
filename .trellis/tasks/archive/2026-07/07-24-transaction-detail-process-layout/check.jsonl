@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"核对前端组件约定"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"核对快照持久化与兼容契约"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"核对端到端数据流"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"核对共享逻辑与重复实现"}

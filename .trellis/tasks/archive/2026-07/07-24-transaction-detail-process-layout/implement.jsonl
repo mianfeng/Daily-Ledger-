@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/index.md","reason":"前端实现入口与组件约定"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"交易审计快照属于持久化状态契约"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"变更横跨类型、账务逻辑、导入导出与界面"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"复用余额快照和资金流映射逻辑"}
