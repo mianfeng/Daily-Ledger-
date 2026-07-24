@@ -255,6 +255,22 @@ body {
   color: var(--life-muted);
 }
 
+.life-flow-change-in {
+  color: #5f8d62;
+}
+
+.life-flow-change-out {
+  color: #b66b5d;
+}
+
+.life-budget-dark .life-flow-change-in {
+  color: #83bd8b;
+}
+
+.life-budget-dark .life-flow-change-out {
+  color: #dc8b82;
+}
+
 .life-budget-dark .life-choice {
   background: #202820;
   color: var(--life-muted);

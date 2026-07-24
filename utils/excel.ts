@@ -197,6 +197,7 @@ export const exportDailyToExcel = (
       周序号: transaction.weekIndex ?? '',
       前周期: transaction.previousCycle ? JSON.stringify(transaction.previousCycle) : '',
       前钱袋: transaction.previousPockets ? JSON.stringify(transaction.previousPockets) : '',
+      交易前余额: transaction.balanceBefore ? JSON.stringify(transaction.balanceBefore) : '',
       交易后余额: transaction.balanceAfter ? JSON.stringify(transaction.balanceAfter) : '',
     })),
   );
@@ -291,6 +292,7 @@ export const parseDailyImportSheet = (sheet: XLSX.WorkSheet) => {
         weekIndex: weekIndex ?? undefined,
         previousCycle: parseJsonValue(row['前周期']),
         previousPockets: parseJsonValue(row['前钱袋']),
+        balanceBefore: parseJsonValue(row['交易前余额'] ?? row.balanceBefore),
         balanceAfter: parseJsonValue(row['交易后余额'] ?? row.balanceAfter),
       };
     })

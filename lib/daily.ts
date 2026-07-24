@@ -136,7 +136,7 @@ const normalizeCreatedAt = (value: unknown) => {
   return new Date(value).toISOString();
 };
 
-const normalizeBalanceAfter = (raw: unknown): DailyTransactionBalanceAfter | undefined => {
+const normalizeBalanceSnapshot = (raw: unknown): DailyTransactionBalanceAfter | undefined => {
   if (!isRecord(raw)) {
     return undefined;
   }
@@ -489,7 +489,8 @@ export const sanitizeDailyData = (
         effectiveDate,
         allocation: normalizeAllocation(item.allocation),
         createdAt: normalizeCreatedAt(item.createdAt),
-        balanceAfter: normalizeBalanceAfter(item.balanceAfter),
+        balanceBefore: normalizeBalanceSnapshot(item.balanceBefore),
+        balanceAfter: normalizeBalanceSnapshot(item.balanceAfter),
         fixedExpenseId:
           item.fixedExpenseId === undefined
             ? undefined
@@ -878,7 +879,7 @@ export const getBudgetSnapshot = (data: DailyData, today = getTodayDate()) => {
   };
 };
 
-const getTransactionBalanceAfter = (
+const getTransactionBalanceSnapshot = (
   data: DailyData,
   balanceDate: string,
 ): DailyTransactionBalanceAfter => {
@@ -906,6 +907,7 @@ const appendTransactionWithAudit = (
   const transactionWithTime: DailyTransaction = {
     ...transaction,
     createdAt: transaction.createdAt ?? new Date().toISOString(),
+    balanceBefore: getTransactionBalanceSnapshot(data, balanceDate),
   };
   const nextData: DailyData = {
     ...data,
@@ -914,7 +916,7 @@ const appendTransactionWithAudit = (
   };
   const auditedTransaction: DailyTransaction = {
     ...transactionWithTime,
-    balanceAfter: getTransactionBalanceAfter(nextData, balanceDate),
+    balanceAfter: getTransactionBalanceSnapshot(nextData, balanceDate),
   };
 
   return {

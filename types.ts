@@ -63,6 +63,7 @@ export interface DailyTransaction extends BaseTransaction {
   weekIndex?: number;
   previousCycle?: BudgetCycle | null;
   previousPockets?: LifeBudgetPockets;
+  balanceBefore?: DailyTransactionBalanceAfter;
   balanceAfter?: DailyTransactionBalanceAfter;
 }
 

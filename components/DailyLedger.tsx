@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowDown,
   CalendarDays,
   Check,
   ChevronDown,
@@ -138,68 +137,58 @@ const transferKindLabels = {
   cycleRollover: '系统结转',
 } as const;
 
-type FlowKey = 'week' | 'buffer' | 'advance' | 'reserve' | 'fixed' | 'gap';
+type FlowKey = 'week' | 'buffer' | 'advance' | 'reserve' | 'fixed';
 
 interface TransactionFlowItem {
   key: FlowKey;
   label: string;
   amount: number;
-  balance?: number;
-  balanceLabel?: string;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  direction: 'in' | 'out';
 }
 
-const flowItemClass: Record<FlowKey, string> = {
-  week: 'border-[#91c7d1]/50 bg-[#91c7d1]/15',
-  buffer: 'border-[#95c79a]/50 bg-[#95c79a]/15',
-  advance: 'border-[#d9b76c]/50 bg-[#d9b76c]/15',
-  reserve: 'border-[#d9b76c]/50 bg-[#d9b76c]/15',
-  fixed: 'border-stone-300 bg-stone-100/70',
-  gap: 'border-[#d88b7f]/55 bg-[#d88b7f]/15',
-};
-
-const getFlowBalance = (
+const getFlowSnapshotBalance = (
   transaction: DailyTransaction,
-  key: Exclude<FlowKey, 'gap'>,
+  key: FlowKey,
+  snapshot: DailyTransaction['balanceAfter'],
 ) => {
-  const balanceAfter = transaction.balanceAfter;
-  if (!balanceAfter) {
+  if (!snapshot) {
     return undefined;
   }
 
   if (key === 'week') {
     if (transaction.type === 'income') {
-      return { value: balanceAfter.spendable, label: '可消费余额' };
+      return snapshot.spendable;
     }
-    if (transaction.type === 'transfer') {
-      return { value: 0, label: '结转后余额' };
-    }
-    return { value: balanceAfter.weekRemaining, label: '本周剩余' };
+    return snapshot.weekRemaining;
   }
   if (key === 'advance') {
-    return { value: balanceAfter.futureSpendable, label: '后续可用' };
+    return snapshot.futureSpendable;
   }
   if (key === 'buffer') {
-    return { value: balanceAfter.buffer, label: '缓冲金余额' };
+    return snapshot.buffer;
   }
   if (key === 'reserve') {
-    return { value: balanceAfter.reserve, label: '储备金余额' };
+    return snapshot.reserve;
   }
-  return { value: balanceAfter.fixedReserved, label: '固定预留余额' };
+  return snapshot.fixedReserved;
 };
 
 const createFlowItem = (
   transaction: DailyTransaction,
-  key: Exclude<FlowKey, 'gap'>,
+  key: FlowKey,
   label: string,
   amount: number,
+  direction: TransactionFlowItem['direction'],
 ): TransactionFlowItem => {
-  const balance = getFlowBalance(transaction, key);
   return {
     key,
     label,
     amount: Math.abs(amount),
-    balance: balance?.value,
-    balanceLabel: balance?.label,
+    balanceBefore: getFlowSnapshotBalance(transaction, key, transaction.balanceBefore),
+    balanceAfter: getFlowSnapshotBalance(transaction, key, transaction.balanceAfter),
+    direction,
   };
 };
 
@@ -212,7 +201,7 @@ const getTransactionFlow = (transaction: DailyTransaction) => {
   }
 
   if (transaction.type === 'income') {
-    const order: Array<[Exclude<FlowKey, 'gap'>, string]> = [
+    const order: Array<[FlowKey, string]> = [
       ['fixed', '固定预留'],
       ['reserve', '储备金'],
       ['buffer', '缓冲金'],
@@ -221,11 +210,11 @@ const getTransactionFlow = (transaction: DailyTransaction) => {
     for (const [key, label] of order) {
       const amount = allocation[key];
       if (amount > 0) {
-        destinations.push(createFlowItem(transaction, key, label, amount));
+        destinations.push(createFlowItem(transaction, key, label, amount, 'in'));
       }
     }
   } else if (transaction.type === 'expense') {
-    const order: Array<[Exclude<FlowKey, 'gap'>, string]> =
+    const order: Array<[FlowKey, string]> =
       transaction.expenseTiming === 'prepaid'
         ? [
             ['buffer', '缓冲金'],
@@ -252,7 +241,7 @@ const getTransactionFlow = (transaction: DailyTransaction) => {
     for (const [key, label] of order) {
       const amount = allocation[key];
       if (amount > 0) {
-        sources.push(createFlowItem(transaction, key, label, amount));
+        sources.push(createFlowItem(transaction, key, label, amount, 'out'));
       }
     }
   } else if (transaction.transferKind === 'weeklyRollover') {
@@ -265,21 +254,22 @@ const getTransactionFlow = (transaction: DailyTransaction) => {
             ? '预算周余额'
             : `第 ${transaction.weekIndex + 1} 周余额`,
           allocation.week,
+          'out',
         ),
       );
     }
     if (allocation.buffer > 0) {
-      destinations.push(createFlowItem(transaction, 'buffer', '缓冲金', allocation.buffer));
+      destinations.push(createFlowItem(transaction, 'buffer', '缓冲金', allocation.buffer, 'in'));
     }
     if (allocation.reserve > 0) {
-      destinations.push(createFlowItem(transaction, 'reserve', '储备金', allocation.reserve));
+      destinations.push(createFlowItem(transaction, 'reserve', '储备金', allocation.reserve, 'in'));
     }
   } else {
     if (allocation.buffer < 0) {
-      sources.push(createFlowItem(transaction, 'buffer', '缓冲金', allocation.buffer));
+      sources.push(createFlowItem(transaction, 'buffer', '缓冲金', allocation.buffer, 'out'));
     }
     if (allocation.reserve > 0) {
-      destinations.push(createFlowItem(transaction, 'reserve', '储备金', allocation.reserve));
+      destinations.push(createFlowItem(transaction, 'reserve', '储备金', allocation.reserve, 'in'));
     }
   }
 
@@ -310,24 +300,35 @@ const formatCreatedTime = (createdAt?: string) => {
   });
 };
 
-const TransactionFlowRows: React.FC<{ items: TransactionFlowItem[] }> = ({ items }) => (
-  <div className="space-y-2">
+const TransactionProcessRows: React.FC<{
+  items: TransactionFlowItem[];
+  gap: number;
+}> = ({ items, gap }) => (
+  <div className="min-w-0 space-y-1.5">
     {items.map((item) => (
       <div
         key={`${item.key}-${item.label}`}
-        className={`rounded-2xl border px-3 py-2.5 ${flowItemClass[item.key]}`}
+        className="scrollbar-hide overflow-x-auto"
       >
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-black text-stone-700">{item.label}</span>
-          <span className="text-sm font-black text-stone-800">{formatAmount(item.amount)}</span>
+        <div className="flex w-max items-baseline whitespace-nowrap text-xs font-bold text-stone-700">
+          <span>{item.label}部分：</span>
+          <span>{formatAmount(item.balanceBefore ?? 0)}</span>
+          <span
+            className={`mx-1 font-black ${item.direction === 'in' ? 'life-flow-change-in' : 'life-flow-change-out'}`}
+          >
+            {item.direction === 'in' ? '+' : '-'} {formatAmount(item.amount)}
+          </span>
+          <span>= {formatAmount(item.balanceAfter ?? 0)}</span>
         </div>
-        {item.balance !== undefined && item.balanceLabel && (
-          <div className="mt-1 text-[10px] font-bold text-stone-500">
-            {item.balanceLabel} {formatAmount(item.balance)}
-          </div>
-        )}
       </div>
     ))}
+    {gap > 0 && (
+      <div className="scrollbar-hide overflow-x-auto">
+        <div className="w-max whitespace-nowrap text-xs font-bold text-stone-700">
+          资金缺口部分：<span className="life-flow-change-out font-black">未覆盖 {formatAmount(gap)}</span>
+        </div>
+      </div>
+    )}
   </div>
 );
 
@@ -380,90 +381,41 @@ const TransactionFlowDetail: React.FC<{
 }> = ({ transaction, kindLabel }) => {
   const { sources, destinations, gap } = getTransactionFlow(transaction);
   const createdTime = formatCreatedTime(transaction.createdAt);
-  const gapItem: TransactionFlowItem | null = gap > 0
-    ? {
-        key: 'gap',
-        label: transaction.type === 'income' ? '未分配金额' : '资金缺口',
-        amount: gap,
-      }
-    : null;
-  const sourceItems = transaction.type === 'expense' && gapItem
-    ? [...sources, gapItem]
-    : sources;
-  const destinationItems = transaction.type === 'income' && gapItem
-    ? [...destinations, gapItem]
-    : destinations;
-  const hasFlow = sourceItems.length > 0 || destinationItems.length > 0;
+  const processItems = [...sources, ...destinations];
+  const hasCompleteSnapshots = Boolean(
+    transaction.balanceBefore && transaction.balanceAfter,
+  );
+  const hasProcess = hasCompleteSnapshots && (processItems.length > 0 || gap > 0);
+  const dateTime = `${formatDisplayDate(transaction.date)}${createdTime ? ` ${createdTime}` : ''}`;
 
   return (
-    <div className="space-y-4">
-      <div className="life-soft-row rounded-2xl px-4 py-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-[10px] font-black tracking-[0.16em] text-stone-500">
-              {kindLabel}
-            </div>
-            <div className="mt-1 truncate text-sm font-black text-stone-800">
-              {transaction.desc}
-            </div>
-          </div>
-          <div className={`shrink-0 text-xl font-black ${getTransactionAmountClass(transaction)}`}>
-            {formatTransactionAmount(transaction)}
-          </div>
+    <div className="space-y-2">
+      <div className="life-soft-row grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-stone-200 px-3 py-2.5">
+        <div className="shrink-0 text-[10px] font-black tracking-[0.14em] text-stone-500">
+          详情
         </div>
-        <div className="mt-2 text-[10px] font-bold text-stone-500">
-          {formatDisplayDate(transaction.date)}
-          {createdTime ? ` · ${createdTime}` : ''}
-          {transaction.expenseTiming === 'prepaid'
-            ? ` · 归属 ${formatDisplayDate(transaction.effectiveDate ?? transaction.date)}`
-            : ''}
+        <div className="scrollbar-hide min-w-0 overflow-x-auto">
+          <div className="flex w-max items-center whitespace-nowrap text-xs font-bold text-stone-700">
+            <span>{kindLabel}</span>
+            <span className="mx-2 text-stone-400">｜</span>
+            <span>{transaction.desc}</span>
+            <span className="mx-2 text-stone-400">｜</span>
+            <span>{dateTime}</span>
+            <span className="mx-2 text-stone-400">｜</span>
+            <span className={`font-black ${getTransactionAmountClass(transaction)}`}>
+              {formatTransactionAmount(transaction)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {!hasFlow && (
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-3 py-4 text-center text-xs font-bold text-stone-500">
-          该流水未保存资金分配明细
+      {hasProcess && (
+        <div className="life-soft-row grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-stone-200 px-3 py-2.5">
+          <div className="shrink-0 pt-0.5 text-[10px] font-black tracking-[0.14em] text-stone-500">
+            过程
+          </div>
+          <TransactionProcessRows items={processItems} gap={gap} />
         </div>
-      )}
-
-      {transaction.type === 'income' && hasFlow && (
-        <>
-          <div className="rounded-2xl border border-[#91c7d1]/50 bg-[#91c7d1]/15 px-3 py-3">
-            <div className="text-[10px] font-black text-stone-500">收入总额</div>
-            <div className="mt-1 text-lg font-black text-stone-800">
-              {formatAmount(transaction.amount)}
-            </div>
-          </div>
-          <div className="flex justify-center text-[#427987]">
-            <ArrowDown size={18} />
-          </div>
-          <TransactionFlowRows items={destinationItems} />
-        </>
-      )}
-
-      {transaction.type === 'expense' && hasFlow && (
-        <>
-          <TransactionFlowRows items={sourceItems} />
-          <div className="flex justify-center text-[#b66b5d]">
-            <ArrowDown size={18} />
-          </div>
-          <div className="rounded-2xl border border-[#d88b7f]/50 bg-[#d88b7f]/15 px-3 py-3">
-            <div className="text-[10px] font-black text-stone-500">支出总额</div>
-            <div className="mt-1 text-lg font-black text-stone-800">
-              {formatAmount(transaction.amount)}
-            </div>
-          </div>
-        </>
-      )}
-
-      {transaction.type === 'transfer' && hasFlow && (
-        <>
-          <TransactionFlowRows items={sourceItems} />
-          <div className="flex justify-center text-[#70685f]">
-            <ArrowDown size={18} />
-          </div>
-          <TransactionFlowRows items={destinationItems} />
-        </>
       )}
     </div>
   );
