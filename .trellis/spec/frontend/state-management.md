@@ -179,8 +179,8 @@ writeLocalLedgerData(currentData);
 - `DailyTransaction.type === "transfer"` represents an internal life-budget pocket transfer:
   - it must be visible in history for auditability
   - it must not count as income, expense, week spending, or cycle spending
-  - weekly rollover transfers subtract `allocation.week` from spendable and add `allocation.buffer` / `allocation.reserve` to the matching pockets
-  - cycle rollover transfers may use a negative `allocation.buffer` to move part of buffer into reserve
+  - weekly rollover transfers subtract `allocation.week` from spendable and allocate the remainder as 60% buffer / 40% reserve, subject to the buffer cap
+  - cycle rollover transfers move 40% of the existing buffer into reserve and keep 60% in buffer, using a negative `allocation.buffer` for the moved reserve portion
 - Main-income fixed expense reservation keeps money and bill events separate:
   - whenever a main income is recorded, calculate the shortfall as `max(0, active fixed-expense total - fixedReserved)` and fill that shortfall before allocating the remaining income
   - when `fixedReserved` already covers the active fixed-expense total, carry it forward and do not create another fixed reserve batch

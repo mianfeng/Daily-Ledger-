@@ -170,7 +170,7 @@ export const DEFAULT_LIFE_BUDGET_SETTINGS: LifeBudgetSettings = {
   reserveFixedAmount: 10000,
   bufferFixedAmount: 1500,
   reserveRecoveryRate: 0.1,
-  weeklyRolloverReserveRate: 0.5,
+  weeklyRolloverReserveRate: 0.4,
   reserveGoal: 50000,
   bufferCap: 6000,
   minimumWeeklyLiving: 500,
@@ -220,10 +220,7 @@ const sanitizeSettings = (raw: unknown): LifeBudgetSettings => {
       value.reserveRecoveryRate,
       DEFAULT_LIFE_BUDGET_SETTINGS.reserveRecoveryRate,
     ),
-    weeklyRolloverReserveRate: clampRate(
-      value.weeklyRolloverReserveRate,
-      DEFAULT_LIFE_BUDGET_SETTINGS.weeklyRolloverReserveRate,
-    ),
+    weeklyRolloverReserveRate: DEFAULT_LIFE_BUDGET_SETTINGS.weeklyRolloverReserveRate,
     reserveGoal: Math.max(
       0,
       toFiniteNumber(value.reserveGoal, DEFAULT_LIFE_BUDGET_SETTINGS.reserveGoal),
