@@ -54,14 +54,25 @@ const daysBetweenInclusive = (startDate: string, endDate: string) => {
   return Math.max(1, Math.round((end - start) / 86400000) + 1);
 };
 
+const getAdjustedPayday = (year: number, month: number, payday: number) => {
+  const candidate = new Date(year, month, Math.min(28, Math.max(1, Math.round(payday))));
+  while (candidate.getDay() === 0 || candidate.getDay() === 6) {
+    candidate.setDate(candidate.getDate() - 1);
+  }
+  return candidate;
+};
+
+const formatLocalDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const getNextPayday = (startDate: string, payday: number) => {
   const start = new Date(`${startDate}T00:00:00`);
   const safePayday = Math.min(28, Math.max(1, Math.round(payday)));
-  const candidate = new Date(start.getFullYear(), start.getMonth(), safePayday);
+  let candidate = getAdjustedPayday(start.getFullYear(), start.getMonth(), safePayday);
   if (candidate.getTime() <= start.getTime()) {
-    candidate.setMonth(candidate.getMonth() + 1);
+    candidate = getAdjustedPayday(start.getFullYear(), start.getMonth() + 1, safePayday);
   }
-  return `${candidate.getFullYear()}-${String(candidate.getMonth() + 1).padStart(2, '0')}-${String(candidate.getDate()).padStart(2, '0')}`;
+  return formatLocalDate(candidate);
 };
 
 const normalizeExpenseCategory = (value: unknown): DailyExpenseCategory | undefined => {
@@ -164,7 +175,7 @@ const normalizeBalanceSnapshot = (raw: unknown): DailyTransactionBalanceAfter | 
 };
 
 export const DEFAULT_LIFE_BUDGET_SETTINGS: LifeBudgetSettings = {
-  expectedPayday: 10,
+  expectedPayday: 15,
   savingsRate: 0.2,
   bufferRate: 0.2,
   reserveFixedAmount: 10000,
@@ -202,10 +213,7 @@ const sanitizeSettings = (raw: unknown): LifeBudgetSettings => {
       : Math.max(0, toFiniteNumber(reserveMinimumCandidate, 0));
 
   return {
-    expectedPayday: Math.min(
-      28,
-      Math.max(1, Math.round(toFiniteNumber(value.expectedPayday, DEFAULT_LIFE_BUDGET_SETTINGS.expectedPayday))),
-    ),
+    expectedPayday: DEFAULT_LIFE_BUDGET_SETTINGS.expectedPayday,
     savingsRate: clampRate(value.savingsRate, DEFAULT_LIFE_BUDGET_SETTINGS.savingsRate),
     bufferRate: clampRate(value.bufferRate, DEFAULT_LIFE_BUDGET_SETTINGS.bufferRate),
     reserveFixedAmount: Math.max(
@@ -1335,40 +1343,6 @@ export const allocateIncome = (
       pockets: {
         ...budget.pockets,
         spendable: roundAmount(budget.pockets.spendable + safeAmount),
-      },
-    };
-    return appendTransactionWithAudit(
-      rolloverData,
-      { ...incomeTransaction, allocation },
-      nextBudget,
-    );
-  }
-
-  if (
-    budget.currentCycle &&
-    normalizedDate >= budget.currentCycle.startDate &&
-    normalizedDate <= budget.currentCycle.plannedEndDate
-  ) {
-    const fixedReserved = roundAmount(Math.min(safeAmount, fixedReserveGap));
-    const spendableIncome = roundAmount(Math.max(0, safeAmount - fixedReserved));
-    const allocation: DailyTransactionAllocation = {
-      week: spendableIncome,
-      buffer: 0,
-      advance: 0,
-      reserve: 0,
-      fixed: fixedReserved,
-    };
-    const nextBudget: LifeBudgetState = {
-      ...budget,
-      currentCycle: {
-        ...budget.currentCycle,
-        mainIncome: roundAmount(budget.currentCycle.mainIncome + safeAmount),
-        fixedReserved: roundAmount(budget.currentCycle.fixedReserved + fixedReserved),
-      },
-      pockets: {
-        ...budget.pockets,
-        spendable: roundAmount(budget.pockets.spendable + spendableIncome),
-        fixedReserved: roundAmount(budget.pockets.fixedReserved + fixedReserved),
       },
     };
     return appendTransactionWithAudit(

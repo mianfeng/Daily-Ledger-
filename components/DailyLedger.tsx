@@ -483,7 +483,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     spendable: String(budget.pockets.spendable || ''),
     buffer: String(budget.pockets.buffer || ''),
     reserve: String(budget.pockets.reserve || ''),
-    expectedPayday: String(budget.settings.expectedPayday),
     reserveFixedAmount: String(budget.settings.reserveFixedAmount || ''),
     bufferFixedAmount: String(budget.settings.bufferFixedAmount || ''),
     reserveGoal: String(budget.settings.reserveGoal || ''),
@@ -624,7 +623,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       spendable: String(budget.pockets.spendable || ''),
       buffer: String(budget.pockets.buffer || ''),
       reserve: String(budget.pockets.reserve || ''),
-      expectedPayday: String(budget.settings.expectedPayday),
       reserveFixedAmount: String(budget.settings.reserveFixedAmount || ''),
       bufferFixedAmount: String(budget.settings.bufferFixedAmount || ''),
       reserveGoal: String(budget.settings.reserveGoal || ''),
@@ -640,7 +638,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         buffer: parseAmount(setupForm.buffer),
         reserve: parseAmount(setupForm.reserve),
         settings: {
-          expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
           reserveFixedAmount:
             parseAmount(setupForm.reserveFixedAmount) ||
             budget.settings.reserveFixedAmount,
@@ -1481,7 +1478,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 <NumberField label="当前储备金" value={setupForm.reserve} onChange={(reserve) => setSetupForm((prev) => ({ ...prev, reserve }))} />
               </>
             )}
-            <NumberField label="预计发薪日" value={setupForm.expectedPayday} onChange={(expectedPayday) => setSetupForm((prev) => ({ ...prev, expectedPayday }))} />
+            <label className="text-xs font-bold text-stone-500">
+              预计发薪日
+              <div className={`${fieldClass} mt-1 flex items-center font-black`}>
+                每月 15 日，遇周末提前
+              </div>
+            </label>
             <NumberField label="储备固定金额" value={setupForm.reserveFixedAmount} onChange={(reserveFixedAmount) => setSetupForm((prev) => ({ ...prev, reserveFixedAmount }))} />
             <NumberField label="缓冲固定金额" value={setupForm.bufferFixedAmount} onChange={(bufferFixedAmount) => setSetupForm((prev) => ({ ...prev, bufferFixedAmount }))} />
             <label className="text-xs font-bold text-stone-500">
@@ -1522,7 +1524,6 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               }
 
               updateSettings({
-                expectedPayday: Math.round(parseAmount(setupForm.expectedPayday)) || 10,
                 reserveFixedAmount:
                   parseAmount(setupForm.reserveFixedAmount) ||
                   budget.settings.reserveFixedAmount,
@@ -1583,9 +1584,9 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           {incomeForm.incomeKind === 'main' && (
             <div className="mt-3 rounded-xl bg-[#f3f0e9] px-3 py-2 text-xs leading-5 text-stone-600">
               {willAutoReserveFixed
-                ? `当前固定预留 ${formatAmount(budget.pockets.fixedReserved)}，主要收入会先补足缺口 ${formatAmount(fixedReserveGap)}，剩余再分配。`
+                ? `主要收入会开启新的预算周期，并先补足固定预留缺口 ${formatAmount(fixedReserveGap)}。`
                 : activeFixedExpenseTotal > 0
-                  ? `当前固定预留已覆盖固定支出目标 ${formatAmount(activeFixedExpenseTotal)}，本次不会重复新增。`
+                  ? `主要收入会开启新的预算周期。当前固定预留已覆盖固定支出目标 ${formatAmount(activeFixedExpenseTotal)}，本次不会重复新增。`
                   : '主要收入会开启新的预算周期：剩余自动拆成储备金、本预算周额度和缓冲金。'}
             </div>
           )}

@@ -182,11 +182,14 @@ writeLocalLedgerData(currentData);
   - weekly rollover transfers subtract `allocation.week` from spendable and allocate the remainder as 60% buffer / 40% reserve, subject to the buffer cap
   - cycle rollover transfers move 40% of the existing buffer into reserve and keep 60% in buffer, using a negative `allocation.buffer` for the moved reserve portion
 - Main-income fixed expense reservation keeps money and bill events separate:
+  - every `main` income starts a new budget cycle, even when the income date is still inside the current cycle
+  - the expected payday is the 15th of each month; when the 15th is a weekend, use the previous weekday as the effective payday
   - whenever a main income is recorded, calculate the shortfall as `max(0, active fixed-expense total - fixedReserved)` and fill that shortfall before allocating the remaining income
   - when `fixedReserved` already covers the active fixed-expense total, carry it forward and do not create another fixed reserve batch
   - fixed reserve remains in `LifeBudgetState.pockets.fixedReserved` across cycles until a fixed payment deducts it or the user manually adjusts it
   - manual fixed reserve adjustments may move money from spendable first, then buffer, but must not draw from reserve or create money
 - Main-income cycle allocation uses fixed budget amounts rather than user-facing percentages:
+  - legacy `settings.expectedPayday` may remain for stored-data compatibility, but cycle planning must use the fixed payday rule above
   - reserve `settings.reserveFixedAmount` after fixed-expense reservation
   - keep up to `settings.minimumWeeklyLiving` per budget-week in the weekly pool
   - reserve `settings.bufferFixedAmount` after the minimum weekly living pool, capped by `settings.bufferCap`
@@ -236,7 +239,9 @@ writeLocalLedgerData(currentData);
 - Build/type-check should cover old and new `DailyData` shapes.
 - Manual verification should cover initialization, main income allocation, normal expenses, large expenses, calibration, and fixed expense payment.
 - Regression verification for rollback changes should cover:
-  - main income fills only the fixed-reserve shortfall, including additional main income within the current cycle
+  - main income always opens a new cycle, including when recorded before the previous planned cycle end
+  - main income fills only the fixed-reserve shortfall when opening the new cycle
+  - payday planning uses the 15th of the next month, adjusted earlier when the 15th falls on a weekend
   - deleting additional main income rolls back its fixed-reserve allocation in both pockets and the cycle summary
   - deleting a current cycle-opening main income restores the previous cycle and pocket baseline
   - deleting a historical cycle-opening main income does not subtract overwritten weekly/buffer money from the current pockets
