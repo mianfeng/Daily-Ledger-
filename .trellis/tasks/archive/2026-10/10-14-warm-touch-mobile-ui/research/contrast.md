@@ -1,0 +1,74 @@
+# UI contrast verification
+
+All text pairs require 4.5:1, including gradient endpoints.
+
+| Theme | Foreground / Background | Ratio | Pass |
+| --- | --- | --- | --- |
+| 亮色·生活 | text #2a2118 / bg #ece7df | 12.84 | yes |
+| 亮色·生活 | text #2a2118 / card #fbf8f3 | 14.91 | yes |
+| 亮色·生活 | text #2a2118 / accent-soft #dcebe2 | 12.81 | yes |
+| 亮色·生活 | muted #6e6254 / bg #ece7df | 4.82 | yes |
+| 亮色·生活 | muted #6e6254 / card #fbf8f3 | 5.60 | yes |
+| 亮色·生活 | muted #6e6254 / accent-soft #dcebe2 | 4.81 | yes |
+| 亮色·生活 | muted #6e6254 / warn-soft #f7e8c6 | 4.89 | yes |
+| 亮色·生活 | accent #296f5d / card #fbf8f3 | 5.62 | yes |
+| 亮色·生活 | accent #296f5d / accent-soft #dcebe2 | 4.83 | yes |
+| 亮色·生活 | warn #8f5a00 / card #fbf8f3 | 5.46 | yes |
+| 亮色·生活 | warn #8f5a00 / warn-soft #f7e8c6 | 4.77 | yes |
+| 亮色·生活 | neg #b8402b / card #fbf8f3 | 5.21 | yes |
+| 亮色·生活 | neg #b8402b / warn-soft #f7e8c6 | 4.55 | yes |
+| 亮色·生活 | pos #296e3f / card #fbf8f3 | 5.84 | yes |
+| 亮色·生活 | pos #296e3f / accent-soft #dcebe2 | 5.01 | yes |
+| 亮色·生活 | on-accent #fff / accent #296f5d | 5.96 | yes |
+| 亮色·生活 | on-accent #fff / accent-hi #347d67 | 4.91 | yes |
+| 亮色·铜钱 | text #2a2118 / bg #ece7df | 12.84 | yes |
+| 亮色·铜钱 | text #2a2118 / card #fbf8f3 | 14.91 | yes |
+| 亮色·铜钱 | text #2a2118 / accent-soft #f4e3d3 | 12.62 | yes |
+| 亮色·铜钱 | muted #6e6254 / bg #ece7df | 4.82 | yes |
+| 亮色·铜钱 | muted #6e6254 / card #fbf8f3 | 5.60 | yes |
+| 亮色·铜钱 | muted #6e6254 / accent-soft #f4e3d3 | 4.74 | yes |
+| 亮色·铜钱 | muted #6e6254 / warn-soft #f7e8c6 | 4.89 | yes |
+| 亮色·铜钱 | accent #9b511f / card #fbf8f3 | 5.52 | yes |
+| 亮色·铜钱 | accent #9b511f / accent-soft #f4e3d3 | 4.67 | yes |
+| 亮色·铜钱 | warn #8f5a00 / card #fbf8f3 | 5.46 | yes |
+| 亮色·铜钱 | warn #8f5a00 / warn-soft #f7e8c6 | 4.77 | yes |
+| 亮色·铜钱 | neg #b8402b / card #fbf8f3 | 5.21 | yes |
+| 亮色·铜钱 | neg #b8402b / warn-soft #f7e8c6 | 4.55 | yes |
+| 亮色·铜钱 | pos #296e3f / card #fbf8f3 | 5.84 | yes |
+| 亮色·铜钱 | pos #296e3f / accent-soft #f4e3d3 | 4.94 | yes |
+| 亮色·铜钱 | on-accent #fff / accent #9b511f | 5.85 | yes |
+| 亮色·铜钱 | on-accent #fff / accent-hi #a85a24 | 5.06 | yes |
+| 暗色·生活 | text #f1e9dd / bg #171310 | 15.34 | yes |
+| 暗色·生活 | text #f1e9dd / card #211c17 | 14.03 | yes |
+| 暗色·生活 | text #f1e9dd / accent-soft #1f3a31 | 10.21 | yes |
+| 暗色·生活 | muted #b3a695 / bg #171310 | 7.74 | yes |
+| 暗色·生活 | muted #b3a695 / card #211c17 | 7.08 | yes |
+| 暗色·生活 | muted #b3a695 / accent-soft #1f3a31 | 5.16 | yes |
+| 暗色·生活 | muted #b3a695 / warn-soft #3a2d12 | 5.63 | yes |
+| 暗色·生活 | accent #86d1b5 / card #211c17 | 9.49 | yes |
+| 暗色·生活 | accent #86d1b5 / accent-soft #1f3a31 | 6.91 | yes |
+| 暗色·生活 | warn #edb958 / card #211c17 | 9.40 | yes |
+| 暗色·生活 | warn #edb958 / warn-soft #3a2d12 | 7.47 | yes |
+| 暗色·生活 | neg #ff9b84 / card #211c17 | 8.26 | yes |
+| 暗色·生活 | neg #ff9b84 / warn-soft #3a2d12 | 6.57 | yes |
+| 暗色·生活 | pos #8edca3 / card #211c17 | 10.39 | yes |
+| 暗色·生活 | pos #8edca3 / accent-soft #1f3a31 | 7.56 | yes |
+| 暗色·生活 | on-accent #0e241c / accent #86d1b5 | 9.16 | yes |
+| 暗色·生活 | on-accent #0e241c / accent-hi #a2e0c8 | 10.90 | yes |
+| 暗色·铜钱 | text #f1e9dd / bg #171310 | 15.34 | yes |
+| 暗色·铜钱 | text #f1e9dd / card #211c17 | 14.03 | yes |
+| 暗色·铜钱 | text #f1e9dd / accent-soft #3b2a1c | 11.37 | yes |
+| 暗色·铜钱 | muted #b3a695 / bg #171310 | 7.74 | yes |
+| 暗色·铜钱 | muted #b3a695 / card #211c17 | 7.08 | yes |
+| 暗色·铜钱 | muted #b3a695 / accent-soft #3b2a1c | 5.74 | yes |
+| 暗色·铜钱 | muted #b3a695 / warn-soft #3a2d12 | 5.63 | yes |
+| 暗色·铜钱 | accent #eba871 / card #211c17 | 8.34 | yes |
+| 暗色·铜钱 | accent #eba871 / accent-soft #3b2a1c | 6.76 | yes |
+| 暗色·铜钱 | warn #edb958 / card #211c17 | 9.40 | yes |
+| 暗色·铜钱 | warn #edb958 / warn-soft #3a2d12 | 7.47 | yes |
+| 暗色·铜钱 | neg #ff9b84 / card #211c17 | 8.26 | yes |
+| 暗色·铜钱 | neg #ff9b84 / warn-soft #3a2d12 | 6.57 | yes |
+| 暗色·铜钱 | pos #8edca3 / card #211c17 | 10.39 | yes |
+| 暗色·铜钱 | pos #8edca3 / accent-soft #3b2a1c | 8.42 | yes |
+| 暗色·铜钱 | on-accent #2a1707 / accent #eba871 | 8.47 | yes |
+| 暗色·铜钱 | on-accent #2a1707 / accent-hi #f2bc8d | 10.09 | yes |
