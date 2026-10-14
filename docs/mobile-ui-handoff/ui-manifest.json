@@ -1,0 +1,199 @@
+{
+  "schemaVersion": "1.0",
+  "product": "Daily Ledger",
+  "extractedAt": "2026-10-14",
+  "sourceCommit": "fe60032",
+  "evidence": "Static source inspection; no browser visual validation",
+  "locale": "zh-CN",
+  "currency": "CNY",
+  "platform": "responsive_web",
+  "intent": "Redesign mobile visuals while preserving implemented functionality and business semantics",
+  "defaultScreen": "daily.home",
+  "storage": { "kind": "browser_localStorage", "authentication": false, "cloudSync": false },
+  "currentShell": {
+    "navigation": "fixed bottom navigation on mobile; sidebar on desktop",
+    "destinations": [
+      { "id": "copper.home", "label": "铜钱生意" },
+      { "id": "daily.home", "label": "生活预算" }
+    ],
+    "themes": ["light", "dark"],
+    "contentScroll": "vertical",
+    "globalActions": ["theme.toggle", "backup.exportJson", "backup.restoreJson"],
+    "restoreRequiresConfirmation": true
+  },
+  "designFreedom": ["palette", "typography", "spacing", "layout", "navigation presentation", "chart presentation", "sheet versus full-screen subpage", "component shapes", "motion"],
+  "constraints": [
+    "Keep the two modules and their money independent",
+    "Keep all existing functionality reachable",
+    "Do not add authentication, cloud sync, bank integration or new financial products",
+    "Preserve local data export and import semantics",
+    "Distinguish current-week spending capacity from cycle and total balances",
+    "Do not recompute missing historical audit snapshots",
+    "Do not rewrite allocation algorithms as part of visual redesign"
+  ],
+  "screens": [
+    {
+      "id": "daily.home", "label": "生活预算", "kind": "root",
+      "source": "components/DailyLedger.tsx",
+      "sectionsInCurrentOrder": [
+        { "id": "header", "content": ["Life Budget", "生活预算"], "actions": [{ "label": "设置", "target": "daily.settings" }] },
+        { "id": "initializationHint", "visibleWhen": "budget.initialized is false", "content": ["先建立生活预算", "旧流水保留"] },
+        { "id": "weekHero", "content": ["本周剩余", "预算周起止日期", "周期余额", "本周已用", "消耗进度", "本周额度", "周期状态", "缓冲金", "有提前支付时显示金额"], "actions": [{ "label": "周期状态/提前支付", "target": "daily.cycle" }] },
+        { "id": "recordAndSummary", "content": ["记一笔", "待处理/固定预留可切换", "固定支出待付数", "余额校准提示", "储备缺口", "固定预留金额", "本期固定项数"], "actions": [{ "label": "记一笔", "target": "daily.expense" }], "gestures": ["summary tabs can also switch by horizontal swipe"] },
+        { "id": "quickActions", "actions": [{ "label": "收入分配", "target": "daily.income" }, { "label": "校准", "target": "daily.calibration" }, { "label": "固定支出", "target": "daily.fixed" }] },
+        { "id": "weeklyConsumption", "content": ["已花/未花堆叠柱", "每周预算", "已花或提前支付", "剩余", "过去/当前/未来周"], "actions": [{ "label": "点击预算周", "target": "daily.cycle" }], "emptyState": "收入分配后显示周期节奏" },
+        { "id": "recentEvents", "component": "daily.eventRow", "actions": [{ "label": "查看全部", "target": "daily.history" }, { "label": "点击事件", "target": "daily.flow" }, { "label": "删除", "effect": "confirm and rollback the selected record" }] },
+        { "id": "legacyBackup", "collapsedByDefault": true, "actions": ["daily.exportExcel", "daily.importExcel"] }
+      ],
+      "states": ["uninitialized", "initialized_without_cycle", "active_cycle", "extended_cycle", "overspent_week", "reserve_gap", "prepaid_expenses", "empty_events"]
+    },
+    {
+      "id": "daily.settings", "label": "初始设置/预算设置", "kind": "bottom_sheet",
+      "fields": [
+        { "id": "spendable", "label": "当前可消费余额", "type": "money", "visibleWhen": "uninitialized" },
+        { "id": "buffer", "label": "当前缓冲金", "type": "money", "visibleWhen": "uninitialized" },
+        { "id": "reserve", "label": "当前储备金", "type": "money", "visibleWhen": "uninitialized" },
+        { "id": "expectedPayday", "label": "预计发薪日", "type": "read_only", "value": "每月15日，遇周末提前" },
+        { "id": "reserveFixedAmount", "label": "储备固定金额", "type": "money" },
+        { "id": "bufferFixedAmount", "label": "缓冲固定金额", "type": "money" },
+        { "id": "fixedReserved", "label": "当前固定预留", "type": "read_only_money" },
+        { "id": "reserveGoal", "label": "储备金目标", "type": "money" },
+        { "id": "bufferCap", "label": "缓冲金上限", "type": "money" },
+        { "id": "minimumWeeklyLiving", "label": "最低每周生活线", "type": "money" },
+        { "id": "reserveMinimumOverride", "label": "储备金最低线覆盖", "type": "optional_money", "emptyMeaning": "自动计算" }
+      ],
+      "summary": ["储备余额/目标", "目标进度", "最低线", "缺口"],
+      "actions": ["save", "close", "theme.toggle", "backup.exportJson", "backup.restoreJson"],
+      "notes": ["Automatically opens on first use", "Settings affect future allocations; existing weeks are not recalculated"]
+    },
+    {
+      "id": "daily.income", "label": "收入分配", "kind": "bottom_sheet",
+      "fields": [
+        { "id": "incomeKind", "type": "segmented_choice", "options": [{ "value": "main", "label": "主要收入" }, { "value": "casual", "label": "零散收入" }, { "value": "refund", "label": "退款报销" }] },
+        { "id": "amount", "label": "金额", "type": "money" },
+        { "id": "date", "label": "日期", "type": "date" },
+        { "id": "desc", "label": "备注", "type": "text" }
+      ],
+      "conditionalContent": ["Main income opens a new cycle and shows fixed-reserve shortfall or already-covered explanation"],
+      "actions": ["确认分配", "关闭"]
+    },
+    {
+      "id": "daily.expense", "label": "记支出", "kind": "bottom_sheet",
+      "fields": [
+        { "id": "category", "type": "category_choice", "options": [{ "value": "daily", "label": "日常" }, { "value": "dining", "label": "外食" }, { "value": "other", "label": "其他" }, { "value": "unplanned", "label": "计划外" }, { "value": "large", "label": "大额" }] },
+        { "id": "amount", "label": "金额", "type": "money" },
+        { "id": "date", "label": "日期/付款日期", "type": "date" },
+        { "id": "desc", "label": "备注", "type": "optional_text" },
+        { "id": "isPrepaid", "label": "未来开销", "type": "toggle" },
+        { "id": "effectiveDate", "label": "归属日期", "type": "date", "visibleWhen": "isPrepaid" }
+      ],
+      "conditionalContent": ["Prepaid funding explanation", "Large-expense recommendation", "Insufficient-money confirmation"],
+      "validation": ["positive amount", "effectiveDate later than payment date", "effectiveDate outside payment budget week when both weeks exist"],
+      "actions": ["记录支出", "关闭"]
+    },
+    {
+      "id": "daily.calibration", "label": "余额校准", "kind": "bottom_sheet",
+      "fields": [{ "id": "amount", "label": "当前可消费余额", "type": "money" }],
+      "actions": ["完成校准", "关闭"],
+      "notes": ["Adjusts spendable money, not total assets; differences may generate correction or unrecorded-expense events"]
+    },
+    {
+      "id": "daily.fixed", "label": "固定支出", "kind": "bottom_sheet",
+      "content": ["固定支出预留", "主要收入补足缺口说明", "固定支出列表"],
+      "fields": [{ "id": "fixedReservedAmount", "label": "固定预留目标金额", "type": "money" }, { "id": "name", "label": "名称", "type": "text" }, { "id": "amount", "label": "金额", "type": "money" }, { "id": "dueDay", "label": "每月到期日", "type": "day_of_month" }],
+      "rowContent": ["名称", "金额", "每月到期日", "当前周期支付状态"],
+      "actions": ["保存预留", "添加固定支出", "标记已付", "删除固定支出", "关闭"],
+      "states": ["empty", "pending", "paid_disabled", "reserve_shortfall"]
+    },
+    {
+      "id": "daily.cycle", "label": "周期详情", "kind": "bottom_sheet",
+      "content": ["总金额", "可动用余额", "储备余额/目标/进度", "本周期日常剩余", "缓冲金", "固定预留", "本周日期/额度/已花/剩余", "周期日期/状态", "主要收入+其他收入", "日常预算", "储备增长", "可展开预算周列表", "提前支付清单", "最近周期摘要"],
+      "actions": ["展开/收起预算周", "关闭"], "states": ["no_cycle", "active", "extended", "prepaid_present"]
+    },
+    {
+      "id": "daily.history", "label": "历史流水", "kind": "bottom_sheet",
+      "component": "daily.eventRow", "pagination": { "initial": 20, "increment": 20 },
+      "actions": [{ "label": "点击流水", "target": "daily.flow" }, { "label": "删除", "effect": "confirmation and rollback" }, { "label": "加载更多", "effect": "show next 20" }, { "label": "关闭", "target": "daily.home" }],
+      "states": ["empty", "has_more", "all_loaded"]
+    },
+    {
+      "id": "daily.flow", "label": "资金流向", "kind": "nested_detail_sheet",
+      "content": ["类型", "备注", "金额", "日期/创建时间", "资金来源/去向", "分配金额", "资金缺口", "有完整快照时显示原余额±变化=新余额"],
+      "actions": ["关闭并返回原上下文"],
+      "states": ["income", "expense", "transfer", "funding_gap", "legacy_missing_allocation", "legacy_missing_snapshots"]
+    },
+    {
+      "id": "copper.home", "label": "铜钱生意", "kind": "root", "source": "components/CopperShop.tsx",
+      "sectionsInCurrentOrder": [
+        { "id": "localDataToolbar", "content": ["本地存储和换设备说明"], "actions": ["theme.toggle", "backup.exportJson", "backup.restoreJson"] },
+        { "id": "header", "content": ["Copper Business", "铜钱生意"], "actions": [{ "label": "配置", "target": "copper.settings" }] },
+        { "id": "legacyWarning", "visibleWhen": "locked legacy records exist", "content": ["历史记录缺明细，不可删除"] },
+        { "id": "assets", "content": ["总资产", "现金合计", "库存成本"] },
+        { "id": "cashPockets", "content": ["流动库余额/利润比例", "存储库余额/利润比例"] },
+        { "id": "entryForm", "fields": ["收/进货类型", "日期", "金额", "销售成本（销售时）", "待确认开关（销售时）", "备注"], "actions": ["提交记账"] },
+        { "id": "trends", "visibleWhen": "chart data exists", "content": ["近30天收入", "近30天毛利", "库存变化", "收入柱+利润均线", "库存成本曲线", "最高毛利日"], "actions": ["收利/库存切换"] },
+        { "id": "monthlySummary", "visibleWhen": "monthly stats exist", "content": ["月份", "收入", "成本", "毛利润", "待确认笔数/金额", "进货", "现金变化"], "currentPresentation": "horizontal scrolling table" },
+        { "id": "recentTransactions", "content": ["备注", "日期", "类型", "金额", "销售成本/利润", "待确认自动日期", "取消标记", "历史锁定标记"], "actions": ["显示/隐藏已取消", "确认待确认销售", "取消待确认销售", "删除非锁定记录"] }
+      ],
+      "states": ["empty", "normal_sale", "loss_sale", "purchase", "inventory_adjustment", "pending", "confirmed", "cancelled", "legacy_locked"]
+    },
+    {
+      "id": "copper.settings", "label": "铜钱设置", "kind": "bottom_sheet",
+      "groups": [
+        { "id": "ratios", "fields": ["流动库%", "存储库%"], "validation": "sum equals 100", "actions": ["保存比例"] },
+        { "id": "inventoryEntry", "fields": ["本笔库存成本", "备注"], "actions": ["补录库存"] },
+        { "id": "inventoryTotal", "fields": ["库存成本总额", "备注"], "actions": ["记录调整"] },
+        { "id": "excelBackup", "actions": ["copper.exportExcel", "copper.importExcel"] }
+      ], "actions": ["关闭"]
+    }
+  ],
+  "businessContracts": {
+    "daily": [
+      "Budget weeks follow income cycles, not necessarily calendar weeks or months",
+      "Each main income starts a new cycle, even before the previous cycle ends",
+      "Payday rule is monthly day 15, moved to preceding weekday if weekend",
+      "Cycle spendable = pockets.spendable",
+      "Usable balance = spendable + buffer + fixedReserved",
+      "Total cycle money = usable balance + reserve",
+      "Main income fills only the fixed-reserve shortfall",
+      "Main-income UI uses fixed reserve/buffer amounts, not legacy savingsRate/bufferRate controls",
+      "Weekly rollover: 60% buffer, 40% reserve, subject to buffer cap",
+      "Cycle rollover moves 40% of existing buffer to reserve",
+      "Prepaid payment deducts now and reports on effectiveDate; preserve both dates",
+      "Transfers are internal and do not count as income or expense",
+      "Historical balance snapshots are immutable; missing snapshots omit calculation process",
+      "Show uncovered expenses as funding gaps, not fabricated pocket deductions"
+    ],
+    "copper": [
+      "Cash total = liquid + reserve; total assets = cash total + inventory cost",
+      "Profit = sale amount - sale cost; negative profit is valid",
+      "Positive-profit sale: cost returns to liquid; profit splits by configured ratios",
+      "Non-positive-profit sale: sale cash enters liquid",
+      "Purchase reduces cash and increases inventory cost",
+      "Sale cost must not exceed inventory cost; purchase must not exceed available cash",
+      "Pending sale already affects cash and inventory when created",
+      "Confirmation only changes status; auto-confirm after 10 natural days when app processes it",
+      "Cancellation rolls back cash/inventory and excludes the sale from stats/charts",
+      "Deleting an already-cancelled sale does not roll back a second time",
+      "Legacy locked records cannot be deleted",
+      "Inventory supplementation/stocktake is not a cash purchase"
+    ]
+  },
+  "backupActions": [
+    { "id": "backup.exportJson", "scope": "both modules", "format": "json" },
+    { "id": "backup.restoreJson", "scope": "replace both modules", "format": "json", "confirmation": true },
+    { "id": "daily.exportExcel", "scope": "daily full state", "format": "xlsx" },
+    { "id": "daily.importExcel", "scope": "daily module", "format": "xlsx/xls", "confirmation": true },
+    { "id": "copper.exportExcel", "scope": "copper module", "format": "xlsx" },
+    { "id": "copper.importExcel", "scope": "replace copper module", "format": "xlsx/xls", "confirmation": true }
+  ],
+  "suggestedDesignDeliverables": {
+    "firstRoundScreens": ["daily.home", "daily.expense", "daily.flow", "copper.home"],
+    "remainingFunctions": "Provide component/state specifications and reachable locations for every remaining screen",
+    "tokens": ["palette", "Chinese and numeric fonts", "type scale", "spacing", "radii", "borders", "icons", "motion"],
+    "targetWidthsPx": [360, 390, 430],
+    "interactionDetails": ["touch targets", "safe areas", "keyboard avoidance", "sheet scrolling", "return context", "chart touch", "confirmation feedback"],
+    "sampleData": "Invented demonstration data only; consistent arithmetic; no claim of real user balances"
+  },
+  "sourceFiles": ["App.tsx", "components/DailyLedger.tsx", "components/CopperShop.tsx", "types.ts", "lib/daily.ts", "lib/copper.ts", "index.css", "README.md", ".trellis/spec/frontend/state-management.md"]
+}
