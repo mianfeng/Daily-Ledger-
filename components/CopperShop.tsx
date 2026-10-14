@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowRightCircle,
   Briefcase,
-  Calendar,
   Check,
   Coins,
-  Download,
   Lock,
   Package,
   RotateCcw,
@@ -13,10 +11,8 @@ import {
   Table,
   Trash2,
   TrendingUp,
-  Upload,
   Wallet,
-  X,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Bar,
   CartesianGrid,
@@ -26,9 +22,10 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts';
-import * as XLSX from 'xlsx';
-import { DEFAULT_COPPER_DATA } from '../lib/appData';
+} from "recharts";
+import { BackupSection, InlineError, Overlay, useUi } from "./ui/Ui";
+import * as XLSX from "xlsx";
+import { DEFAULT_COPPER_DATA } from "../lib/appData";
 import {
   autoConfirmCopperPendingTransactions,
   applyCopperTransaction,
@@ -47,21 +44,15 @@ import {
   isCopperCancelledTransaction,
   isCopperPendingTransaction,
   rollbackCopperTransaction,
-} from '../lib/copper';
-import { getTodayDate } from '../lib/date';
-import { CopperData, CopperRatios } from '../types';
-import {
-  exportCopperToExcel,
-  parseCopperImportWorkbook,
-} from '../utils/excel';
-
-const formatSigned = (value: number) =>
-  `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+} from "../lib/copper";
+import { getTodayDate } from "../lib/date";
+import { CopperData, CopperRatios } from "../types";
+import { exportCopperToExcel, parseCopperImportWorkbook } from "../utils/excel";
 
 const formatCompactAmount = (value: number) => {
   const absValue = Math.abs(value);
   if (absValue >= 10000) {
-    return `${value < 0 ? '-' : ''}${(absValue / 10000).toFixed(absValue >= 100000 ? 0 : 1)}万`;
+    return `${value < 0 ? "-" : ""}${(absValue / 10000).toFixed(absValue >= 100000 ? 0 : 1)}万`;
   }
   return `${Math.round(value)}`;
 };
@@ -69,40 +60,54 @@ const formatCompactAmount = (value: number) => {
 const formatCompactMoney = (value: number) => `¥ ${formatCompactAmount(value)}`;
 
 const formatSignedCompact = (value: number) =>
-  `${value >= 0 ? '+' : ''}${formatCompactAmount(value)}`;
+  `${value >= 0 ? "+" : "−"}¥${formatCompactAmount(Math.abs(value))}`;
 
-const formatMoney = (value: number) => `¥ ${value.toFixed(2)}`;
+const formatMoney = (value: number) =>
+  `¥${value.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type CopperTrendMode = 'flow' | 'inventory';
+type CopperTrendMode = "flow" | "inventory";
 
 interface CopperShopProps {
   data: CopperData;
   setData: React.Dispatch<React.SetStateAction<CopperData>>;
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
+  appControls?: React.ReactNode;
 }
 
-export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) => {
+export const CopperShop: React.FC<CopperShopProps> = ({
+  data,
+  setData,
+  theme,
+  appControls,
+}) => {
+  const { confirm, notify } = useUi();
+  const [formError, setFormError] = useState("");
+  const [showEntry, setShowEntry] = useState(false);
+  const [showMonthly, setShowMonthly] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [ratioDraft, setRatioDraft] = useState<CopperRatios>(data.ratios);
-  const [inventoryEntryAmount, setInventoryEntryAmount] = useState('');
-  const [inventoryEntryDesc, setInventoryEntryDesc] = useState('');
-  const [inventoryDraft, setInventoryDraft] = useState(String(data.inventoryCost));
-  const [inventoryAdjustmentDesc, setInventoryAdjustmentDesc] = useState('');
-  const [trendMode, setTrendMode] = useState<CopperTrendMode>('flow');
-  const [showCancelledTransactions, setShowCancelledTransactions] = useState(false);
+  const [inventoryEntryAmount, setInventoryEntryAmount] = useState("");
+  const [inventoryEntryDesc, setInventoryEntryDesc] = useState("");
+  const [inventoryDraft, setInventoryDraft] = useState(
+    String(data.inventoryCost),
+  );
+  const [inventoryAdjustmentDesc, setInventoryAdjustmentDesc] = useState("");
+  const [trendMode, setTrendMode] = useState<CopperTrendMode>("flow");
+  const [showCancelledTransactions, setShowCancelledTransactions] =
+    useState(false);
   const [form, setForm] = useState<{
     amount: string;
     cost: string;
     date: string;
     desc: string;
     isPending: boolean;
-    type: 'income' | 'expense';
+    type: "income" | "expense";
   }>({
-    amount: '',
-    cost: '',
-    desc: '',
+    amount: "",
+    cost: "",
+    desc: "",
     isPending: true,
-    type: 'income',
+    type: "income",
     date: getTodayDate(),
   });
 
@@ -113,10 +118,10 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
   useEffect(() => {
     if (showSettings) {
       setRatioDraft(data.ratios);
-      setInventoryEntryAmount('');
-      setInventoryEntryDesc('');
+      setInventoryEntryAmount("");
+      setInventoryEntryDesc("");
       setInventoryDraft(String(data.inventoryCost));
-      setInventoryAdjustmentDesc('');
+      setInventoryAdjustmentDesc("");
     }
   }, [data.inventoryCost, data.ratios, showSettings]);
 
@@ -124,10 +129,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     () => getCopperCashTotal(data.balances),
     [data.balances],
   );
-  const totalAssets = useMemo(
-    () => getTotalCopperAssets(data),
-    [data],
-  );
+  const totalAssets = useMemo(() => getTotalCopperAssets(data), [data]);
   const monthlyStats = useMemo(
     () => getCopperMonthlyStats(data.transactions),
     [data.transactions],
@@ -166,13 +168,17 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       bestProfitDay,
       flowData,
       inventoryChange:
-        lastPoint && firstPoint ? lastPoint.inventoryCost - firstPoint.inventoryCost : 0,
+        lastPoint && firstPoint
+          ? lastPoint.inventoryCost - firstPoint.inventoryCost
+          : 0,
       totalIncome: totals.income,
       totalProfit: totals.profit,
     };
   }, [chartData]);
   const lockedLegacyCount = useMemo(
-    () => data.transactions.filter((transaction) => transaction.isLegacyLocked).length,
+    () =>
+      data.transactions.filter((transaction) => transaction.isLegacyLocked)
+        .length,
     [data.transactions],
   );
   const recentTransactions = useMemo(
@@ -180,46 +186,46 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       [...data.transactions]
         .filter(
           (transaction) =>
-            showCancelledTransactions || !isCopperCancelledTransaction(transaction),
+            showCancelledTransactions ||
+            !isCopperCancelledTransaction(transaction),
         )
         .reverse()
         .slice(0, 10),
     [data.transactions, showCancelledTransactions],
   );
-  const isDark = theme === 'dark';
-  const chartGridColor = isDark ? 'rgba(255,255,255,0.10)' : '#E7E1D4';
-  const chartTickColor = isDark ? '#BFC9C1' : '#7D7165';
+  const chartGridColor = "var(--line)";
+  const chartTickColor = "var(--muted)";
   const tooltipStyle = {
-    background: isDark ? '#202820' : 'rgba(255, 255, 255, 0.96)',
-    borderRadius: '10px',
-    border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(77,91,82,0.12)',
-    boxShadow: '0 18px 34px -22px rgba(0, 0, 0, 0.45)',
-    color: isDark ? '#EDF2EA' : '#26342F',
-    fontSize: '11px',
-    padding: '6px 8px',
+    background: "var(--card)",
+    borderRadius: "16px",
+    border: "none",
+    boxShadow: "var(--raise)",
+    color: "var(--text)",
+    fontSize: "12px",
+    padding: "12px",
   };
 
   const handleAddTransaction = () => {
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      alert('请输入有效金额');
+      setFormError("请输入有效金额");
       return;
     }
 
     if (!form.date) {
-      alert('请选择日期');
+      setFormError("请选择日期");
       return;
     }
 
-    if (form.type === 'income') {
+    if (form.type === "income") {
       const cost = Number(form.cost);
       if (!Number.isFinite(cost) || cost < 0) {
-        alert('请输入有效成本');
+        setFormError("请输入有效成本");
         return;
       }
 
       if (cost > data.inventoryCost) {
-        alert('本笔成本不能超过当前库存总成本');
+        setFormError("本笔成本不能超过当前库存总成本");
         return;
       }
 
@@ -238,7 +244,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       );
     } else {
       if (amount > cashTotal) {
-        alert('现金余额不足，无法进货');
+        setFormError("现金余额不足，无法进货");
         return;
       }
 
@@ -255,17 +261,20 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       );
     }
 
+    setShowEntry(false);
+    setFormError("");
+    notify("记账成功");
     setForm((prev) => ({
       ...prev,
-      amount: '',
-      cost: '',
-      desc: '',
-      isPending: prev.type === 'income' ? true : prev.isPending,
+      amount: "",
+      cost: "",
+      desc: "",
+      isPending: prev.type === "income" ? true : prev.isPending,
     }));
   };
 
-  const handleDeleteTransaction = (id: number) => {
-    if (!window.confirm('确定删除这条记录吗？资金和库存成本将自动回滚。')) {
+  const handleDeleteTransaction = async (id: number) => {
+    if (!(await confirm("确定删除这条记录吗？资金和库存成本将自动回滚。"))) {
       return;
     }
 
@@ -275,26 +284,38 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     }
 
     if (transaction.isLegacyLocked || !transaction.cashAllocation) {
-      alert('这条旧记录缺少精确资金明细，已锁定删除以避免余额出错。');
+      setFormError("这条旧记录缺少精确资金明细，已锁定删除以避免余额出错。");
       return;
     }
 
     const nextInventoryCost =
       data.inventoryCost - (transaction.inventoryDelta ?? 0);
     if (nextInventoryCost < 0) {
-      alert('这笔进货可能已被后续销售消耗，不能直接删除。');
+      setFormError("这笔进货可能已被后续销售消耗，不能直接删除。");
       return;
     }
 
     setData((prev) => rollbackCopperTransaction(prev, transaction));
   };
 
-  const handleConfirmPending = (id: number) => {
+  const handleConfirmPending = async (id: number) => {
+    if (
+      !(await confirm({
+        title: "确认销售？",
+        body: "款与库存已经入账。本操作只将销售标记为已确认，不会重复入账。",
+        confirmLabel: "确认销售",
+      }))
+    )
+      return;
     setData((prev) => confirmCopperPendingTransaction(prev, id));
   };
 
-  const handleCancelPending = (id: number) => {
-    if (!window.confirm('确定取消这笔待确认销售吗？资金和库存成本会回滚，记录会保留为已取消。')) {
+  const handleCancelPending = async (id: number) => {
+    if (
+      !(await confirm(
+        "确定取消这笔待确认销售吗？资金和库存成本会回滚，记录会保留为已取消。",
+      ))
+    ) {
       return;
     }
 
@@ -305,7 +326,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     const totalRatio = ratioDraft.liquid + ratioDraft.reserve;
 
     if (totalRatio !== 100) {
-      alert('比例总和必须是100%');
+      setFormError("比例总和必须是100%");
       return;
     }
 
@@ -316,7 +337,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
   const handleInventoryEntry = () => {
     const amount = Number(inventoryEntryAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      alert('请输入有效库存成本');
+      setFormError("请输入有效库存成本");
       return;
     }
 
@@ -325,26 +346,26 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
         prev,
         createInventoryAdjustmentTransaction({
           date: getTodayDate(),
-          desc: inventoryEntryDesc.trim() || '库存成本补录',
+          desc: inventoryEntryDesc.trim() || "库存成本补录",
           previousInventoryCost: prev.inventoryCost,
           nextInventoryCost: prev.inventoryCost + amount,
         }),
       ),
     );
-    setInventoryEntryAmount('');
-    setInventoryEntryDesc('');
+    setInventoryEntryAmount("");
+    setInventoryEntryDesc("");
     setShowSettings(false);
   };
 
   const handleInventoryAdjustment = () => {
     const nextInventoryCost = Number(inventoryDraft);
     if (!Number.isFinite(nextInventoryCost) || nextInventoryCost < 0) {
-      alert('请输入有效库存成本');
+      setFormError("请输入有效库存成本");
       return;
     }
 
     if (nextInventoryCost === data.inventoryCost) {
-      alert('库存成本没有变化');
+      setFormError("库存成本没有变化");
       return;
     }
 
@@ -362,379 +383,377 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
     setShowSettings(false);
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const input = event.target;
     if (!file) {
       return;
     }
 
-    if (!window.confirm('确定用导入文件覆盖当前铜钱分账数据吗？余额、比例、库存成本和流水都会被替换。')) {
-      input.value = '';
+    if (
+      !(await confirm(
+        "确定用导入文件覆盖当前铜钱分账数据吗？余额、比例、库存成本和流水都会被替换。",
+      ))
+    ) {
+      input.value = "";
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
       try {
-        const workbook = XLSX.read(loadEvent.target?.result, { type: 'array' });
-        const importedData = parseCopperImportWorkbook(workbook, DEFAULT_COPPER_DATA);
+        const workbook = XLSX.read(loadEvent.target?.result, { type: "array" });
+        const importedData = parseCopperImportWorkbook(
+          workbook,
+          DEFAULT_COPPER_DATA,
+        );
         setData(importedData);
-        alert(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
+        notify(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
       } catch {
-        alert('导入失败，格式不正确');
+        setFormError("导入失败，格式不正确");
       } finally {
-        input.value = '';
+        input.value = "";
       }
     };
     reader.readAsArrayBuffer(file);
   };
 
   return (
-    <div className={`copper-shop copper-shop-${theme} space-y-4 animate-fade-in pb-10`}>
-      <div className="flex justify-between items-center gap-3">
+    <div
+      className={`copper-shop copper-shop-${theme} module-business space-y-4 animate-fade-in`}
+    >
+      <header className="flex items-center justify-between gap-3 mb-5">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8b8175]">
-            Copper Business
-          </div>
-          <h1 className="mt-1 text-2xl font-black text-[#3f4842] flex items-center gap-2">
-            <span className="rounded-xl bg-[#8aa0a2] p-2 text-white shadow-sm">
-              <Briefcase size={20} />
-            </span>
-            铜钱生意
-          </h1>
+          <p className="ui-help mt-0">本地保存于此浏览器</p>
+          <h1>铜钱生意</h1>
         </div>
         <button
-          onClick={() => setShowSettings(true)}
-          className="rounded-full border border-stone-200 bg-white/80 p-2.5 text-[#70685f] shadow-sm"
-          title="配置"
+          className="ui-icon-button"
+          onClick={() => {
+            setFormError("");
+            setShowSettings(true);
+          }}
+          aria-label="铜钱配置"
         >
-          <Settings size={18} />
+          <Settings size={20} />
         </button>
-      </div>
-
+      </header>
+      {!showSettings && !showEntry && <InlineError message={formError} />}
       {showSettings && (
-        <div className="copper-sheet-overlay" onClick={() => setShowSettings(false)}>
-        <div className="copper-sheet space-y-4" onClick={(event) => event.stopPropagation()}>
-          <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-stone-300" />
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-base font-black">
-              <Settings size={17} />
-              铜钱设置
-            </h2>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="rounded-full border border-stone-200 bg-white/80 p-2 text-stone-500"
-              title="关闭"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
-            <h3 className="font-bold text-sm mb-3">利润分配比例 (总和须为100)</h3>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="block text-xs text-stone-500 mb-1">流动库 %</label>
-                <input
-                  type="number"
-                  value={ratioDraft.liquid}
-                  onChange={(event) =>
-                    setRatioDraft((prev) => ({
-                      ...prev,
-                      liquid: Number(event.target.value) || 0,
-                    }))
-                  }
-                  className="w-full p-1.5 border rounded text-sm"
-                />
+        <Overlay
+          title="铜钱配置"
+          variant="page"
+          protectEdits
+          onClose={() => setShowSettings(false)}
+          error={formError}
+          onClearError={() => setFormError("")}
+        >
+          <div className="space-y-4">
+            <div className="ui-card">
+              <h3 className="font-bold text-sm mb-3">
+                利润分配比例 (总和须为100)
+              </h3>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1">
+                    流动库 %
+                  </label>
+                  <input
+                    type="number"
+                    value={ratioDraft.liquid}
+                    onChange={(event) =>
+                      setRatioDraft((prev) => ({
+                        ...prev,
+                        liquid: Number(event.target.value) || 0,
+                      }))
+                    }
+                    className="w-full p-1.5 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1">
+                    存储库 %
+                  </label>
+                  <input
+                    type="number"
+                    value={ratioDraft.reserve}
+                    onChange={(event) =>
+                      setRatioDraft((prev) => ({
+                        ...prev,
+                        reserve: Number(event.target.value) || 0,
+                      }))
+                    }
+                    className="w-full p-1.5 border rounded text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-stone-500 mb-1">存储库 %</label>
-                <input
-                  type="number"
-                  value={ratioDraft.reserve}
-                  onChange={(event) =>
-                    setRatioDraft((prev) => ({
-                      ...prev,
-                      reserve: Number(event.target.value) || 0,
-                    }))
-                  }
-                  className="w-full p-1.5 border rounded text-sm"
-                />
-              </div>
-            </div>
-            <button
-              onClick={handleSaveSettings}
-              className="w-full bg-[#4f7f8c] text-white py-2 rounded-xl hover:bg-[#426f79] text-sm font-bold"
-            >
-              保存比例
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
-            <h3 className="font-bold text-sm mb-3">库存成本补录</h3>
-            <div className="flex flex-col md:flex-row gap-2">
-              <input
-                type="number"
-                value={inventoryEntryAmount}
-                onChange={(event) => setInventoryEntryAmount(event.target.value)}
-                className="md:w-32 p-1.5 border rounded text-sm"
-                placeholder="本笔成本"
-              />
-              <input
-                type="text"
-                value={inventoryEntryDesc}
-                onChange={(event) => setInventoryEntryDesc(event.target.value)}
-                className="flex-1 p-1.5 border rounded text-sm"
-                placeholder="备注"
-              />
-              <button
-                onClick={handleInventoryEntry}
-                className="px-3 py-1.5 bg-emerald-700 text-white rounded text-sm hover:bg-emerald-800"
-              >
-                补录库存
+              <button onClick={handleSaveSettings} className="ui-key w-full">
+                保存比例
               </button>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-stone-200 bg-white/80 p-3">
-            <h3 className="font-bold text-sm mb-3">盘点设置总额</h3>
-            <div className="flex flex-col md:flex-row gap-2">
-              <input
-                type="number"
-                value={inventoryDraft}
-                onChange={(event) => setInventoryDraft(event.target.value)}
-                className="md:w-32 p-1.5 border rounded text-sm"
-                placeholder="库存成本"
-              />
-              <input
-                type="text"
-                value={inventoryAdjustmentDesc}
-                onChange={(event) => setInventoryAdjustmentDesc(event.target.value)}
-                className="flex-1 p-1.5 border rounded text-sm"
-                placeholder="备注"
-              />
-              <button
-                onClick={handleInventoryAdjustment}
-                className="px-3 py-1.5 bg-stone-700 text-white rounded text-sm hover:bg-stone-800"
-              >
-                记录调整
-              </button>
+            <div className="ui-card">
+              <h3 className="font-bold text-sm mb-3">库存成本补录</h3>
+              <div className="flex flex-col md:flex-row gap-2">
+                <input
+                  type="number"
+                  value={inventoryEntryAmount}
+                  onChange={(event) =>
+                    setInventoryEntryAmount(event.target.value)
+                  }
+                  className="md:w-32 p-1.5 border rounded text-sm"
+                  aria-label="本笔库存成本"
+                  placeholder="本笔成本"
+                />
+                <input
+                  type="text"
+                  value={inventoryEntryDesc}
+                  onChange={(event) =>
+                    setInventoryEntryDesc(event.target.value)
+                  }
+                  className="flex-1 p-1.5 border rounded text-sm"
+                  aria-label="库存调整备注"
+                  placeholder="备注"
+                />
+                <button onClick={handleInventoryEntry} className="ui-key">
+                  补录库存
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="pt-1 flex gap-2">
-            <button
-              onClick={() => exportCopperToExcel(data)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-            >
-              <Download size={14} /> 导出备份
-            </button>
-            <label className="flex items-center gap-1 px-3 py-1.5 bg-stone-500 text-white rounded text-xs hover:bg-stone-600 cursor-pointer">
-              <Upload size={14} /> 导入备份
-              <input type="file" hidden onChange={handleImport} accept=".xlsx,.xls" />
-            </label>
+            <div className="ui-card">
+              <h3 className="font-bold text-sm mb-3">盘点设置总额</h3>
+              <div className="flex flex-col md:flex-row gap-2">
+                <input
+                  type="number"
+                  value={inventoryDraft}
+                  onChange={(event) => setInventoryDraft(event.target.value)}
+                  className="md:w-32 p-1.5 border rounded text-sm"
+                  aria-label="盘点库存成本总额"
+                  placeholder="库存成本"
+                />
+                <input
+                  type="text"
+                  value={inventoryAdjustmentDesc}
+                  onChange={(event) =>
+                    setInventoryAdjustmentDesc(event.target.value)
+                  }
+                  className="flex-1 p-1.5 border rounded text-sm"
+                  aria-label="库存调整备注"
+                  placeholder="备注"
+                />
+                <button onClick={handleInventoryAdjustment} className="ui-key">
+                  记录调整
+                </button>
+              </div>
+            </div>
+
+            <p className="ui-help">库存补录与盘点是库存调整，不是进货付款。</p>
+            <BackupSection
+              moduleName="铜钱生意"
+              appControls={appControls}
+              onExport={() => exportCopperToExcel(data)}
+              onImport={handleImport}
+            />
           </div>
-        </div>
-        </div>
+        </Overlay>
       )}
 
       {lockedLegacyCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded-xl text-xs">
-          检测到 {lockedLegacyCount} 条旧版流水缺少精确资金明细。这些记录会保留展示，但禁止删除，避免回滚后余额失真。
+        <div className="bg-[var(--warn-soft)] border-0 text-[var(--warn)] px-3 py-2 rounded-xl text-xs">
+          检测到 {lockedLegacyCount}{" "}
+          条旧版流水缺少精确资金明细。这些记录会保留展示，但禁止删除，避免回滚后余额失真。
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-gradient-to-r from-amber-700 to-amber-900 p-3 rounded-xl shadow-sm text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-white/10 rounded-full">
-              <Wallet size={18} className="text-white" />
-            </div>
-            <div>
-              <div className="text-amber-100 text-[10px] font-medium uppercase tracking-wider">
-                Total Assets
-              </div>
-              <div className="text-xl font-bold leading-none">
-                ¥ {totalAssets.toFixed(2)}
-              </div>
-            </div>
-          </div>
-          <Coins className="text-amber-200/40 rotate-12" size={32} />
+      <section className="business-assets">
+        <div className="flex items-center justify-between ui-muted text-sm">
+          <b>总资产</b>
+          <Briefcase size={20} />
         </div>
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 flex items-center justify-between">
+        <div className="ui-num">{formatMoney(totalAssets)}</div>
+        <div className="life-balances">
           <div>
-            <div className="text-[10px] font-bold text-stone-400 uppercase">现金合计</div>
-            <div className="text-lg font-bold text-stone-800">¥ {cashTotal.toFixed(2)}</div>
+            现金合计<b>{formatMoney(cashTotal)}</b>
           </div>
-          <Wallet size={24} className="text-stone-300" />
-        </div>
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-bold text-stone-400 uppercase">库存成本</div>
-            <div className="text-lg font-bold text-emerald-700">¥ {data.inventoryCost.toFixed(2)}</div>
-          </div>
-          <Package size={24} className="text-emerald-200" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white p-2 rounded-lg shadow-sm border-t-2 border-yellow-600 text-center flex flex-col items-center justify-between min-h-[80px]">
-          <span className="text-[10px] font-bold text-stone-500 flex items-center justify-center gap-1 mb-1 w-full border-b border-dashed border-stone-100 pb-1">
-            <Coins size={12} className="text-yellow-600" /> 流动库
-          </span>
-          <span className="text-base font-bold text-stone-800">
-            ¥ {data.balances.liquid.toFixed(2)}
-          </span>
-          <div className="text-[10px] text-stone-400 bg-stone-50 px-1.5 rounded-full mt-1">
-            利润 {data.ratios.liquid}%
+            库存成本<b>{formatMoney(data.inventoryCost)}</b>
           </div>
         </div>
-
-        <div className="bg-white p-2 rounded-lg shadow-sm border-t-2 border-emerald-600 text-center flex flex-col items-center justify-between min-h-[80px]">
-          <span className="text-[10px] font-bold text-stone-500 flex items-center justify-center gap-1 mb-1 w-full border-b border-dashed border-stone-100 pb-1">
-            <Lock size={12} className="text-emerald-600" /> 存储库
-          </span>
-          <span className="text-base font-bold text-stone-800">
-            ¥ {data.balances.reserve.toFixed(2)}
-          </span>
-          <div className="text-[10px] text-stone-400 bg-stone-50 px-1.5 rounded-full mt-1">
-            利润 {data.ratios.reserve}%
+      </section>
+      <section className="business-pockets">
+        <div className="ui-card business-pocket">
+          <div className="ui-muted text-xs flex items-center gap-2">
+            <Wallet size={16} />
+            流动库
           </div>
+          <div className="ui-num">{formatMoney(data.balances.liquid)}</div>
+          <div className="ui-help mb-0">利润分配 {data.ratios.liquid}%</div>
         </div>
-      </div>
-
-      <div className="bg-white p-2 rounded-xl shadow-sm border border-stone-200 flex flex-col md:flex-row items-stretch md:items-center gap-2">
-        <div className="flex items-center gap-2 bg-stone-50 p-1 rounded-lg">
-          <div className="flex bg-white rounded-md shadow-sm border border-stone-100 overflow-hidden">
-            <button
-              onClick={() => setForm((prev) => ({ ...prev, isPending: true, type: 'income' }))}
-              className={`px-3 py-1.5 text-xs font-bold transition-colors ${
-                form.type === 'income'
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'text-stone-400 hover:bg-stone-50'
-              }`}
-            >
-              收
-            </button>
-            <div className="w-px bg-stone-100"></div>
-            <button
-              onClick={() => setForm((prev) => ({ ...prev, isPending: false, type: 'expense' }))}
-              className={`px-3 py-1.5 text-xs font-bold transition-colors ${
-                form.type === 'expense'
-                  ? 'bg-red-50 text-red-500'
-                  : 'text-stone-400 hover:bg-stone-50'
-              }`}
-            >
-              进货
-            </button>
+        <div className="ui-card business-pocket">
+          <div className="ui-muted text-xs flex items-center gap-2">
+            <Lock size={16} />
+            存储库
           </div>
-
-          <div className="relative flex-1 md:flex-none">
-            <input
-              type="date"
-              value={form.date}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, date: event.target.value }))
-              }
-              className="w-full md:w-32 bg-transparent text-xs text-stone-600 font-medium focus:outline-none cursor-pointer pl-6 py-1 min-w-[7.5rem]"
-            />
-            <Calendar
-              size={12}
-              className="absolute left-1 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
-            />
-          </div>
+          <div className="ui-num">{formatMoney(data.balances.reserve)}</div>
+          <div className="ui-help mb-0">利润分配 {data.ratios.reserve}%</div>
         </div>
-
-        {form.type === 'income' && (
-          <label className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-800 md:w-24">
-            <span>待确认</span>
-            <input
-              type="checkbox"
-              checked={form.isPending}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, isPending: event.target.checked }))
-              }
-              className="h-4 w-4 accent-amber-700"
-            />
-          </label>
-        )}
-
-        <div className="flex flex-1 items-center gap-2 bg-stone-50 p-1 rounded-lg">
-          <input
-            type="number"
-            placeholder="金额"
-            value={form.amount}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, amount: event.target.value }))
-            }
-            className="w-20 bg-transparent text-sm font-bold text-stone-800 placeholder:text-stone-300 focus:outline-none text-right"
-          />
-          {form.type === 'income' && (
-            <>
-              <span className="text-stone-300 text-xs">|</span>
-              <input
-                type="number"
-                placeholder="成本"
-                value={form.cost}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, cost: event.target.value }))
-                }
-                className="w-20 bg-transparent text-sm font-bold text-emerald-700 placeholder:text-stone-300 focus:outline-none text-right"
-              />
-            </>
-          )}
-          <span className="text-stone-300 text-xs">|</span>
-          <input
-            type="text"
-            placeholder={form.type === 'income' ? '备注...' : '进货备注...'}
-            value={form.desc}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, desc: event.target.value }))
-            }
-            className="flex-1 bg-transparent text-xs text-stone-700 placeholder:text-stone-300 focus:outline-none min-w-0"
-          />
-        </div>
-
+      </section>
+      <section className="business-entries">
         <button
-          onClick={handleAddTransaction}
-          className="bg-amber-700 hover:bg-amber-800 text-white p-2 rounded-lg transition-colors shadow-sm active:scale-95 flex items-center justify-center"
+          className="ui-key"
+          onClick={() => {
+            setFormError("");
+            setForm((prev) => ({ ...prev, type: "income", isPending: true }));
+            setShowEntry(true);
+          }}
         >
-          <ArrowRightCircle size={18} />
+          <Coins size={18} />
+          记销售
         </button>
-      </div>
+        <button
+          className="ui-key"
+          onClick={() => {
+            setFormError("");
+            setForm((prev) => ({ ...prev, type: "expense", isPending: false }));
+            setShowEntry(true);
+          }}
+        >
+          <Package size={18} />
+          记进货
+        </button>
+      </section>
+      {showEntry && (
+        <Overlay
+          title={form.type === "income" ? "记销售" : "记进货"}
+          protectEdits
+          onClose={() => setShowEntry(false)}
+          error={formError}
+          onClearError={() => setFormError("")}
+          footer={
+            <button className="ui-key" onClick={handleAddTransaction}>
+              {form.type === "income" ? "记录销售" : "记录进货"}
+              <ArrowRightCircle size={18} />
+            </button>
+          }
+        >
+          <label className="ui-help">
+            {form.type === "income" ? "销售金额" : "进货金额"}
+            <div className="ui-amount-field">
+              <span>¥</span>
+              <input
+                aria-label={form.type === "income" ? "销售金额" : "进货金额"}
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={form.amount}
+                placeholder="0.00"
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, amount: event.target.value }))
+                }
+              />
+            </div>
+          </label>
+          <div className="space-y-4">
+            {form.type === "income" && (
+              <label className="block ui-help">
+                销售成本
+                <input
+                  className="mt-2"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  value={form.cost}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, cost: event.target.value }))
+                  }
+                />
+              </label>
+            )}
+            <label className="block ui-help">
+              日期
+              <input
+                className="mt-2"
+                type="date"
+                value={form.date}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, date: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block ui-help">
+              备注
+              <input
+                className="mt-2"
+                value={form.desc}
+                placeholder="可选"
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, desc: event.target.value }))
+                }
+              />
+            </label>
+            {form.type === "income" && (
+              <label className="ui-card flex items-center justify-between gap-3">
+                <span>
+                  <b>待确认销售</b>
+                  <span className="block ui-help">
+                    款与库存立即入账，10个自然日后应用处理时自动确认。
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={form.isPending}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      isPending: event.target.checked,
+                    }))
+                  }
+                />
+              </label>
+            )}
+            <p className="ui-help">
+              {form.type === "income"
+                ? "销售成本不能超过现有库存成本；利润可为负。"
+                : "进货会减少现金并增加库存成本；现金不足时不能进货。"}
+            </p>
+          </div>
+        </Overlay>
+      )}
 
       {chartData.length > 0 && (
-        <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-100">
+        <div className="business-trend">
           <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                  <TrendingUp size={13} className="text-amber-700" /> 经营趋势
+                <h3 className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                  <TrendingUp size={13} className="text-[var(--warn)]" />{" "}
+                  经营趋势
                 </h3>
-                <div className="mt-1 flex items-center gap-3 text-[10px] text-stone-400">
+                <div className="mt-1 flex items-center gap-3 text-xs text-[var(--muted)]">
                   <span className="flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-sm bg-emerald-500"></span>
+                    <span className="h-2 w-2 rounded-sm bg-[var(--accent)]"></span>
                     收入
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="h-0.5 w-3 rounded-full bg-blue-500"></span>
+                    <span className="h-0.5 w-3 rounded-full bg-[var(--accent)]"></span>
                     利润均线
                   </span>
                 </div>
               </div>
-              <div className="flex shrink-0 rounded-lg bg-stone-100 p-0.5 text-[10px] font-bold">
+              <div className="ui-segmented">
                 {[
-                  ['flow', '收利'],
-                  ['inventory', '库存'],
+                  ["flow", "收利"],
+                  ["inventory", "库存"],
                 ].map(([mode, label]) => (
                   <button
+                    aria-pressed={trendMode === mode}
                     key={mode}
                     onClick={() => setTrendMode(mode as CopperTrendMode)}
                     className={`rounded-md px-2 py-1 transition-colors ${
                       trendMode === mode
-                        ? 'bg-white text-stone-800 shadow-sm'
-                        : 'text-stone-400'
+                        ? "bg-[var(--card)] text-[var(--text)] shadow-sm"
+                        : "text-[var(--muted)]"
                     }`}
                   >
                     {label}
@@ -744,25 +763,31 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-emerald-50 px-2 py-2">
-                <div className="text-[9px] font-bold text-emerald-700">近30天收入</div>
-                <div className="mt-0.5 text-sm font-bold text-emerald-800">
+              <div className="rounded-lg bg-[var(--accent-soft)] px-2 py-2">
+                <div className="text-xs font-bold text-[var(--pos)]">
+                  近30天收入
+                </div>
+                <div className="mt-0.5 text-sm font-bold text-[var(--pos)]">
                   {formatCompactMoney(trendSummary.totalIncome)}
                 </div>
               </div>
-              <div className="rounded-lg bg-blue-50 px-2 py-2">
-                <div className="text-[9px] font-bold text-blue-700">近30天毛利</div>
-                <div className="mt-0.5 text-sm font-bold text-blue-800">
+              <div className="rounded-lg bg-[var(--accent-soft)] px-2 py-2">
+                <div className="text-xs font-bold text-[var(--accent)]">
+                  近30天毛利
+                </div>
+                <div className="mt-0.5 text-sm font-bold text-[var(--accent)]">
                   {formatSignedCompact(trendSummary.totalProfit)}
                 </div>
               </div>
-              <div className="rounded-lg bg-amber-50 px-2 py-2">
-                <div className="text-[9px] font-bold text-amber-700">库存变化</div>
+              <div className="rounded-lg bg-[var(--warn-soft)] px-2 py-2">
+                <div className="text-xs font-bold text-[var(--warn)]">
+                  库存变化
+                </div>
                 <div
                   className={`mt-0.5 text-sm font-bold ${
                     trendSummary.inventoryChange >= 0
-                      ? 'text-amber-800'
-                      : 'text-emerald-700'
+                      ? "text-[var(--warn)]"
+                      : "text-[var(--pos)]"
                   }`}
                 >
                   {formatSignedCompact(trendSummary.inventoryChange)}
@@ -770,30 +795,44 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
               </div>
             </div>
 
-            <div className="h-56">
+            <p className="business-chart-summary" aria-label="经营趋势摘要">
+              近30天收入 {formatMoney(trendSummary.totalIncome)}，毛利{" "}
+              {formatMoney(trendSummary.totalProfit)}，库存变化{" "}
+              {formatMoney(trendSummary.inventoryChange)}
+              。轻触图表查看当日数值。
+            </p>
+            <div className="h-56" role="group" aria-label="经营趋势图">
               <ResponsiveContainer width="100%" height="100%">
-                {trendMode === 'flow' ? (
+                {trendMode === "flow" ? (
                   <ComposedChart
+                    accessibilityLayer
                     data={trendSummary.flowData}
-                    margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke={chartGridColor}
+                    />
                     <XAxis
                       dataKey="shortDate"
                       axisLine={false}
                       interval="preserveStartEnd"
                       minTickGap={18}
-                      tick={{ fontSize: 9, fill: chartTickColor }}
+                      tick={{ fontSize: 12, fill: chartTickColor }}
                       tickLine={false}
                     />
                     <YAxis
                       axisLine={false}
-                      tickFormatter={(value) => formatCompactAmount(Number(value))}
-                      tick={{ fontSize: 9, fill: chartTickColor }}
+                      tickFormatter={(value) =>
+                        formatCompactAmount(Number(value))
+                      }
+                      tick={{ fontSize: 12, fill: chartTickColor }}
                       tickLine={false}
-                      width={34}
+                      width={44}
                     />
                     <Tooltip
+                      trigger="click"
                       formatter={(value: number, name: string) => [
                         formatMoney(Number(value)),
                         name,
@@ -804,7 +843,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                     <Bar
                       dataKey="income"
                       name="收入"
-                      fill="#6FA88D"
+                      fill="var(--accent-soft)"
                       radius={[4, 4, 0, 0]}
                       maxBarSize={14}
                     />
@@ -812,7 +851,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                       type="monotone"
                       dataKey="profitTrend"
                       name="利润均线"
-                      stroke="#C58E62"
+                      stroke="var(--accent)"
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 3 }}
@@ -820,27 +859,35 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                   </ComposedChart>
                 ) : (
                   <ComposedChart
+                    accessibilityLayer
                     data={chartData}
-                    margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
+                    margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke={chartGridColor}
+                    />
                     <XAxis
                       dataKey="shortDate"
                       axisLine={false}
                       interval="preserveStartEnd"
                       minTickGap={18}
-                      tick={{ fontSize: 9, fill: chartTickColor }}
+                      tick={{ fontSize: 12, fill: chartTickColor }}
                       tickLine={false}
                     />
                     <YAxis
                       axisLine={false}
-                      domain={['auto', 'auto']}
-                      tickFormatter={(value) => formatCompactAmount(Number(value))}
-                      tick={{ fontSize: 9, fill: chartTickColor }}
+                      domain={["auto", "auto"]}
+                      tickFormatter={(value) =>
+                        formatCompactAmount(Number(value))
+                      }
+                      tick={{ fontSize: 12, fill: chartTickColor }}
                       tickLine={false}
-                      width={34}
+                      width={44}
                     />
                     <Tooltip
+                      trigger="click"
                       formatter={(value: number) => formatMoney(Number(value))}
                       labelFormatter={(label) => `日期: ${label}`}
                       contentStyle={tooltipStyle}
@@ -849,7 +896,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
                       type="monotone"
                       dataKey="inventoryCost"
                       name="库存成本"
-                      stroke="#8AA0A2"
+                      stroke="var(--accent)"
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 3 }}
@@ -860,10 +907,11 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
             </div>
 
             {trendSummary.bestProfitDay && (
-              <div className="flex items-center justify-between rounded-lg bg-stone-50 px-2.5 py-2 text-[10px] text-stone-500">
+              <div className="flex items-center justify-between rounded-lg bg-[var(--card)] px-2.5 py-2 text-xs text-[var(--muted)]">
                 <span>最高毛利日</span>
-                <span className="font-bold text-stone-700">
-                  {trendSummary.bestProfitDay.shortDate} / {formatMoney(trendSummary.bestProfitDay.profit)}
+                <span className="font-bold text-[var(--text)]">
+                  {trendSummary.bestProfitDay.shortDate} /{" "}
+                  {formatMoney(trendSummary.bestProfitDay.profit)}
                 </span>
               </div>
             )}
@@ -872,159 +920,197 @@ export const CopperShop: React.FC<CopperShopProps> = ({ data, setData, theme }) 
       )}
 
       {monthlyStats.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-stone-100">
-          <div className="px-3 py-2 border-b border-stone-100 bg-stone-50 flex items-center gap-2">
-            <Table size={12} className="text-stone-500" />
-            <h3 className="font-bold text-[10px] text-stone-700">月度经营汇总</h3>
+        <button
+          className="ui-button w-full"
+          onClick={() => setShowMonthly(true)}
+        >
+          <Table size={18} />
+          月度经营汇总 · 查看全部
+        </button>
+      )}
+      {showMonthly && (
+        <Overlay
+          title="月度经营汇总"
+          variant="page"
+          onClose={() => setShowMonthly(false)}
+        >
+          <div className="space-y-4">
+            {monthlyStats.map((stat) => (
+              <section className="business-month-card" key={stat.month}>
+                <h3>{stat.month}</h3>
+                <dl className="business-month-grid">
+                  <div>
+                    <dt>收入</dt>
+                    <dd className="ui-positive">+{formatMoney(stat.income)}</dd>
+                  </div>
+                  <div>
+                    <dt>销售成本</dt>
+                    <dd>{formatMoney(stat.cost)}</dd>
+                  </div>
+                  <div>
+                    <dt>毛利润</dt>
+                    <dd
+                      className={
+                        stat.profit >= 0 ? "ui-positive" : "ui-negative"
+                      }
+                    >
+                      {stat.profit >= 0 ? "+" : "−"}
+                      {formatMoney(Math.abs(stat.profit))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>待确认</dt>
+                    <dd>
+                      {stat.pendingCount}笔 / {formatMoney(stat.pendingIncome)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>进货</dt>
+                    <dd className="ui-negative">
+                      −{formatMoney(stat.purchase)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>现金变化</dt>
+                    <dd
+                      className={
+                        stat.cashNet >= 0 ? "ui-positive" : "ui-negative"
+                      }
+                    >
+                      {stat.cashNet >= 0 ? "+" : "−"}
+                      {formatMoney(Math.abs(stat.cashNet))}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            ))}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-stone-50 text-stone-500 font-medium">
-                <tr>
-                  <th className="px-3 py-1.5">月份</th>
-                  <th className="px-3 py-1.5 text-emerald-600">收入</th>
-                  <th className="px-3 py-1.5">成本</th>
-                  <th className="px-3 py-1.5 text-blue-600">毛利润</th>
-                  <th className="px-3 py-1.5 text-amber-600">待确认</th>
-                  <th className="px-3 py-1.5 text-red-500">进货</th>
-                  <th className="px-3 py-1.5 text-right">现金变化</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {monthlyStats.map((stat) => (
-                  <tr key={stat.month} className="hover:bg-stone-50 transition-colors">
-                    <td className="px-3 py-1.5 font-medium text-stone-700">{stat.month}</td>
-                    <td className="px-3 py-1.5 text-emerald-600">+{stat.income.toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-stone-600">{stat.cost.toFixed(2)}</td>
-                    <td className={`px-3 py-1.5 font-bold ${stat.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {formatSigned(stat.profit)}
-                    </td>
-                    <td className="px-3 py-1.5 text-amber-700">
-                      {stat.pendingCount > 0
-                        ? `${stat.pendingCount}笔 / ${stat.pendingIncome.toFixed(2)}`
-                        : '-'}
-                    </td>
-                    <td className="px-3 py-1.5 text-red-500">-{stat.purchase.toFixed(2)}</td>
-                    <td className={`px-3 py-1.5 text-right font-bold ${stat.cashNet >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                      {formatSigned(stat.cashNet)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </Overlay>
       )}
 
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-            Recent Transactions
-          </h2>
+      <section className="business-recent">
+        <div className="flex items-center justify-between gap-2">
+          <h3>最近流水</h3>
           <button
+            className="ui-button"
+            aria-pressed={showCancelledTransactions}
             onClick={() => setShowCancelledTransactions((prev) => !prev)}
-            className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold text-stone-500"
           >
-            {showCancelledTransactions ? '隐藏已取消' : '显示已取消'}
+            {showCancelledTransactions ? "隐藏已取消" : "显示已取消"}
           </button>
         </div>
-        <ul className="space-y-1.5">
+        <ul>
           {recentTransactions.map((transaction) => {
-            const isIncome = transaction.type === 'income';
-            const isAdjustment = transaction.type === 'inventory_adjustment';
-            const isPending = isCopperPendingTransaction(transaction);
-            const isCancelled = isCopperCancelledTransaction(transaction);
-            const amountLabel = isAdjustment
-              ? formatSigned(transaction.inventoryDelta ?? 0)
-              : `${isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}`;
-
+            const isIncome = transaction.type === "income";
+            const isAdjustment = transaction.type === "inventory_adjustment";
+            const pending = isCopperPendingTransaction(transaction);
+            const cancelled = isCopperCancelledTransaction(transaction);
+            const amount = isAdjustment
+              ? (transaction.inventoryDelta ?? 0)
+              : transaction.amount;
+            const sign = isAdjustment
+              ? amount >= 0
+                ? "+"
+                : "−"
+              : isIncome
+                ? "+"
+                : "−";
+            const days = Math.max(
+              0,
+              Math.ceil(
+                (new Date(
+                  `${getCopperPendingDueDate(transaction)}T00:00:00`,
+                ).getTime() -
+                  new Date(`${getTodayDate()}T00:00:00`).getTime()) /
+                  86400000,
+              ),
+            );
+            const profit = transaction.profit ?? transaction.amount;
             return (
               <li
                 key={transaction.id}
-                className={`bg-white px-3 py-2 rounded-lg shadow-sm flex justify-between items-center border group ${
-                  isCancelled ? 'border-stone-200 opacity-70' : 'border-stone-100'
-                }`}
+                className={cancelled ? "is-cancelled" : ""}
               >
                 <div>
-                  <div className="font-medium text-stone-800 text-xs">{transaction.desc}</div>
-                  <div className="text-[10px] text-stone-400 flex items-center gap-1 flex-wrap">
-                    {formatCopperTransactionDate(transaction.date)}
-                    <span className="px-1 bg-stone-50 rounded text-stone-500 scale-90 origin-left">
-                      {getCopperTransactionKindLabel(transaction)}
+                  <b className="block text-sm">
+                    {transaction.desc ||
+                      getCopperTransactionKindLabel(transaction)}
+                  </b>
+                  <p className="ui-help mt-1 mb-0">
+                    {formatCopperTransactionDate(transaction.date)} ·{" "}
+                    {getCopperTransactionKindLabel(transaction)}
+                  </p>
+                  {isIncome && (
+                    <p className="ui-help mt-1 mb-0">
+                      成本 {formatMoney(transaction.cost ?? 0)} / 利润{" "}
+                      <span
+                        className={profit >= 0 ? "ui-positive" : "ui-negative"}
+                      >
+                        {profit >= 0 ? "+" : "−"}
+                        {formatMoney(Math.abs(profit))}
+                      </span>
+                    </p>
+                  )}
+                  {transaction.isLegacyLocked && (
+                    <span className="ui-badge ui-badge-warning">
+                      <Lock size={12} /> 历史锁定
                     </span>
-                    {isIncome && (
-                      <span className="px-1 bg-emerald-50 rounded text-emerald-700 scale-90 origin-left">
-                        成本 {(transaction.cost ?? 0).toFixed(2)} / 利润 {formatSigned(transaction.profit ?? transaction.amount)}
-                      </span>
-                    )}
-                    {isPending && (
-                      <span className="px-1 bg-amber-50 rounded text-amber-700 scale-90 origin-left">
-                        待确认 · {formatCopperTransactionDate(getCopperPendingDueDate(transaction))}自动
-                      </span>
-                    )}
-                    {isCancelled && (
-                      <span className="px-1 bg-stone-100 rounded text-stone-500 scale-90 origin-left">
-                        已取消
-                      </span>
-                    )}
-                    {transaction.isLegacyLocked && (
-                      <span className="px-1 bg-amber-50 rounded text-amber-700 scale-90 origin-left">
-                        历史锁定
-                      </span>
-                    )}
-                  </div>
+                  )}
+                  {isIncome && !pending && !cancelled && (
+                    <span className="ui-badge">已确认</span>
+                  )}
+                  {cancelled && <span className="ui-badge">已取消</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`text-xs font-bold ${
-                    isCancelled
-                      ? 'text-stone-400 line-through'
-                      : isAdjustment
-                      ? 'text-amber-700'
-                      : isIncome
-                        ? 'text-emerald-600'
-                        : 'text-red-500'
-                  }`}>
-                    {amountLabel}
-                  </div>
-                  {isPending ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleConfirmPending(transaction.id)}
-                        className="rounded bg-emerald-50 p-1 text-emerald-700"
-                        title="确认"
-                      >
-                        <Check size={12} />
-                      </button>
-                      <button
-                        onClick={() => handleCancelPending(transaction.id)}
-                        className="rounded bg-stone-100 p-1 text-stone-500"
-                        title="取消"
-                      >
-                        <RotateCcw size={12} />
-                      </button>
-                    </div>
-                  ) : (
+                  <b
+                    className={`ui-num ${cancelled ? "ui-muted line-through" : isIncome ? "ui-positive" : isAdjustment ? "ui-muted" : "ui-negative"}`}
+                  >
+                    {sign}
+                    {formatMoney(Math.abs(amount))}
+                  </b>
+                  {!pending && !transaction.isLegacyLocked && (
                     <button
+                      className="ui-icon-button"
                       onClick={() => handleDeleteTransaction(transaction.id)}
-                      className={`p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${
-                        transaction.isLegacyLocked
-                          ? 'text-stone-200 cursor-not-allowed'
-                          : 'text-stone-300 hover:text-red-500'
-                      }`}
-                      title={transaction.isLegacyLocked ? '历史锁定记录不可删除' : '删除'}
+                      aria-label={`删除 ${transaction.desc}`}
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={18} />
                     </button>
                   )}
                 </div>
+                {pending && (
+                  <>
+                    <div className="business-pending-note">
+                      待确认 · {days}天后自动确认 · 款与库存已入账
+                    </div>
+                    <div className="business-pending-actions">
+                      <button
+                        className="ui-key"
+                        onClick={() => handleConfirmPending(transaction.id)}
+                      >
+                        <Check size={16} />
+                        确认
+                      </button>
+                      <button
+                        className="ui-danger"
+                        onClick={() => handleCancelPending(transaction.id)}
+                      >
+                        <RotateCcw size={16} />
+                        取消并回滚
+                      </button>
+                    </div>
+                  </>
+                )}
               </li>
             );
           })}
           {recentTransactions.length === 0 && (
-            <li className="text-center text-stone-400 py-4 text-xs">暂无记录</li>
+            <li className="business-empty">
+              暂无记录。点击「记销售」或「记进货」开始记账。
+            </li>
           )}
         </ul>
-      </div>
+      </section>
     </div>
   );
 };

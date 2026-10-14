@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test:ui": "node scripts/ui-smoke.cjs",
+    "test:contrast": "node scripts/ui-contrast.cjs",
     "build": "vite build",
     "preview": "vite preview"
   },
