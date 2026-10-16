@@ -1,0 +1,2394 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-palette="kyoto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Ledger · 账本 UI/UX 重构设计工作台 (Concept 02 · 澄澈账本)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Theme Preset 1: Crisp Nordic Paper (Default Light) */
+      --bg-canvas: #F4F5F7;
+      --bg-app: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F1F5F9;
+      --bg-elevated: #FFFFFF;
+      --text-main: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      --border-hairline: #E2E8F0;
+      --border-strong: #CBD5E1;
+
+      /* Daily Module Accent (Emerald / Pine) */
+      --daily-accent: #0D6E52;
+      --daily-accent-hover: #0A5841;
+      --daily-accent-soft: #ECFDF5;
+      --daily-accent-border: #A7F3D0;
+      --daily-on-accent: #FFFFFF;
+
+      /* Copper Business Module Accent (Terracotta / Amber) */
+      --copper-accent: #C2591A;
+      --copper-accent-hover: #A34812;
+      --copper-accent-soft: #FFF7ED;
+      --copper-accent-border: #FED7AA;
+      --copper-on-accent: #FFFFFF;
+
+      /* Semantic Status */
+      --warn: #D97706;
+      --warn-soft: #FEF3C7;
+      --warn-border: #FDE68A;
+      --danger: #DC2626;
+      --danger-soft: #FEF2F2;
+      --danger-border: #FECACA;
+      --success: #16A34A;
+      --success-soft: #F0FDF4;
+
+      /* Shadows & Radius */
+      --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+      --shadow-float: 0 12px 32px -8px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.05);
+      --r-card: 20px;
+      --r-control: 14px;
+      --r-pill: 9999px;
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090D16;
+      --bg-app: #0F1420;
+      --bg-card: #161D2E;
+      --bg-subtle: #1E273B;
+      --bg-elevated: #1E293B;
+      --text-main: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --border-hairline: #263147;
+      --border-strong: #334155;
+
+      --daily-accent: #34D399;
+      --daily-accent-hover: #6EE7B7;
+      --daily-accent-soft: rgba(52, 211, 153, 0.12);
+      --daily-accent-border: rgba(52, 211, 153, 0.28);
+      --daily-on-accent: #062419;
+
+      --copper-accent: #FB923C;
+      --copper-accent-hover: #FDBA74;
+      --copper-accent-soft: rgba(251, 146, 60, 0.12);
+      --copper-accent-border: rgba(251, 146, 60, 0.28);
+      --copper-on-accent: #271204;
+
+      --warn: #FBBF24;
+      --warn-soft: rgba(251, 191, 36, 0.14);
+      --warn-border: rgba(251, 191, 36, 0.3);
+      --danger: #F87171;
+      --danger-soft: rgba(248, 113, 113, 0.14);
+      --danger-border: rgba(248, 113, 113, 0.3);
+      --success: #4ADE80;
+      --success-soft: rgba(74, 222, 128, 0.14);
+
+      --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.35);
+      --shadow-float: 0 16px 36px -6px rgba(0, 0, 0, 0.65);
+    }
+
+    [data-palette="kyoto"] {
+      --bg-canvas: #F3F2EE;
+      --bg-app: #F9F8F6;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F0EFEA;
+      --text-main: #1C1917;
+      --text-secondary: #57534E;
+      --text-muted: #A8A29E;
+      --border-hairline: #E7E5E4;
+      --daily-accent: #1F5E4B;
+      --daily-accent-soft: #EBF5F0;
+      --daily-accent-border: #B6DFD0;
+      --copper-accent: #B4532A;
+      --copper-accent-soft: #FDF3EE;
+      --copper-accent-border: #F5CBB8;
+    }
+
+    [data-palette="kyoto"][data-theme="dark"] {
+      --bg-canvas: #111110;
+      --bg-app: #171615;
+      --bg-card: #21201E;
+      --bg-subtle: #2B2927;
+      --text-main: #F5F5F4;
+      --text-secondary: #A8A29E;
+      --text-muted: #78716C;
+      --border-hairline: #33302E;
+    }
+
+    [data-palette="cobalt"] {
+      --daily-accent: #2563EB;
+      --daily-accent-hover: #1D4ED8;
+      --daily-accent-soft: #EFF6FF;
+      --daily-accent-border: #BFDBFE;
+      --copper-accent: #D97706;
+      --copper-accent-soft: #FFFBEB;
+      --copper-accent-border: #FDE68A;
+    }
+
+    [data-palette="cobalt"][data-theme="dark"] {
+      --daily-accent: #60A5FA;
+      --daily-accent-soft: rgba(96, 165, 250, 0.14);
+      --daily-accent-border: rgba(96, 165, 250, 0.3);
+      --daily-on-accent: #0B1D3A;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .font-num {
+      font-family: "Inter", "JetBrains Mono", "Noto Sans SC", sans-serif;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .surface-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-card);
+      box-shadow: var(--shadow-card);
+    }
+
+    .surface-subtle {
+      background-color: var(--bg-subtle);
+      border-radius: var(--r-control);
+    }
+
+    /* Striped pattern for future prepaid bar */
+    .bg-prepaid-stripe {
+      background-image: repeating-linear-gradient(
+        -45deg,
+        var(--warn),
+        var(--warn) 4px,
+        transparent 4px,
+        transparent 8px
+      );
+    }
+
+    /* Phone Frame styling for 4-screen board */
+    .phone-frame {
+      width: 375px;
+      min-width: 375px;
+      height: 812px;
+      background-color: var(--bg-app);
+      border-radius: 42px;
+      border: 6px solid var(--border-strong);
+      box-shadow: var(--shadow-float);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .phone-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+    }
+    .phone-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP WORKBENCH BAR -->
+  <header class="sticky top-0 z-40 backdrop-blur-md bg-white/85 dark:bg-slate-900/85 border-b border-slate-200/80 dark:border-slate-800 px-4 lg:px-8 py-3 transition-colors" style="background-color: color-mix(in srgb, var(--bg-card) 88%, transparent); border-color: var(--border-hairline);">
+    <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand & Concept Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">
+          DL
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">Concept 02 · 澄澈账本</span>
+            <h1 class="text-base font-bold tracking-tight">Daily Ledger UI/UX 重构设计工作台</h1>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">告别厚重拟物与口径混淆 · 建立「资金池层级联动 + 瀑布流向拆解 + 现代瑞士网格」</p>
+        </div>
+      </div>
+
+      <!-- Main Mode Switcher -->
+      <div class="flex items-center gap-1 p-1 rounded-xl border" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+        <button id="tab-board" onclick="switchWorkbenchView('board')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          01 · 四屏重构画板 (对比原图)
+        </button>
+        <button id="tab-interactive" onclick="switchWorkbenchView('interactive')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          02 · 全功能交互原型 (11个页面/弹层)
+        </button>
+        <button id="tab-components" onclick="switchWorkbenchView('components')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          04 · 组件功能重构实验室 (6大升级)
+        </button>
+        <button id="tab-audit" onclick="switchWorkbenchView('audit')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+          03 · 痛点诊断与 Token 规范
+        </button>
+      </div>
+
+      <!-- Theme & Palette Controls -->
+      <div class="flex items-center gap-2">
+        <select id="palette-select" onchange="changePalette(this.value)" aria-label="配色方案选择" class="text-xs font-medium px-2.5 py-1.5 rounded-lg border bg-transparent cursor-pointer" style="border-color: var(--border-hairline); color: var(--text-main); background-color: var(--bg-card);">
+          <option value="kyoto" selected>配色 B：竹青宣纸 · 轻盈雅致 (已锁定交接)</option>
+          <option value="nordic">配色 A：松石冷白 · 现代瑞士</option>
+          <option value="cobalt">配色 C：深海钴蓝 · 专业金融 (高锐度)</option>
+        </select>
+
+        <button id="theme-toggle-btn" onclick="toggleTheme()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all" style="background-color: var(--bg-card); border-color: var(--border-hairline); color: var(--text-main);">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">切换暗色</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKBENCH CONTENT -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-8 py-6">
+
+    <!-- ==========================================
+         VIEW 1: 4-SCREEN CONCEPT BOARD (Matches User's Image Layout)
+         ========================================== -->
+    <section id="view-board" class="space-y-6">
+      <!-- Summary Banner of Key Improvements -->
+      <div class="surface-card p-4 lg:p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--daily-accent);">DAILY LEDGER / MOBILE CONCEPT 02</span>
+            <span class="text-xs px-2 py-0.5 rounded-md font-medium" style="background-color: var(--bg-subtle); color: var(--text-secondary);">375px 基准 · 100% 兼容现有业务契约</span>
+          </div>
+          <h2 class="text-lg font-bold">澄澈账本 · 秩序感与资金链路可视化</h2>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            去除老旧的厚底凸起按钮与灰暗凹槽；将「本周剩余 ↔ 周期日常 ↔ 缓冲金」、「总资产 ↔ 现金两库 ↔ 库存成本」的数学包含关系直接视觉化。
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium" style="color: var(--text-secondary);">画板演示状态：</span>
+          <button id="board-state-normal" onclick="setBoardDemoState('normal')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">常规状态</button>
+          <button id="board-state-overspent" onclick="setBoardDemoState('overspent')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all">本周超支 + 提前支付态</button>
+        </div>
+      </div>
+
+      <!-- 4 Phones Horizontal Scroll / Grid -->
+      <div class="overflow-x-auto pb-4">
+        <div class="flex items-start gap-6 min-w-max mx-auto">
+
+          <!-- SCREEN 01: 生活预算首页 (MAIN) -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold">01 · 生活预算首页</span>
+              <span class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--text-muted);">daily.home · MAIN</span>
+            </div>
+            <div class="phone-frame" id="board-phone-1">
+              <!-- Status Bar -->
+              <div class="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-semibold select-none">
+                <span>9:41</span>
+                <div class="flex items-center gap-1.5">
+                  <span>5G</span>
+                  <div class="w-5 h-2.5 rounded-sm border border-current p-0.5 flex items-center"><div class="w-full h-full bg-current rounded-[1px]"></div></div>
+                </div>
+              </div>
+
+              <!-- Scrollable Content -->
+              <div class="phone-scroll px-4 pt-2 pb-24 space-y-3.5" id="board-daily-home-content">
+                <!-- Populated by JS renderBoard() -->
+              </div>
+
+              <!-- Bottom Floating Module Switcher -->
+              <div class="absolute bottom-3 left-3.5 right-3.5 p-1 rounded-full border backdrop-blur-md flex items-center shadow-lg" style="background-color: color-mix(in srgb, var(--bg-card) 92%, transparent); border-color: var(--border-hairline);">
+                <button onclick="openInteractiveAt('daily', 'home')" class="flex-1 py-2 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-all" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">
+                  <span>💳</span> 生活预算
+                </button>
+                <button onclick="openInteractiveAt('copper', 'home')" class="flex-1 py-2 rounded-full text-xs font-medium flex items-center justify-center gap-1.5 transition-all" style="color: var(--text-secondary);">
+                  <span>🪙</span> 铜钱生意
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCREEN 02: 快速记支出 (EXPENSE) -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold">02 · 快速记支出</span>
+              <span class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--text-muted);">daily.expense · SHEET</span>
+            </div>
+            <div class="phone-frame" id="board-phone-2">
+              <!-- Status Bar -->
+              <div class="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-semibold opacity-50 select-none">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <!-- Dimmed Backdrop Header -->
+              <div class="px-4 py-2 opacity-30 pointer-events-none select-none">
+                <div class="text-[11px]">10月14日 · 星期三</div>
+                <div class="text-lg font-bold">生活预算</div>
+              </div>
+
+              <!-- Bottom Sheet Container -->
+              <div class="flex-1 rounded-t-[28px] border-t flex flex-col justify-between overflow-hidden shadow-2xl" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                <div class="phone-scroll p-4 space-y-3.5" id="board-expense-sheet-content">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCREEN 03: 资金流向详情 (FLOW) -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold">03 · 资金流向详情</span>
+              <span class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--text-muted);">daily.flow · WATERFALL</span>
+            </div>
+            <div class="phone-frame" id="board-phone-3">
+              <!-- Status Bar -->
+              <div class="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-semibold select-none">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="phone-scroll px-4 pt-2 pb-6 space-y-3.5" id="board-flow-content">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SCREEN 04: 铜钱生意首页 (BUSINESS) -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-xs font-bold">04 · 铜钱生意首页</span>
+              <span class="text-[11px] font-mono uppercase tracking-wider" style="color: var(--text-muted);">copper.home · BUSINESS</span>
+            </div>
+            <div class="phone-frame" id="board-phone-4">
+              <!-- Status Bar -->
+              <div class="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-semibold select-none">
+                <span>9:41</span>
+                <span>5G 100%</span>
+              </div>
+              <div class="phone-scroll px-4 pt-2 pb-24 space-y-3.5" id="board-copper-content">
+                <!-- Populated by JS -->
+              </div>
+              <!-- Bottom Floating Module Switcher -->
+              <div class="absolute bottom-3 left-3.5 right-3.5 p-1 rounded-full border backdrop-blur-md flex items-center shadow-lg" style="background-color: color-mix(in srgb, var(--bg-card) 92%, transparent); border-color: var(--border-hairline);">
+                <button onclick="openInteractiveAt('daily', 'home')" class="flex-1 py-2 rounded-full text-xs font-medium flex items-center justify-center gap-1.5 transition-all" style="color: var(--text-secondary);">
+                  <span>💳</span> 生活预算
+                </button>
+                <button onclick="openInteractiveAt('copper', 'home')" class="flex-1 py-2 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-all" style="background-color: var(--copper-accent); color: var(--copper-on-accent);">
+                  <span>🪙</span> 铜钱生意
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 2: INTERACTIVE FULL PROTOTYPE
+         ========================================== -->
+    <section id="view-interactive" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Left Sidebar: Screen & State Inspector -->
+        <div class="lg:col-span-4 space-y-4">
+          <div class="surface-card p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold">交互式页面导航树 (11 个视图)</h3>
+              <span class="text-[11px] px-2 py-0.5 rounded-full font-medium" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">点击直接跳转</span>
+            </div>
+            <p class="text-xs" style="color: var(--text-secondary);">
+              严格对应 <code class="px-1 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700 text-[11px]">current-ui-manifest.json</code> 中的全部页面与弹层结构：
+            </p>
+
+            <!-- Daily Ledger Screens -->
+            <div class="space-y-1.5">
+              <div class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--daily-accent);">Module A · 生活预算 (DailyLedger)</div>
+              <div class="grid grid-cols-2 gap-1.5" id="nav-daily-screens">
+                <button onclick="openInteractiveAt('daily', 'home')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-home">🏠 生活预算首页</button>
+                <button onclick="openInteractiveAt('daily', 'expense')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-expense">💸 记支出 (Sheet)</button>
+                <button onclick="openInteractiveAt('daily', 'income')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-income">💰 收入分配 (Sheet)</button>
+                <button onclick="openInteractiveAt('daily', 'calibration')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-calibration">⚖️ 余额校准 (Sheet)</button>
+                <button onclick="openInteractiveAt('daily', 'fixed')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-fixed">🏦 固定支出 (Sheet)</button>
+                <button onclick="openInteractiveAt('daily', 'cycle')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-cycle">📊 周期详情 (Page)</button>
+                <button onclick="openInteractiveAt('daily', 'history')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-history">📜 历史流水 (Page)</button>
+                <button onclick="openInteractiveAt('daily', 'flow')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="daily-flow">🌊 资金流向 (Overlay)</button>
+                <button onclick="openInteractiveAt('daily', 'settings')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all col-span-2" data-nav="daily-settings">⚙️ 预算设置与整站备份 (daily.settings)</button>
+              </div>
+            </div>
+
+            <!-- Copper Shop Screens -->
+            <div class="space-y-1.5 pt-2 border-t" style="border-color: var(--border-hairline);">
+              <div class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--copper-accent);">Module B · 铜钱生意 (CopperShop)</div>
+              <div class="grid grid-cols-2 gap-1.5" id="nav-copper-screens">
+                <button onclick="openInteractiveAt('copper', 'home')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="copper-home">🏮 铜钱生意首页</button>
+                <button onclick="openInteractiveAt('copper', 'sale')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="copper-sale">➕ 记销售 (Sheet)</button>
+                <button onclick="openInteractiveAt('copper', 'purchase')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="copper-purchase">📦 记进货 (Sheet)</button>
+                <button onclick="openInteractiveAt('copper', 'monthly')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all" data-nav="copper-monthly">📅 月度经营汇总</button>
+                <button onclick="openInteractiveAt('copper', 'settings')" class="text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all col-span-2" data-nav="copper-settings">🛠️ 铜钱配置与库存盘点 (copper.settings)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edge Case / State Simulator -->
+          <div class="surface-card p-4 space-y-3">
+            <h3 class="text-sm font-bold">边界状态模拟器 (State Contracts)</h3>
+            <p class="text-xs" style="color: var(--text-secondary);">测试重构 UI 在不同业务边界下的视觉表现：</p>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span>生活预算周期状态</span>
+                <div class="flex gap-1">
+                  <button onclick="setSimState('cycleMode', 'normal')" id="sim-cycle-normal" class="px-2.5 py-1 rounded-md border font-medium">正常剩余</button>
+                  <button onclick="setSimState('cycleMode', 'overspent')" id="sim-cycle-overspent" class="px-2.5 py-1 rounded-md border font-medium">本周超支</button>
+                  <button onclick="setSimState('cycleMode', 'empty')" id="sim-cycle-empty" class="px-2.5 py-1 rounded-md border font-medium">无周期态</button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span>资金流向详情降级态</span>
+                <div class="flex gap-1">
+                  <button onclick="setSimState('flowMode', 'full')" id="sim-flow-full" class="px-2 py-1 rounded-md border font-medium">完整快照</button>
+                  <button onclick="setSimState('flowMode', 'gap')" id="sim-flow-gap" class="px-2 py-1 rounded-md border font-medium">资金缺口</button>
+                  <button onclick="setSimState('flowMode', 'legacy')" id="sim-flow-legacy" class="px-2 py-1 rounded-md border font-medium">旧记录缺快照</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center / Right: Live Interactive Phone + Context Notes -->
+        <div class="lg:col-span-8 flex flex-col md:flex-row items-center md:items-start justify-center gap-6">
+          <!-- Interactive Phone -->
+          <div class="phone-frame" id="interactive-phone">
+            <!-- Status Bar -->
+            <div class="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-semibold select-none">
+              <span>9:41</span>
+              <div class="flex items-center gap-1.5">
+                <span>5G</span>
+                <div class="w-5 h-2.5 rounded-sm border border-current p-0.5 flex items-center"><div class="w-full h-full bg-current rounded-[1px]"></div></div>
+              </div>
+            </div>
+
+            <!-- Dynamic Screen Body -->
+            <div class="phone-scroll px-4 pt-2 pb-24 space-y-3.5 relative" id="interactive-body">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Dynamic Overlay / Bottom Sheet Portal inside Phone -->
+            <div id="interactive-overlay" class="hidden absolute inset-0 z-30 flex flex-col justify-end" style="background-color: rgba(15, 23, 42, 0.48); backdrop-filter: blur(2px);">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Toast inside Phone -->
+            <div id="interactive-toast" class="hidden absolute bottom-20 left-6 right-6 z-40 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-900/95 shadow-xl flex items-center justify-between">
+              <span id="interactive-toast-text">已保存记录</span>
+              <span class="text-emerald-400">✓</span>
+            </div>
+
+            <!-- Floating Module Switcher -->
+            <div id="interactive-tabbar" class="absolute bottom-3 left-3.5 right-3.5 p-1 rounded-full border backdrop-blur-md flex items-center shadow-lg z-20" style="background-color: color-mix(in srgb, var(--bg-card) 92%, transparent); border-color: var(--border-hairline);">
+              <button id="interactive-tab-daily" onclick="openInteractiveAt('daily', 'home')" class="flex-1 py-2 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-all">
+                <span>💳</span> 生活预算
+              </button>
+              <button id="interactive-tab-copper" onclick="openInteractiveAt('copper', 'home')" class="flex-1 py-2 rounded-full text-xs font-medium flex items-center justify-center gap-1.5 transition-all">
+                <span>🪙</span> 铜钱生意
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Card: Design Rationale for Current Active Screen -->
+          <div class="flex-1 w-full max-w-md surface-card p-5 space-y-4" id="screen-rationale-card">
+            <!-- Populated dynamically based on current active screen -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 3: COMPONENT FUNCTIONAL LAB (6 Interactive Upgraded Components)
+         ========================================== -->
+    <section id="view-components" class="hidden space-y-6">
+      <div class="surface-card p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1">
+          <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--daily-accent);">COMPONENT ARCHITECTURE & FUNCTIONAL UPGRADES</span>
+          <h2 class="text-lg font-bold">6 个核心组件的功能重构与交互实验室</h2>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            基于 <code>current-ui-manifest.json</code> 暴露出的组件层短板（如字符串匹配弹层、算式输入缺失、分润比例需手动凑100%、历史流水无筛选等），可直接在下方交互体验升级后的组件功能：
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Upgrade 1: SmartMoneyInput with Inline Expression Evaluator + Copper Profit Split -->
+        <div class="surface-card p-5 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">组件重构 01 · NumberField ➔ SmartMoneyInput</span>
+              <h3 class="text-sm font-bold mt-1.5">行内算式求值 + 快捷筹码 + 铜钱毛利/库存实时校验</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">DailyLedger / CopperShop</span>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            <strong>原版痛点</strong>：原生 <code>input[inputmode=decimal]</code> 无法算账（如聚餐立减 <code>128-15</code> 或多件合算 <code>38+16.5</code> 需切出 App 按计算器）；铜钱销售输入成本时无实时毛利率与超库存预警。<br/>
+            <strong>重构功能</strong>：支持直接输入加减算式实时求值、一键累加常用金额筹码，并在铜钱销售中实时联动 7:3 分润与库存成本上限校验。
+          </p>
+
+          <!-- Interactive Demo Box -->
+          <div class="p-4 rounded-2xl border space-y-3" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold">试一试：输入算式（如 <code>38+15-5</code>）或点快捷筹码</span>
+              <span id="lab-expr-preview" class="text-xs font-mono font-bold px-2 py-0.5 rounded" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">= ¥50.00</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="lab-smart-input" type="text" value="38+12" oninput="evalLabSmartInput()" aria-label="支持算式的金额输入" class="flex-1 px-3 py-2 rounded-xl border font-num text-base font-extrabold outline-none" style="background-color: var(--bg-card); border-color: var(--border-strong);" placeholder="输入金额或算式，如 120+35" />
+              <button onclick="applyLabExpr()" class="px-3 py-2 rounded-xl text-xs font-bold shrink-0" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">合并求值 (=)</button>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="appendLabChip('+10')" class="px-2.5 py-1 rounded-lg border text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">+¥10</button>
+              <button onclick="appendLabChip('+50')" class="px-2.5 py-1 rounded-lg border text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">+¥50</button>
+              <button onclick="appendLabChip('+100')" class="px-2.5 py-1 rounded-lg border text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">+¥100</button>
+              <button onclick="appendLabChip('-5')" class="px-2.5 py-1 rounded-lg border text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">-¥5 (优惠减免)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upgrade 2: RatioSplitControl for Copper Settings -->
+        <div class="surface-card p-5 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--copper-accent-soft); color: var(--copper-accent);">组件重构 02 · 双输入框 ➔ RatioSplitControl</span>
+              <h3 class="text-sm font-bold mt-1.5">流动库 / 存储库 100% 恒等联动滑块组件</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">copper.settings</span>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            <strong>原版痛点</strong>：<code>copper.settings</code> 用两个独立输入框分别填「流动库%」和「存储库%」，再校验和是否为 100——改一个必须手动算另一个，否则报错。<br/>
+            <strong>重构功能</strong>：改为单滑块 + 预设比例一键切换，调整一端时另一端自动互补为 <code>100% - X%</code>，并实时预演每 ¥1,000 毛利的分润去向。
+          </p>
+
+          <!-- Interactive Demo Box -->
+          <div class="p-4 rounded-2xl border space-y-3" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <div class="flex items-center justify-between text-xs font-bold">
+              <span style="color: var(--copper-accent);">💳 流动库：<span id="lab-ratio-liquid" class="font-num text-sm">70%</span></span>
+              <span style="color: var(--text-secondary);">🔒 存储库：<span id="lab-ratio-reserve" class="font-num text-sm">30%</span></span>
+            </div>
+            <input id="lab-ratio-slider" type="range" min="0" max="100" step="5" value="70" oninput="updateLabRatio(this.value)" aria-label="流动库与存储库分润比例滑块" class="w-full cursor-pointer accent-amber-600" />
+            <div class="flex items-center justify-between text-[11px]" style="color: var(--text-secondary);">
+              <span id="lab-ratio-sim">每 ¥1,000 毛利：流动库 +¥700 · 存储库 +¥300</span>
+              <div class="flex gap-1">
+                <button onclick="updateLabRatio(70)" class="px-2 py-0.5 rounded border text-[10px] font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">7:3 常规</button>
+                <button onclick="updateLabRatio(50)" class="px-2 py-0.5 rounded border text-[10px] font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">5:5 稳健</button>
+                <button onclick="updateLabRatio(100)" class="px-2 py-0.5 rounded border text-[10px] font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">全回流</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upgrade 3: Filterable TransactionList + Two-Stage Inline Delete -->
+        <div class="surface-card p-5 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">组件重构 03 · TransactionEventRow & HistoryFilter</span>
+              <h3 class="text-sm font-bold mt-1.5">多维口袋筛选器 + 防误触二次确认行操作</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">daily.history / recentEvents</span>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            <strong>原版痛点</strong>：<code>daily.history</code> 只有「加载更多 20 条」，没有按口袋（哪些开销动用了缓冲金？哪些是提前支付？）或关键词过滤；每行右侧常驻独立删除键极易滑动误触。<br/>
+            <strong>重构功能</strong>：顶部增加「资金口袋/类型筛选胶囊」，并将右侧裸露删除键改为<strong>「点击展开二次确认滑块」</strong>，兼顾安全与清爽。
+          </p>
+
+          <!-- Interactive Demo Box -->
+          <div class="p-4 rounded-2xl border space-y-2.5" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button onclick="setLabHistoryFilter('all')" id="lab-flt-all" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border">全部 (3)</button>
+              <button onclick="setLabHistoryFilter('buffer')" id="lab-flt-buffer" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border">动用缓冲金 (2)</button>
+              <button onclick="setLabHistoryFilter('prepaid')" id="lab-flt-prepaid" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border">提前支付 (1)</button>
+            </div>
+            <div id="lab-history-list" class="space-y-1.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Upgrade 4: BackupSection with Dry-Run Diff Preview & Health Indicator -->
+        <div class="surface-card p-5 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--copper-accent-soft); color: var(--copper-accent);">组件重构 04 · BackupSection ➔ SafeBackupGuard</span>
+              <h3 class="text-sm font-bold mt-1.5">本地存储健康度感知 + 导入覆盖前「差异预检 (Dry-Run)」</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">components/ui/Ui.tsx</span>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            <strong>原版痛点</strong>：纯 <code>localStorage</code> 无云同步，但首页无备份久远提醒；且 JSON/Excel 恢复会直接全量替换，选错旧文件会导致近期账目瞬间被冲掉。<br/>
+            <strong>重构功能</strong>：记录 <code>lastBackupAt</code> 并在超期时于设置图标展示温和提醒点；导入文件后先解析展示<strong>「导入文件 vs 当前本地账本」条数与最新日期对比卡</strong>，确认无误再落盘。
+          </p>
+
+          <!-- Interactive Demo Box -->
+          <div class="p-4 rounded-2xl border space-y-2.5" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold">📦 模拟导入 <code>daily-backup-2026-10.json</code> 预检对比：</span>
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold" style="background-color: var(--warn-soft); color: var(--warn);">发现差异 · 需确认</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">当前浏览器账本</div>
+                <div class="font-bold mt-0.5">生活 42 笔 · 生意 18 笔</div>
+                <div class="text-[10px]" style="color: var(--text-secondary);">最新记录：10月14日 16:20</div>
+              </div>
+              <div class="p-2.5 rounded-xl border" style="background-color: var(--daily-accent-soft); border-color: var(--daily-accent-border);">
+                <div class="text-[10px]" style="color: var(--daily-accent);">待恢复备份文件</div>
+                <div class="font-bold mt-0.5">生活 39 笔 · 生意 18 笔</div>
+                <div class="text-[10px]" style="color: var(--warn);">⚠️ 比当前少 3 笔最新记录</div>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="alertToast('已先自动下载当前快照，再执行恢复！')" class="flex-1 py-2 rounded-xl text-xs font-bold" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">先备份当前并继续恢复</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upgrade 5: Declarative Overlay + History Popstate & Drag-to-Dismiss -->
+        <div class="surface-card p-5 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">组件重构 05 · Overlay & BottomSheet 解耦</span>
+              <h3 class="text-sm font-bold mt-1.5">废除「按中文标题猜容器」+ 补齐下滑手势与物理返回键拦截</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">Ui.tsx / DailyLedger.tsx</span>
+          </div>
+          <ul class="space-y-1.5 text-xs" style="color: var(--text-secondary);">
+            <li>● <strong>架构解耦</strong>：现在 <code>BottomSheet</code> 靠判断中文标题来决定是 <code>sheet</code> 还是 <code>page</code>，并遍历 <code>children</code> 抽取主按钮。重构为显式 Props：<code>&lt;Overlay variant="sheet" title="记支出" footer={&lt;SubmitButton /&gt;}&gt;</code>，两个模块彻底共用一套弹层。</li>
+            <li>● <strong>真·手势与路由栈</strong>：为顶部 <code>handle</code> 绑定 <code>onPointerDown/Move</code> 下拉阻尼关闭；弹层打开时压入 <code>window.history.pushState({ overlay: id })</code>，手机左滑返回时优雅关闭当前弹层而非直接退出网页。</li>
+          </ul>
+        </div>
+
+        <!-- Upgrade 6: Keep-Alive Module Switcher & Cross-Tab Dirty Guard -->
+        <div class="surface-card p-5 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded" style="background-color: var(--copper-accent-soft); color: var(--copper-accent);">组件重构 06 · LedgerApp 模块状态保活</span>
+              <h3 class="text-sm font-bold mt-1.5">双账本切换保活（Keep-Alive）+ 跨模块快速划转联动</h3>
+            </div>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">App.tsx / LedgerApp</span>
+          </div>
+          <ul class="space-y-1.5 text-xs" style="color: var(--text-secondary);">
+            <li>● <strong>消除卸载丢状态</strong>：<code>current-ui-manifest.json</code> 指出切换底部导航会直接 Unmount 前一模块。改为双容器 CSS 保活或状态提升，切去「铜钱生意」看一眼利润再切回「生活预算」时，滚动位置与草稿完好无损。</li>
+            <li>● <strong>生意分红转入生活预算（可选快捷联动）</strong>：当铜钱生意「存储库」沉淀利润后，可在存储库卡片提供「提现分红至生活预算 -> 自动预填零散收入/主要收入」的跨模块桥接动作。</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==========================================
+         VIEW 3: UX AUDIT & CODEX HANDOFF SPEC
+         ========================================== -->
+    <section id="view-audit" class="hidden space-y-6">
+      <!-- 0. One-Click Codex Handoff Export Bar -->
+      <div class="surface-card p-5 border-2 flex flex-wrap items-center justify-between gap-4" style="border-color: var(--daily-accent-border); background-color: var(--daily-accent-soft);">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">READY FOR CODEX</span>
+            <h2 class="text-base font-extrabold">AI Codex 完整重构交接包（已锁定「配色 B：竹青宣纸」+ 6 大组件升级）</h2>
+          </div>
+          <p class="text-xs" style="color: var(--text-secondary);">
+            你可以直接点击右侧按钮下载 <code>codex-refactor-spec.md</code> 与 <code>redesign-ui-manifest.json</code> 放入项目根目录，或直接复制下方指令发给 Codex 执行。
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="downloadHandoffFile('spec')" class="px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">
+            ⬇️ 下载 codex-refactor-spec.md
+          </button>
+          <button onclick="downloadHandoffFile('manifest')" class="px-3.5 py-2 rounded-xl text-xs font-bold border transition-all" style="background-color: var(--bg-card); border-color: var(--border-hairline); color: var(--text-main);">
+            ⬇️ 下载 redesign-ui-manifest.json
+          </button>
+        </div>
+      </div>
+
+      <!-- 1. Comprehensive UI/UX Critique Table -->
+      <div class="surface-card p-6 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--daily-accent);">PART 1 · 深度体验诊断</span>
+            <h2 class="text-lg font-bold mt-0.5">为什么现在的「温润触控」界面容易看腻且不够直观？</h2>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b" style="border-color: var(--border-hairline); color: var(--text-secondary);">
+                <th class="py-2.5 pr-4 font-semibold">诊断维度</th>
+                <th class="py-2.5 px-4 font-semibold">现有设计（温润触控 Concept 01）痛点</th>
+                <th class="py-2.5 pl-4 font-semibold">重构方案（澄澈账本 Concept 02）改进点</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y" style="border-color: var(--border-hairline);">
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">1. 色彩与质感疲劳</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);">全屏笼罩在偏黄的燕麦灰底（<code>#ECE7DF</code>）与米白卡（<code>#FBF8F3</code>）中，明度差极小；加上厚重的内阴影凹槽（<code>sunken</code>）和底部凸起厚边，视觉发闷、有年代感。</td>
+                <td class="py-3 pl-4">采用<strong>高对比度澄澈纸感（<code>#F8FAFC</code> + 纯白卡片 + 1px 精细描边）</strong>，移除厚重拟物凹凸槽，用色彩语义（松石绿/赤陶橙）与字重拉开层级，久看不腻。</td>
+              </tr>
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">2. 资金口径关系隐晦</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);">首页主卡里「本周剩余 ¥682」、「周期日常剩余 ¥2,682」、「缓冲金 ¥1,500」平铺在一起，看不出「本周额度属于周期日常的一部分，而缓冲金是超支保护层」。</td>
+                <td class="py-3 pl-4">设计<strong>「主额度 + 下挂周期池条带」双层结构</strong>：上方聚焦本周可用与进度，下方用联结式子栏明确标示「周期池余量」与「安全缓冲垫」，一眼看懂兜底关系。</td>
+              </tr>
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">3. 首页操作区碎片化</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);">左侧一个巨大正方形「+ 记一笔」，右侧挤着需左右滑动切换的「待处理 / 固定预留」小卡片，下方又排 3 个胶囊按钮，动线割裂且隐藏了固定预留关键信息。</td>
+                <td class="py-3 pl-4">整合为<strong>「主记账动作栏 + 三大快捷入口」</strong>，并将「待处理 & 固定预留」升级为<strong>一屏直读的双栏状态看板</strong>，无需盲滑小圆点即可同时看清待付笔数与预留金额。</td>
+              </tr>
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">4. 每周消耗槽像「盲盒」</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);">4 个粗大的灰色垂直凹槽没有周次文字、没有日期、没有剩余数字，像一排未标注的电池格，无法直观感知周期节奏。</td>
+                <td class="py-3 pl-4">重构为<strong>「周期微缩时间轴（Weekly Rhythm Cards）」</strong>：每周独立展示周次标签（W1–W4）、当前周高亮、已花实心条 + 提前支付斜纹条 + 剩余金额。</td>
+              </tr>
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">5. 资金流向缺乏「流向感」</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);"><code>daily.flow</code> 把「本周预算 -682」和「缓冲金 -118」画成两个孤立的大白框套灰框，像两道孤立算术题，看不出「先扣光本周预算、再用缓冲金补足」的级联顺序。</td>
+                <td class="py-3 pl-4">引入<strong>「级联瀑布流（Waterfall Flow）」</strong>：左侧贯穿式步骤轴（① 优先扣减 → ② 差额补足），配合口袋损耗进度条（原余额 ➔ 扣减 ➔ 新余额），来龙去脉一目了然。</td>
+              </tr>
+              <tr>
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">6. 铜钱生意资产结构脱节</td>
+                <td class="py-3 px-4" style="color: var(--text-secondary);">上方卡片写「总资产 28,460 = 现金 18,460 + 库存 10,000」，下方又单独摆两张「流动库 12,920」「存储库 5,540」，需要心算才明白下方两张卡加起来就是上面的现金合计。</td>
+                <td class="py-3 pl-4">重构为<strong>「资产树状总览卡」</strong>：顶部增加「现金 65% : 库存 35%」比例条，并将「流动库 (70%) + 存储库 (30%)」直接内嵌在「现金合计」分支下，数学恒等式无需心算。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Ready-to-Use CSS Tokens & Codex Refactor Prompt -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="surface-card p-6 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--daily-accent);">PART 2 · DESIGN TOKENS</span>
+              <h3 class="text-base font-bold">可直接替换 <code>index.css</code> 的全新视觉变量</h3>
+            </div>
+            <button onclick="copyCodeBlock('css-tokens-code')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">复制 CSS Tokens</button>
+          </div>
+          <pre id="css-tokens-code" class="p-4 rounded-xl text-[11px] font-mono overflow-x-auto leading-relaxed" style="background-color: var(--bg-subtle); color: var(--text-main);">/* ============================================================================
+   Daily Ledger · Concept 02 重构视觉变量 (配色 B：竹青宣纸 · 轻盈雅致 / Kyoto Washi)
+   可直接替换 index.css 中的 :root 与暗色/模块覆盖变量
+   ============================================================================ */
+
+:root {
+  /* 基础表面：温润极浅宣纸白 + 纯白卡片 + 1px 精细描边（告别原本暗沉发黄的 #ECE7DF） */
+  --bg: #F9F8F6;
+  --bg-canvas: #F3F2EE;
+  --card: #FFFFFF;
+  --subtle: #F0EFEA;
+  --text: #1C1917;
+  --muted: #57534E;
+  --text-faint: #A8A29E;
+
+  /* 生活预算模块强调色（竹青 / 深松绿） */
+  --accent: #1F5E4B;
+  --accent-hi: #17493A;
+  --on-accent: #FFFFFF;
+  --accent-soft: #EBF5F0;
+  --accent-border: #B6DFD0;
+
+  /* 语义状态色 */
+  --warn: #D97706;
+  --warn-soft: #FEF3C7;
+  --warn-border: #FDE68A;
+  --neg: #DC2626;
+  --neg-soft: #FEF2F2;
+  --neg-border: #FECACA;
+  --pos: #16A34A;
+  --pos-soft: #F0FDF4;
+
+  /* 边框、轨道与去拟物化阴影（移除旧版厚重内阴影凹槽） */
+  --line: #E7E5E4;
+  --line-strong: #D6D3D1;
+  --track: #E7E5E4;
+  --scrim: rgba(28, 25, 23, 0.48);
+  --raise: 0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px -2px rgba(28, 25, 23, 0.03);
+  --sunken: inset 0 0 0 1px #E7E5E4;
+
+  /* 字体与圆角尺度 */
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "HarmonyOS Sans SC", system-ui, sans-serif;
+  --font-num: "Inter", "JetBrains Mono", "SF Pro Rounded", "Noto Sans SC", system-ui, sans-serif;
+  --r-card: 20px;
+  --r-control: 14px;
+  --r-key: 14px;
+  --r-sheet: 28px;
+  --r-pill: 999px;
+  --hit: 44px;
+  --ease-sheet: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 铜钱生意模块覆盖（亮色：赤陶柿红） */
+[data-module="copper"],
+.module-copper {
+  --accent: #B4532A;
+  --accent-hi: #96421E;
+  --on-accent: #FFFFFF;
+  --accent-soft: #FDF3EE;
+  --accent-border: #F5CBB8;
+}
+
+/* 暗色模式覆盖（玄墨宣纸 Dark） */
+[data-theme="dark"],
+.theme-dark {
+  --bg: #171615;
+  --bg-canvas: #111110;
+  --card: #21201E;
+  --subtle: #2B2927;
+  --text: #F5F5F4;
+  --muted: #A8A29E;
+  --text-faint: #78716C;
+
+  --accent: #4ADE80;
+  --accent-hi: #86EFAC;
+  --on-accent: #072617;
+  --accent-soft: rgba(74, 222, 128, 0.12);
+  --accent-border: rgba(74, 222, 128, 0.28);
+
+  --warn: #FBBF24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --warn-border: rgba(251, 191, 36, 0.3);
+  --neg: #F87171;
+  --neg-soft: rgba(248, 113, 113, 0.14);
+  --neg-border: rgba(248, 113, 113, 0.3);
+  --pos: #4ADE80;
+  --pos-soft: rgba(74, 222, 128, 0.14);
+
+  --line: #33302E;
+  --line-strong: #44403C;
+  --track: #33302E;
+  --scrim: rgba(0, 0, 0, 0.65);
+  --raise: 0 2px 10px rgba(0, 0, 0, 0.4);
+  --sunken: inset 0 0 0 1px #33302E;
+}
+
+/* 暗色模式 + 铜钱生意覆盖 */
+[data-theme="dark"][data-module="copper"],
+.theme-dark .module-copper {
+  --accent: #FB923C;
+  --accent-hi: #FDBA74;
+  --on-accent: #271204;
+  --accent-soft: rgba(251, 146, 60, 0.13);
+  --accent-border: rgba(251, 146, 60, 0.28);
+}
+
+/* 提前支付斜纹进度条通用工具类 */
+.bg-prepaid-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--warn),
+    var(--warn) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}</pre>
+        </div>
+
+        <div class="surface-card p-6 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider" style="color: var(--copper-accent);">PART 3 · AI CODEX 交接指令</span>
+              <h3 class="text-base font-bold">一键发给 AI Codex 的重构 Prompt</h3>
+            </div>
+            <button onclick="copyCodeBlock('codex-prompt-code')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">复制重构指令</button>
+          </div>
+          <pre id="codex-prompt-code" class="p-4 rounded-xl text-[11px] font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap" style="background-color: var(--bg-subtle); color: var(--text-main);">请读取项目中的 `codex-refactor-spec.md` 与 `redesign-ui-manifest.json`（保留 `current-ui-manifest.json` 的全部业务契约与 `lib/` 计算函数），将 Daily Ledger 重构为「Concept 02 · 澄澈账本（配色 B：竹青宣纸 Kyoto Washi）」并落地 6 项组件功能升级：
+
+1. 全局视觉 Token 替换 (index.css)：
+   - 亮色采用竹青宣纸色系：背景 `--bg: #F9F8F6`、纯白卡片 `--card: #FFFFFF`、次级底 `--subtle: #F0EFEA`、正文 `--text: #1C1917`、辅助字 `--muted: #57534E`、1px 边框 `--line: #E7E5E4`；生活预算强调色 `--accent: #1F5E4B`（浅底 `#EBF5F0`），铜钱生意强调色 `--accent: #B4532A`（浅底 `#FDF3EE`）。
+   - 暗色采用玄墨宣纸色系：`--bg: #171615`、`--card: #21201E`、`--subtle: #2B2927`、`--line: #33302E`，生活强调色 `#4ADE80`，生意强调色 `#FB923C`。
+   - 移除旧版厚重的内阴影凹槽与按钮立面厚底，统一为 `--r-card: 20px`、`--r-control: 14px`、`--sunken: inset 0 0 0 1px var(--line)`。
+
+2. 基础外壳与通用组件升级 (App.tsx & components/ui/Ui.tsx)：
+   - [组件升级 1 · Keep-Alive 保活切换]：`LedgerApp` 同时挂载 `DailyLedger` 与 `CopperShop`，通过 `hidden` 类切换显隐，避免切换底部 Tab 时丢失未保存的表单草稿与滚动位置；支持将铜钱生意存储库分红一键预填至生活预算收入弹层。
+   - [组件升级 2 · 声明式 Overlay + 手势与返回栈]：`Overlay` 与 `BottomSheet` 显式接收 `variant="sheet" | "page" | "confirm"` 与 `footer` 插槽（废除按中文标题匹配）；为 `sheet` 顶部拖拽条绑定下拉阻尼关闭手势（`deltaY > 90px` 触发 `requestClose`），并在打开弹层时同步 `history.pushState` / `popstate` 拦截手机物理返回键。
+   - [组件升级 3 · SafeBackupGuard 备份健康度与预检]：在 `localStorage` 记录上次导出备份时间戳（超 7 天在首页设置按钮显示温和提醒点）；导入 JSON/Excel 覆盖前，在确认弹窗中对比「当前浏览器账本 vs 待导入文件」的笔数与最新日期，支持「先自动导出当前备份再恢复」。
+
+3. 生活预算模块重构 (components/DailyLedger.tsx)：
+   - [组件升级 4 · SmartMoneyInput]：主金额输入框支持直接输入加减算式（如 `38+12-5`）实时求值并展示 `= ¥45.00` 徽章，下方配 `+¥10 / +¥50 / +¥100 / -¥5` 快捷筹码；金额框右侧实时显示当前选中类别的扣款规则标签；日期与备注改为紧凑双列同行布局。
+   - [首页主卡 weekHero 双层联动]：上半层突出「本周剩余 + 已用/额度 + 进度条 + 日均可用」；下半层内嵌「所属周期资金池底座」，并排展示「周期日常剩余」「安全缓冲金（兜底池）」及提前支付入口胶囊。
+   - [操作台与双栏状态看板]：将「+ 记一笔」与「收入分配 / 余额校准 / 固定支出」整合为 12 列紧凑网格；将「待处理事项 / 固定预留池」升级为无需盲滑圆点的直读分段看板。
+   - [每周预算节奏微缩时间轴]：每列展示周次（W1–W4）、本周高亮徽章、起始日、垂直堆叠槽（实心已花 + `.bg-prepaid-stripe` 提前支付斜纹）及各周剩余金额。
+   - [组件升级 5 · 历史流水筛选与防误触删除]：`daily.history` 顶部增加「全部 / 动用缓冲或储备 / 提前支付 / 大额」筛选胶囊与关键词搜索；`TransactionEventRow` 右侧删除改为点击展开二次确认，避免滑动误触。
+   - [资金流向瀑布流 TransactionFlowDetail]：用左侧带序号 `1 -> 2` 的纵向连接线串联各扣款口袋，清晰呈现「原余额 -> 本次扣减 -> 扣款后新余额」，完整保留旧记录缺快照与未覆盖缺口的降级契约。
+
+4. 铜钱生意模块重构 (components/CopperShop.tsx)：
+   - [树状资产恒等式总览卡]：顶部展示总资产与「现金合计 vs 库存成本」双色比例条，下半层直接内嵌「流动库 (70%) + 存储库 (30%)」作为现金合计的子级拆解，让 `12,920 + 5,540 = 18,460` 一目了然。
+   - [记销售实时毛利与库存校验]：`copper.sale` 输入售价与成本时，实时展示毛利额、毛利率（%）及两库分润预览；若成本超过当前库存成本立即行内高亮预警。
+   - [组件升级 6 · RatioSplitControl 恒等联动滑块]：`copper.settings` 的两库比例改为双向恒等滑块 + `7:3 / 5:5 / 全回流` 预设按钮，修改一端自动互补为 `100% - X%`，并展示每 ¥1,000 毛利的分账预览。</pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // STATE & DATA (100% Grounded in current-ui-manifest.json & Screenshots)
+    // =========================================================================
+    const state = {
+      workbenchView: 'board', // 'board' | 'interactive' | 'audit'
+      theme: 'light',         // 'light' | 'dark'
+      palette: 'kyoto',      // 'nordic' | 'kyoto' | 'cobalt'
+      boardDemoState: 'normal', // 'normal' | 'overspent'
+
+      // Interactive Prototype Navigation
+      activeModule: 'daily',  // 'daily' | 'copper'
+      activeScreen: 'home',   // 'home' | 'expense' | 'income' | 'calibration' | 'fixed' | 'cycle' | 'history' | 'flow' | 'settings' | 'sale' | 'purchase' | 'monthly'
+      summaryTab: 'pending',  // 'pending' | 'fixed'
+      copperTrendTab: 'profit', // 'profit' | 'inventory'
+      showCancelledSales: true,
+
+      // Simulator Modes
+      cycleMode: 'normal',    // 'normal' | 'overspent' | 'empty'
+      flowMode: 'full',       // 'full' | 'gap' | 'legacy'
+
+      // Expense Form State
+      expenseForm: {
+        amount: '38.00',
+        category: 'dining',
+        date: '2026-10-14',
+        note: '午餐',
+        isPrepaid: false,
+        effectiveDate: '2026-10-21'
+      },
+
+      // Income Form State
+      incomeForm: {
+        kind: 'main',
+        amount: '12000.00',
+        date: '2026-10-15',
+        note: '10月主薪资入账'
+      },
+
+      // Calibration Form State
+      calibrationForm: {
+        actualSpendable: '7350.00'
+      },
+
+      // Copper Sale Form State
+      saleForm: {
+        amount: '1280.00',
+        cost: '780.00',
+        date: '2026-10-14',
+        note: '乾隆通宝母钱一对',
+        isPending: true
+      },
+
+      // Daily Ledger Data
+      dailyData: {
+        weekRemaining: 682.00,
+        weekSpent: 318.00,
+        weekAllowance: 1000.00,
+        cycleSpendable: 2682.00,
+        buffer: 1500.00,
+        fixedReserved: 3200.00,
+        reserve: 18500.00,
+        reserveGoal: 30000.00,
+        prepaidTotal: 120.00,
+        weeks: [
+          { id: 'W1', label: '第1周', range: '10.12–10.18', status: 'current', spent: 318, prepaid: 0, allowance: 1000, rem: 682 },
+          { id: 'W2', label: '第2周', range: '10.19–10.25', status: 'future', spent: 0, prepaid: 120, allowance: 1000, rem: 880 },
+          { id: 'W3', label: '第3周', range: '10.26–11.01', status: 'future', spent: 0, prepaid: 0, allowance: 1000, rem: 1000 },
+          { id: 'W4', label: '第4周', range: '11.02–11.12', status: 'future', spent: 0, prepaid: 0, allowance: 1000, rem: 1000 }
+        ],
+        recentEvents: [
+          { id: 'ev1', type: 'unplanned', catLabel: '计划外', title: '临时维修', date: '10月14日 16:20', amount: -800.00, pockets: ['本周预算 ¥682', '缓冲金 ¥118'], isPrepaid: false },
+          { id: 'ev2', type: 'dining', catLabel: '外食', title: '午餐 · 商务简餐', date: '10月14日 12:30', amount: -38.00, pockets: ['本周预算 ¥38'], isPrepaid: false },
+          { id: 'ev3', type: 'daily', catLabel: '日常', title: '下周音乐会早鸟票', date: '10月13日付款', effectiveDate: '10月21日归属', amount: -120.00, pockets: ['缓冲金预垫 ¥120'], isPrepaid: true }
+        ],
+        fixedItems: [
+          { id: 'fx1', name: '房租与物业', amount: 2600, dueDay: 18, paid: false },
+          { id: 'fx2', name: '宽带与云服务订阅', amount: 200, dueDay: 20, paid: false },
+          { id: 'fx3', name: '通勤地铁月卡', amount: 400, dueDay: 5, paid: true }
+        ]
+      },
+
+      // Copper Business Data
+      copperData: {
+        totalAssets: 28460.00,
+        cashTotal: 18460.00,
+        inventoryCost: 10000.00,
+        liquidBalance: 12920.00,
+        liquidRatio: 70,
+        reserveBalance: 5540.00,
+        reserveRatio: 30,
+        rev30d: 8620,
+        profit30d: 2460,
+        invDelta30d: -1200,
+        transactions: [
+          { id: 'cp1', type: 'sale', status: 'pending', title: '咸丰重宝当五十 · 评级币', date: '10月14日', amount: 1680, cost: 1100, profit: 580, daysLeft: 7 },
+          { id: 'cp2', type: 'sale', status: 'confirmed', title: '康熙通宝罗汉钱', date: '10月12日', amount: 960, cost: 620, profit: 340 },
+          { id: 'cp3', type: 'purchase', status: 'confirmed', title: '秋季钱币交流会拿货（8枚）', date: '10月10日', amount: -2400, cost: 2400, profit: 0 },
+          { id: 'cp4', type: 'sale', status: 'cancelled', title: '崇宁重宝（买家退回）', date: '10月08日', amount: 520, cost: 380, profit: 140 }
+        ]
+      }
+    };
+
+    // =========================================================================
+    // COMPONENT HELPERS
+    // =========================================================================
+    function renderDailyHomeHTML(isBoard = false) {
+      const d = state.dailyData;
+      const isOverspent = (isBoard && state.boardDemoState === 'overspent') || (!isBoard && state.cycleMode === 'overspent');
+      const isEmptyCycle = !isBoard && state.cycleMode === 'empty';
+
+      const weekRem = isOverspent ? 0 : d.weekRemaining;
+      const weekSpent = isOverspent ? 1180 : d.weekSpent;
+      const overage = isOverspent ? 180 : 0;
+      const spentPct = Math.min(100, Math.round((weekSpent / d.weekAllowance) * 100));
+
+      return `
+        <!-- 1. Header -->
+        <div class="flex items-center justify-between pt-1">
+          <div>
+            <div class="text-[11px] font-medium" style="color: var(--text-secondary);">10月14日 · 星期三</div>
+            <h2 class="text-xl font-extrabold tracking-tight">生活预算</h2>
+          </div>
+          <button onclick="openInteractiveAt('daily', 'settings')" class="w-9 h-9 rounded-xl border flex items-center justify-center transition-all hover:opacity-80" style="background-color: var(--bg-card); border-color: var(--border-hairline);" title="预算设置">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </button>
+        </div>
+
+        ${isEmptyCycle ? `
+          <!-- Empty Cycle Hero -->
+          <div class="surface-card p-5 space-y-3 text-center">
+            <div class="w-10 h-10 rounded-2xl mx-auto flex items-center justify-center text-lg" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">🌱</div>
+            <div class="space-y-1">
+              <div class="text-sm font-bold">开始你的第一个预算周期</div>
+              <p class="text-xs" style="color: var(--text-secondary);">录入一笔「主要收入」，系统将自动补足固定预留并划分每周生活额度。</p>
+            </div>
+            <button onclick="openInteractiveAt('daily', 'income')" class="w-full py-2.5 rounded-xl text-xs font-bold" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">立即分配收入 →</button>
+          </div>
+        ` : `
+          <!-- 2. Redesigned Week Hero + Connected Cycle Pool Card -->
+          <div class="surface-card overflow-hidden">
+            <!-- Top Section: Current Week Allowance -->
+            <div class="p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full" style="background-color: ${isOverspent ? 'var(--danger)' : 'var(--daily-accent)'};"></span>
+                  <span class="text-xs font-bold">本周剩余可用</span>
+                </div>
+                <span class="text-[11px] font-medium px-2 py-0.5 rounded-md" style="background-color: var(--bg-subtle); color: var(--text-secondary);">W1 · 10.12 – 10.18</span>
+              </div>
+
+              <div class="flex items-baseline justify-between">
+                <div class="font-num text-3xl font-extrabold tracking-tight" style="color: ${isOverspent ? 'var(--danger)' : 'var(--text-main)'};">
+                  ¥${weekRem.toFixed(2)}
+                </div>
+                <div class="text-right">
+                  ${isOverspent ? `
+                    <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-md" style="background-color: var(--danger-soft); color: var(--danger);">已超支 ¥${overage.toFixed(2)}</span>
+                  ` : `
+                    <div class="text-[11px]" style="color: var(--text-secondary);">已用 <strong class="font-num" style="color: var(--text-main);">¥${weekSpent.toFixed(0)}</strong> / 额度 ¥${d.weekAllowance}</div>
+                  `}
+                </div>
+              </div>
+
+              <!-- Crisp Multi-Segment Progress Bar -->
+              <div class="space-y-1.5">
+                <div class="h-2.5 w-full rounded-full overflow-hidden flex p-0.5 gap-0.5" style="background-color: var(--bg-subtle);">
+                  <div class="h-full rounded-full transition-all" style="width: ${spentPct}%; background-color: ${isOverspent ? 'var(--danger)' : 'var(--daily-accent)'};"></div>
+                </div>
+                <div class="flex items-center justify-between text-[11px]" style="color: var(--text-secondary);">
+                  <span>本周消耗进度 ${spentPct}%</span>
+                  <span>日均可用 ¥${Math.round(weekRem / 4)}/天</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connected Bottom Sub-Ledger: Cycle Pool & Safety Buffer -->
+            <div class="px-4 py-3 border-t space-y-2.5" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+              <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">
+                <span>↳ 所属周期资金池 (10.12 – 11.12)</span>
+                <button onclick="openInteractiveAt('daily', 'cycle')" class="hover:underline font-bold" style="color: var(--daily-accent);">周期详情 →</button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                  <div class="text-[11px]" style="color: var(--text-secondary);">周期日常剩余 <span class="text-[10px] opacity-75">(含本周)</span></div>
+                  <div class="font-num text-sm font-bold mt-0.5">¥${d.cycleSpendable.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                </div>
+                <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px]" style="color: var(--text-secondary);">安全缓冲金</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded font-medium" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">兜底池</span>
+                  </div>
+                  <div class="font-num text-sm font-bold mt-0.5">¥${d.buffer.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                </div>
+              </div>
+
+              <!-- Prepaid Notice Pill -->
+              <div class="flex items-center justify-between pt-0.5">
+                <button onclick="openInteractiveAt('daily', 'cycle')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all" style="background-color: var(--warn-soft); border-color: var(--warn-border); color: var(--warn);">
+                  <span>⏳</span>
+                  <span>未来周提前支付 ¥${d.prepaidTotal.toFixed(0)} · 查看清单 →</span>
+                </button>
+                <span class="text-[11px] font-num" style="color: var(--text-secondary);">可动用总计 ¥7,382</span>
+              </div>
+            </div>
+          </div>
+        `}
+
+        <!-- 3. Redesigned Primary Action + Quick Tools Dock -->
+        <div class="grid grid-cols-12 gap-2">
+          <button onclick="openInteractiveAt('daily', 'expense')" class="col-span-5 py-3 px-3 rounded-2xl font-bold text-xs flex flex-col justify-between items-start shadow-sm transition-transform active:scale-95" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">
+            <span class="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-base font-bold">＋</span>
+            <div class="text-left mt-2">
+              <div class="text-sm font-extrabold">记一笔</div>
+              <div class="text-[10px] opacity-80 font-normal">日常 / 预付 / 大额</div>
+            </div>
+          </button>
+
+          <div class="col-span-7 grid grid-cols-3 gap-1.5">
+            <button onclick="openInteractiveAt('daily', 'income')" class="surface-card p-2.5 flex flex-col justify-between items-start text-left hover:opacity-90 transition-all">
+              <span class="text-sm">💰</span>
+              <div>
+                <div class="text-xs font-bold">收入分配</div>
+                <div class="text-[10px]" style="color: var(--text-secondary);">开启新周期</div>
+              </div>
+            </button>
+            <button onclick="openInteractiveAt('daily', 'calibration')" class="surface-card p-2.5 flex flex-col justify-between items-start text-left hover:opacity-90 transition-all">
+              <span class="text-sm">⚖️</span>
+              <div>
+                <div class="text-xs font-bold">余额校准</div>
+                <div class="text-[10px]" style="color: var(--daily-accent);">可核对</div>
+              </div>
+            </button>
+            <button onclick="openInteractiveAt('daily', 'fixed')" class="surface-card p-2.5 flex flex-col justify-between items-start text-left hover:opacity-90 transition-all relative">
+              <span class="text-sm">🏦</span>
+              <span class="absolute top-2 right-2 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center" style="background-color: var(--warn-soft); color: var(--warn);">2</span>
+              <div>
+                <div class="text-xs font-bold">固定支出</div>
+                <div class="text-[10px]" style="color: var(--warn);">2笔待确认</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Transparent Dual-Status Strip (Replaces tiny hidden swipe card) -->
+        <div class="surface-card p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1 p-0.5 rounded-lg" style="background-color: var(--bg-subtle);">
+              <button onclick="switchSummaryTab('pending')" class="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all" style="background-color: ${state.summaryTab === 'pending' ? 'var(--bg-card)' : 'transparent'}; color: ${state.summaryTab === 'pending' ? 'var(--text-main)' : 'var(--text-secondary)'};">
+                待处理事项 (2)
+              </button>
+              <button onclick="switchSummaryTab('fixed')" class="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all" style="background-color: ${state.summaryTab === 'fixed' ? 'var(--bg-card)' : 'transparent'}; color: ${state.summaryTab === 'fixed' ? 'var(--text-main)' : 'var(--text-secondary)'};">
+                固定预留池 (¥3,200)
+              </button>
+            </div>
+            <button onclick="openInteractiveAt('daily', 'fixed')" class="text-[11px] font-semibold" style="color: var(--daily-accent);">管理 →</button>
+          </div>
+
+          ${state.summaryTab === 'pending' ? `
+            <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">固定待付</div>
+                <div class="text-xs font-bold mt-0.5" style="color: var(--warn);">2 笔待确认</div>
+              </div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">账面校准</div>
+                <div class="text-xs font-bold mt-0.5" style="color: var(--daily-accent);">建议核对</div>
+              </div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">储备缺口</div>
+                <div class="text-xs font-bold mt-0.5">¥0 无缺口</div>
+              </div>
+            </div>
+          ` : `
+            <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">预留余额</div>
+                <div class="text-xs font-bold font-num mt-0.5">¥3,200.00</div>
+              </div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">本期固定项</div>
+                <div class="text-xs font-bold mt-0.5">共 3 项</div>
+              </div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">待确认扣款</div>
+                <div class="text-xs font-bold mt-0.5" style="color: var(--warn);">2 项 (¥2,800)</div>
+              </div>
+            </div>
+          `}
+        </div>
+
+        <!-- 5. Redesigned Weekly Budget Rhythm (Labeled Micro-Timeline) -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-bold">每周预算节奏</h3>
+              <div class="text-[10px] flex items-center gap-2 mt-0.5" style="color: var(--text-secondary);">
+                <span class="inline-flex items-center gap-1"><i class="w-2 h-2 rounded-full inline-block" style="background-color: var(--daily-accent);"></i>已花</span>
+                <span class="inline-flex items-center gap-1"><i class="w-2 h-2 rounded-full inline-block" style="background-color: var(--warn);"></i>提前支付</span>
+              </div>
+            </div>
+            <button onclick="openInteractiveAt('daily', 'cycle')" class="text-[11px] font-semibold" style="color: var(--daily-accent);">本周期 4 周 →</button>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2">
+            ${d.weeks.map(w => {
+              const isCur = w.status === 'current';
+              const sPct = Math.round((w.spent / w.allowance) * 100);
+              const pPct = Math.round((w.prepaid / w.allowance) * 100);
+              return `
+                <button onclick="openInteractiveAt('daily', 'cycle')" class="p-2 rounded-xl border text-left transition-all flex flex-col justify-between" style="background-color: ${isCur ? 'var(--daily-accent-soft)' : 'var(--bg-subtle)'}; border-color: ${isCur ? 'var(--daily-accent-border)' : 'transparent'};">
+                  <div class="flex items-center justify-between w-full">
+                    <span class="text-[11px] font-bold">${w.id}</span>
+                    ${isCur ? `<span class="text-[9px] font-bold px-1 rounded" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">本周</span>` : ''}
+                  </div>
+                  <div class="text-[9px] mt-0.5" style="color: var(--text-secondary);">${w.range.split('–')[0]}起</div>
+
+                  <!-- Vertical Visual Meter -->
+                  <div class="w-full h-10 rounded-lg my-1.5 overflow-hidden flex flex-col justify-end p-0.5" style="background-color: var(--bg-card); border: 1px solid var(--border-hairline);">
+                    ${pPct > 0 ? `<div class="w-full rounded-sm bg-prepaid-stripe" style="height: ${Math.max(18, pPct)}%;"></div>` : ''}
+                    ${sPct > 0 ? `<div class="w-full rounded-sm" style="height: ${Math.max(18, sPct)}%; background-color: var(--daily-accent);"></div>` : ''}
+                  </div>
+
+                  <div class="font-num text-[11px] font-bold">¥${w.rem}</div>
+                  <div class="text-[9px]" style="color: var(--text-secondary);">${w.prepaid > 0 ? `预付¥${w.prepaid}` : '剩余'}</div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- 6. Recent Key Events -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold">最近关键事件</h3>
+            <button onclick="openInteractiveAt('daily', 'history')" class="text-[11px] font-semibold" style="color: var(--daily-accent);">查看全部 →</button>
+          </div>
+          <div class="space-y-1.5">
+            ${d.recentEvents.map(ev => `
+              <div class="p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all hover:opacity-90" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                <button onclick="openInteractiveAt('daily', 'flow')" class="flex-1 flex items-center justify-between text-left min-w-0">
+                  <div class="min-w-0 pr-2">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background-color: ${ev.type === 'unplanned' ? 'var(--danger-soft)' : 'var(--bg-card)'}; color: ${ev.type === 'unplanned' ? 'var(--danger)' : 'var(--text-secondary)'};">${ev.catLabel}</span>
+                      <span class="text-xs font-bold truncate">${ev.title}</span>
+                    </div>
+                    <div class="text-[10px] mt-1 flex flex-wrap items-center gap-1.5" style="color: var(--text-secondary);">
+                      <span>${ev.date}</span>
+                      ${ev.isPrepaid ? `<span class="px-1.5 rounded font-medium" style="background-color: var(--warn-soft); color: var(--warn);">→ ${ev.effectiveDate}</span>` : ''}
+                      <span>· ${ev.pockets.join(' + ')}</span>
+                    </div>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <div class="font-num text-xs font-bold" style="color: var(--danger);">${ev.amount.toFixed(2)}</div>
+                    <div class="text-[10px]" style="color: var(--daily-accent);">流向详情 ›</div>
+                  </div>
+                </button>
+                <button onclick="triggerToast('已演示：触发删除并回滚确认弹窗')" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:bg-red-500/10" style="color: var(--text-muted);" title="删除并回滚">
+                  🗑️
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderExpenseSheetHTML() {
+      const f = state.expenseForm;
+      const amt = parseFloat(f.amount) || 0;
+      const newRem = Math.max(0, 682 - amt);
+      const cats = [
+        { id: 'daily', icon: '🛍️', label: '日常', tag: '扣本周' },
+        { id: 'dining', icon: '🍜', label: '外食', tag: '扣本周' },
+        { id: 'other', icon: '🏷️', label: '其他', tag: '扣本周' },
+        { id: 'unplanned', icon: '⚠️', label: '计划外', tag: '超支动用缓冲' },
+        { id: 'large', icon: '🏛️', label: '大额', tag: '优先缓冲/储备' }
+      ];
+
+      return `
+        <!-- Sheet Handle & Header -->
+        <div class="space-y-2">
+          <div class="w-9 h-1 rounded-full mx-auto" style="background-color: var(--border-strong);"></div>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-extrabold">记支出</h3>
+              <p class="text-[11px]" style="color: var(--text-secondary);">实时预览资金扣减口袋与周期余量</p>
+            </div>
+            <button onclick="openInteractiveAt('daily', 'home')" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-subtle); color: var(--text-secondary);">✕</button>
+          </div>
+        </div>
+
+        <!-- 1. Crisp Amount Input Box -->
+        <div class="p-3.5 rounded-2xl border flex items-baseline justify-between" style="background-color: var(--bg-subtle); border-color: var(--daily-accent-border);">
+          <div>
+            <div class="text-[11px] font-semibold" style="color: var(--text-secondary);">支出金额 (CNY)</div>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class="text-xl font-bold" style="color: var(--daily-accent);">¥</span>
+              <input type="number" step="0.01" value="${f.amount}" oninput="updateExpenseAmount(this.value)" aria-label="支出金额" class="font-num text-3xl font-extrabold bg-transparent border-none outline-none w-36" style="color: var(--text-main);" />
+            </div>
+          </div>
+          <span class="text-[11px] font-bold px-2.5 py-1 rounded-full" style="background-color: var(--daily-accent-soft); color: var(--daily-accent);">
+            ${cats.find(c => c.id === f.category)?.label || '外食'} · ${cats.find(c => c.id === f.category)?.tag}
+          </span>
+        </div>
+
+        <!-- 2. 5 Category Keys with Clear Funding Semantics -->
+        <div class="grid grid-cols-5 gap-1.5">
+          ${cats.map(c => {
+            const active = f.category === c.id;
+            return `
+              <button onclick="selectExpenseCategory('${c.id}')" class="py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center gap-1" style="background-color: ${active ? 'var(--daily-accent-soft)' : 'var(--bg-subtle)'}; border-color: ${active ? 'var(--daily-accent)' : 'transparent'};">
+                <span class="text-sm">${c.icon}</span>
+                <span class="text-xs font-bold" style="color: ${active ? 'var(--daily-accent)' : 'var(--text-main)'};">${c.label}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- 3. Compact 2-Column Date & Note -->
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <label class="block text-[10px] font-semibold" style="color: var(--text-secondary);">付款日期</label>
+            <input type="date" value="${f.date}" onchange="state.expenseForm.date=this.value" aria-label="付款日期" class="text-xs font-bold bg-transparent outline-none w-full mt-0.5" />
+          </div>
+          <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <label class="block text-[10px] font-semibold" style="color: var(--text-secondary);">备注 · 可选</label>
+            <input type="text" value="${f.note}" oninput="state.expenseForm.note=this.value" placeholder="例如：午餐" aria-label="支出备注" class="text-xs font-bold bg-transparent outline-none w-full mt-0.5" />
+          </div>
+        </div>
+
+        <!-- 4. Future Expense (Prepaid) Switch -->
+        <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold">未来开销 (提前支付)</div>
+              <div class="text-[10px]" style="color: var(--text-secondary);">现在付款扣减资金，归属到未来预算周统计</div>
+            </div>
+            <button onclick="togglePrepaidSwitch()" role="switch" aria-checked="${f.isPrepaid}" class="w-10 h-6 rounded-full p-0.5 transition-all flex items-center ${f.isPrepaid ? 'justify-end' : 'justify-start'}" style="background-color: ${f.isPrepaid ? 'var(--daily-accent)' : 'var(--border-strong)'};">
+              <span class="w-5 h-5 rounded-full bg-white shadow"></span>
+            </button>
+          </div>
+          ${f.isPrepaid ? `
+            <div class="pt-2 border-t flex items-center justify-between text-xs" style="border-color: var(--border-hairline);">
+              <span class="text-[11px] font-medium" style="color: var(--warn);">归属预算周日期：</span>
+              <input type="date" value="${f.effectiveDate}" aria-label="归属日期" class="text-xs font-bold px-2 py-1 rounded border bg-transparent" style="border-color: var(--warn-border);" />
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- 5. Real-time Impact Preview Banner -->
+        <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--daily-accent-soft); border-color: var(--daily-accent-border);">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold" style="color: var(--daily-accent);">
+              ${f.category === 'large' ? '🏛️ 大额支出：优先从缓冲金/储备金扣款' : f.isPrepaid ? '⏳ 提前支付：优先动用缓冲金垫付' : '💳 本笔从本周预算扣款'}
+            </span>
+            <span class="font-num font-extrabold" style="color: var(--daily-accent);">¥682 → ¥${newRem.toFixed(0)}</span>
+          </div>
+          <div class="h-1.5 w-full rounded-full overflow-hidden bg-white/60">
+            <div class="h-full rounded-full" style="width: ${Math.min(100, Math.round(((318 + amt) / 1000) * 100))}%; background-color: var(--daily-accent);"></div>
+          </div>
+          <div class="text-[10px]" style="color: var(--text-secondary);">记录后可在「资金流向」中查看真实口袋分配与快照</div>
+        </div>
+
+        <!-- 6. Submit CTA -->
+        <button onclick="submitDemoExpense()" class="w-full py-3 rounded-xl font-bold text-xs shadow-sm transition-transform active:scale-98" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">
+          确认记录支出 ¥${amt.toFixed(2)} →
+        </button>
+      `;
+    }
+
+    function renderFlowDetailHTML(isBoard = false) {
+      const mode = isBoard ? 'full' : state.flowMode;
+
+      return `
+        <!-- Top Nav -->
+        <div class="flex items-center justify-between pt-1">
+          <button onclick="openInteractiveAt('daily', 'home')" class="w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">←</button>
+          <h2 class="text-sm font-extrabold">资金流向详情</h2>
+          <span class="w-8"></span>
+        </div>
+
+        <!-- 1. Receipt Summary Hero Card -->
+        <div class="surface-card p-4 text-center space-y-1.5 relative overflow-hidden">
+          <span class="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full" style="background-color: var(--danger-soft); color: var(--danger);">计划外支出</span>
+          <h3 class="text-base font-extrabold">临时维修</h3>
+          <div class="font-num text-3xl font-extrabold tracking-tight" style="color: var(--danger);">-¥800.00</div>
+          <div class="text-[11px]" style="color: var(--text-secondary);">2026年10月14日 · 记录于 16:20</div>
+        </div>
+
+        <!-- 2. Waterfall Allocation Flow -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-bold">资金来源 · 级联真实分配</span>
+            <span class="text-[10px] font-medium" style="color: var(--text-secondary);">按快照精确还原</span>
+          </div>
+
+          ${mode === 'legacy' ? `
+            <div class="surface-card p-4 space-y-2">
+              <div class="text-xs font-bold" style="color: var(--warn);">ℹ️ 早期记录缺少前后余额快照</div>
+              <p class="text-[11px]" style="color: var(--text-secondary);">仅展示记录当时的扣款口袋金额，不伪造推算前后余额等式：</p>
+              <div class="flex justify-between text-xs font-bold pt-2 border-t" style="border-color: var(--border-hairline);">
+                <span>本周预算扣减</span>
+                <span class="font-num" style="color: var(--danger);">-¥682.00</span>
+              </div>
+              <div class="flex justify-between text-xs font-bold">
+                <span>安全缓冲金扣减</span>
+                <span class="font-num" style="color: var(--danger);">-¥118.00</span>
+              </div>
+            </div>
+          ` : `
+            <div class="relative pl-5 space-y-2.5">
+              <!-- Vertical Waterfall Connector Line -->
+              <div class="absolute left-2 top-4 bottom-4 w-0.5" style="background-color: var(--border-strong);"></div>
+
+              <!-- Step 1: Weekly Budget Depleted -->
+              <div class="relative surface-card p-3.5 space-y-2">
+                <span class="absolute -left-[19px] top-4 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">1</span>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-xs font-bold">本周预算</span>
+                    <span class="text-[10px] ml-1 px-1.5 py-0.5 rounded" style="background-color: var(--bg-subtle); color: var(--text-secondary);">优先扣减 · 占比 85.3%</span>
+                  </div>
+                  <span class="font-num text-sm font-extrabold" style="color: var(--danger);">-¥682.00</span>
+                </div>
+
+                <!-- Depletion Visual Bar -->
+                <div class="p-2.5 rounded-xl grid grid-cols-3 items-center text-center" style="background-color: var(--bg-subtle);">
+                  <div class="text-left">
+                    <div class="font-num text-xs font-bold">¥682.00</div>
+                    <div class="text-[10px]" style="color: var(--text-secondary);">扣款前余额</div>
+                  </div>
+                  <div class="text-[11px] font-num font-bold" style="color: var(--danger);">➔ -682.00 ➔</div>
+                  <div class="text-right">
+                    <div class="font-num text-xs font-extrabold">= ¥0.00</div>
+                    <div class="text-[10px]" style="color: var(--warn);">本周已用尽</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 2: Buffer Pocket Covered Remainder -->
+              <div class="relative surface-card p-3.5 space-y-2">
+                <span class="absolute -left-[19px] top-4 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center" style="background-color: var(--warn); color: #fff;">2</span>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-xs font-bold">安全缓冲金</span>
+                    <span class="text-[10px] ml-1 px-1.5 py-0.5 rounded" style="background-color: var(--warn-soft); color: var(--warn);">自动补足差额 · 14.7%</span>
+                  </div>
+                  <span class="font-num text-sm font-extrabold" style="color: var(--danger);">-¥118.00</span>
+                </div>
+
+                <div class="p-2.5 rounded-xl grid grid-cols-3 items-center text-center" style="background-color: var(--bg-subtle);">
+                  <div class="text-left">
+                    <div class="font-num text-xs font-bold">¥1,500.00</div>
+                    <div class="text-[10px]" style="color: var(--text-secondary);">扣款前余额</div>
+                  </div>
+                  <div class="text-[11px] font-num font-bold" style="color: var(--danger);">➔ -118.00 ➔</div>
+                  <div class="text-right">
+                    <div class="font-num text-xs font-extrabold">= ¥1,382.00</div>
+                    <div class="text-[10px]" style="color: var(--text-secondary);">扣款后新余额</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `}
+        </div>
+
+        <!-- 3. Reconciliation Verification Card -->
+        ${mode === 'gap' ? `
+          <div class="p-3 rounded-xl border space-y-1" style="background-color: var(--danger-soft); border-color: var(--danger-border);">
+            <div class="text-xs font-bold" style="color: var(--danger);">⚠️ 存在未覆盖资金缺口 ¥150.00</div>
+            <div class="text-[11px]" style="color: var(--text-secondary);">可用口袋已扣尽，差额单独记录为未覆盖缺口，不伪造负数口袋。</div>
+          </div>
+        ` : `
+          <div class="p-3 rounded-xl border flex items-center justify-between" style="background-color: var(--daily-accent-soft); border-color: var(--daily-accent-border);">
+            <div class="space-y-0.5">
+              <div class="text-xs font-bold" style="color: var(--daily-accent);">✓ 分配已完整覆盖本笔支出</div>
+              <div class="font-num text-[11px]" style="color: var(--text-secondary);">¥682.00 (本周) + ¥118.00 (缓冲) = ¥800.00</div>
+            </div>
+            <span class="text-xs font-bold px-2 py-0.5 rounded" style="background-color: var(--bg-card); color: var(--daily-accent);">快照一致</span>
+          </div>
+        `}
+
+        <!-- 4. Rollback Delete Action -->
+        <button onclick="triggerToast('已演示：删除记录并原路回滚 ¥682 至本周预算、¥118 至缓冲金')" class="w-full py-2.5 rounded-xl border text-xs font-bold transition-all hover:opacity-80" style="border-color: var(--danger-border); color: var(--danger); background-color: var(--danger-soft);">
+          🗑️ 删除这笔记录 · 原路回滚各口袋余额
+        </button>
+      `;
+    }
+
+    function renderCopperHomeHTML() {
+      const c = state.copperData;
+      const cashPct = Math.round((c.cashTotal / c.totalAssets) * 100);
+      const invPct = 100 - cashPct;
+
+      return `
+        <!-- 1. Header -->
+        <div class="flex items-center justify-between pt-1">
+          <div>
+            <div class="text-[11px] font-medium" style="color: var(--text-secondary);">本地保存于此浏览器</div>
+            <h2 class="text-xl font-extrabold tracking-tight">铜钱生意</h2>
+          </div>
+          <button onclick="openInteractiveAt('copper', 'settings')" class="w-9 h-9 rounded-xl border flex items-center justify-center" style="background-color: var(--bg-card); border-color: var(--border-hairline);" title="铜钱配置">
+            ⚙️
+          </button>
+        </div>
+
+        <!-- 2. Unified Asset Hierarchy Card (Total Assets = Cash [Liquid + Reserve] + Inventory) -->
+        <div class="surface-card overflow-hidden">
+          <div class="p-4 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold" style="color: var(--text-secondary);">生意总资产 (现金 + 库存成本)</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background-color: var(--copper-accent-soft); color: var(--copper-accent);">成本计价</span>
+            </div>
+            <div class="font-num text-3xl font-extrabold tracking-tight">¥${c.totalAssets.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+
+            <!-- Proportional Stacked Bar -->
+            <div class="space-y-1">
+              <div class="h-2 w-full rounded-full overflow-hidden flex gap-0.5 p-0.5" style="background-color: var(--bg-subtle);">
+                <div class="h-full rounded-full" style="width: ${cashPct}%; background-color: var(--copper-accent);"></div>
+                <div class="h-full rounded-full" style="width: ${invPct}%; background-color: var(--text-muted);"></div>
+              </div>
+              <div class="flex justify-between text-[11px]" style="color: var(--text-secondary);">
+                <span>● 现金合计 ¥${c.cashTotal.toLocaleString()} (${cashPct}%)</span>
+                <span>● 库存成本 ¥${c.inventoryCost.toLocaleString()} (${invPct}%)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connected Cash Pockets Breakdown -->
+          <div class="p-3.5 border-t space-y-2" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <div class="flex items-center justify-between text-[10px] font-semibold" style="color: var(--text-secondary);">
+              <span>↳ 现金合计拆解 (¥12,920 + ¥5,540 = ¥18,460)</span>
+              <button onclick="openInteractiveAt('copper', 'settings')" class="font-bold hover:underline" style="color: var(--copper-accent);">分润比例 →</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold">💳 流动库</span>
+                  <span class="text-[10px] px-1.5 rounded font-semibold" style="background-color: var(--copper-accent-soft); color: var(--copper-accent);">利润 ${c.liquidRatio}%</span>
+                </div>
+                <div class="font-num text-sm font-extrabold mt-1">¥${c.liquidBalance.toLocaleString()}</div>
+                <div class="text-[10px]" style="color: var(--text-secondary);">日常拿货与本金回流</div>
+              </div>
+              <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold">🔒 存储库</span>
+                  <span class="text-[10px] px-1.5 rounded font-semibold" style="background-color: var(--bg-subtle); color: var(--text-secondary);">利润 ${c.reserveRatio}%</span>
+                </div>
+                <div class="font-num text-sm font-extrabold mt-1">¥${c.reserveBalance.toLocaleString()}</div>
+                <div class="text-[10px]" style="color: var(--text-secondary);">净利沉淀储备</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Primary Entry Buttons -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <button onclick="openInteractiveAt('copper', 'sale')" class="py-3 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95" style="background-color: var(--copper-accent); color: var(--copper-on-accent);">
+            <span class="text-sm">＋</span> 记销售 (自动算毛利)
+          </button>
+          <button onclick="openInteractiveAt('copper', 'purchase')" class="py-3 px-4 rounded-2xl font-bold text-xs border flex items-center justify-center gap-2 transition-transform active:scale-95" style="background-color: var(--bg-card); border-color: var(--copper-accent-border); color: var(--copper-accent);">
+            <span>📦</span> 记进货 (转库存成本)
+          </button>
+        </div>
+
+        <!-- 4. Business Trends + Monthly Entry -->
+        <div class="surface-card p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold">近 30 天经营趋势</h3>
+            <div class="flex items-center gap-1 p-0.5 rounded-lg text-[10px] font-bold" style="background-color: var(--bg-subtle);">
+              <button onclick="switchCopperTrend('profit')" class="px-2 py-0.5 rounded" style="background-color: ${state.copperTrendTab === 'profit' ? 'var(--bg-card)' : 'transparent'};">收利</button>
+              <button onclick="switchCopperTrend('inventory')" class="px-2 py-0.5 rounded" style="background-color: ${state.copperTrendTab === 'inventory' ? 'var(--bg-card)' : 'transparent'};">库存</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+              <div class="text-[10px]" style="color: var(--text-secondary);">30天收入</div>
+              <div class="font-num text-xs font-extrabold mt-0.5">¥${c.rev30d.toLocaleString()}</div>
+            </div>
+            <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+              <div class="text-[10px]" style="color: var(--text-secondary);">30天毛利</div>
+              <div class="font-num text-xs font-extrabold mt-0.5" style="color: var(--success);">+¥${c.profit30d.toLocaleString()}</div>
+            </div>
+            <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);">
+              <div class="text-[10px]" style="color: var(--text-secondary);">库存变化</div>
+              <div class="font-num text-xs font-extrabold mt-0.5">${c.invDelta30d.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <!-- Crisp SVG Combo Chart -->
+          <div class="h-24 w-full pt-2">
+            <svg viewBox="0 0 300 75" class="w-full h-full overflow-visible">
+              <!-- Grid lines -->
+              <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3 3" />
+              <line x1="0" y1="45" x2="300" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3 3" />
+              <line x1="0" y1="70" x2="300" y2="70" stroke="currentColor" stroke-opacity="0.15" />
+              <!-- Revenue Bars -->
+              <rect x="12" y="42" width="14" height="28" rx="3" fill="var(--copper-accent)" fill-opacity="0.25" />
+              <rect x="48" y="34" width="14" height="36" rx="3" fill="var(--copper-accent)" fill-opacity="0.25" />
+              <rect x="84" y="48" width="14" height="22" rx="3" fill="var(--copper-accent)" fill-opacity="0.25" />
+              <rect x="120" y="26" width="14" height="44" rx="3" fill="var(--copper-accent)" fill-opacity="0.35" />
+              <rect x="156" y="30" width="14" height="40" rx="3" fill="var(--copper-accent)" fill-opacity="0.35" />
+              <rect x="192" y="22" width="14" height="48" rx="3" fill="var(--copper-accent)" fill-opacity="0.45" />
+              <rect x="228" y="14" width="14" height="56" rx="3" fill="var(--copper-accent)" />
+              <rect x="264" y="24" width="14" height="46" rx="3" fill="var(--copper-accent)" fill-opacity="0.45" />
+              <!-- Profit Trend Line -->
+              <polyline fill="none" stroke="var(--copper-accent)" stroke-width="2.2" points="19,50 55,42 91,52 127,34 163,38 199,29 235,18 271,28" />
+              <circle cx="235" cy="18" r="3.5" fill="var(--copper-accent)" />
+              <text x="200" y="10" font-size="8" font-weight="bold" fill="var(--copper-accent)">最高毛利日 +¥580</text>
+            </svg>
+          </div>
+
+          <button onclick="openInteractiveAt('copper', 'monthly')" class="w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-all hover:opacity-90" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+            <span>📅 月度经营汇总</span>
+            <span style="color: var(--copper-accent);">查看全部月份 →</span>
+          </button>
+        </div>
+
+        <!-- 5. Recent Transactions with Pending Sale Actions -->
+        <div class="surface-card p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold">最近经营流水</h3>
+            <button onclick="toggleCancelledSales()" class="text-[11px] font-medium" style="color: var(--text-secondary);">
+              ${state.showCancelledSales ? '隐藏已取消' : '显示已取消'}
+            </button>
+          </div>
+
+          <div class="space-y-2">
+            ${c.transactions.filter(t => state.showCancelledSales || t.status !== 'cancelled').map(t => `
+              <div class="p-2.5 rounded-xl border space-y-2" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background-color: ${t.status === 'pending' ? 'var(--warn-soft)' : t.type === 'purchase' ? 'var(--bg-card)' : 'var(--copper-accent-soft)'}; color: ${t.status === 'pending' ? 'var(--warn)' : t.type === 'purchase' ? 'var(--text-secondary)' : 'var(--copper-accent)'};">
+                        ${t.status === 'pending' ? `待确认 · ${t.daysLeft}天后自动确认` : t.status === 'cancelled' ? '已取消' : t.type === 'purchase' ? '进货入库' : '已确认销售'}
+                      </span>
+                    </div>
+                    <div class="text-xs font-bold mt-1 ${t.status === 'cancelled' ? 'line-through opacity-60' : ''}">${t.title}</div>
+                    <div class="text-[10px] mt-0.5" style="color: var(--text-secondary);">
+                      ${t.date} ${t.type === 'sale' ? `· 成本 ¥${t.cost} · 毛利 +¥${t.profit}` : '· 现金转入库存成本'}
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="font-num text-xs font-extrabold ${t.status === 'cancelled' ? 'line-through opacity-50' : ''}" style="color: ${t.type === 'purchase' ? 'var(--text-main)' : 'var(--copper-accent)'};">
+                      ${t.amount > 0 ? `+¥${t.amount}` : `-¥${Math.abs(t.amount)}`}
+                    </div>
+                    ${t.status === 'pending' ? `<div class="text-[9px]" style="color: var(--warn);">款与库存已入账</div>` : ''}
+                  </div>
+                </div>
+
+                ${t.status === 'pending' ? `
+                  <div class="flex items-center gap-2 pt-1.5 border-t" style="border-color: var(--border-hairline);">
+                    <button onclick="confirmPendingSale('${t.id}')" class="flex-1 py-1.5 rounded-lg text-[11px] font-bold" style="background-color: var(--copper-accent); color: var(--copper-on-accent);">✓ 确认入账</button>
+                    <button onclick="cancelPendingSale('${t.id}')" class="flex-1 py-1.5 rounded-lg text-[11px] font-bold border" style="border-color: var(--danger-border); color: var(--danger);">✕ 取消并回滚</button>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // ADDITIONAL SCREENS FOR INTERACTIVE PROTOTYPE (11 Screens Total)
+    // =========================================================================
+    function renderAdditionalOverlayHTML(module, screen) {
+      if (module === 'daily' && screen === 'expense') {
+        return `<div class="rounded-t-[28px] p-4 space-y-3.5 max-h-[88%] overflow-y-auto shadow-2xl" style="background-color: var(--bg-card);">${renderExpenseSheetHTML()}</div>`;
+      }
+      if (module === 'daily' && screen === 'income') {
+        return `
+          <div class="rounded-t-[28px] p-4 space-y-3.5 max-h-[88%] overflow-y-auto shadow-2xl" style="background-color: var(--bg-card);">
+            <div class="w-9 h-1 rounded-full mx-auto" style="background-color: var(--border-strong);"></div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-extrabold">收入分配 (daily.income)</h3>
+              <button onclick="openInteractiveAt('daily', 'home')" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-subtle);">✕</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1 p-1 rounded-xl" style="background-color: var(--bg-subtle);">
+              <button class="py-1.5 rounded-lg text-xs font-bold shadow-sm" style="background-color: var(--bg-card); color: var(--daily-accent);">主要收入</button>
+              <button class="py-1.5 rounded-lg text-xs font-medium" style="color: var(--text-secondary);">零散收入</button>
+              <button class="py-1.5 rounded-lg text-xs font-medium" style="color: var(--text-secondary);">退款报销</button>
+            </div>
+            <div class="p-3.5 rounded-2xl border" style="background-color: var(--bg-subtle); border-color: var(--daily-accent-border);">
+              <div class="text-[11px] font-semibold" style="color: var(--text-secondary);">入账金额</div>
+              <div class="font-num text-2xl font-extrabold mt-0.5">¥ 12,000.00</div>
+            </div>
+            <div class="p-3 rounded-xl border space-y-1.5 text-xs" style="background-color: var(--daily-accent-soft); border-color: var(--daily-accent-border);">
+              <div class="font-bold" style="color: var(--daily-accent);">🔄 开启新预算周期分配预览：</div>
+              <div class="flex justify-between"><span>1. 补足固定预留缺口：</span><span class="font-num font-bold">¥0.00 (已满额 ¥3,200)</span></div>
+              <div class="flex justify-between"><span>2. 拨入储备金固定额：</span><span class="font-num font-bold">¥2,000.00</span></div>
+              <div class="flex justify-between"><span>3. 拨入缓冲金固定额：</span><span class="font-num font-bold">¥500.00</span></div>
+              <div class="flex justify-between pt-1 border-t font-bold" style="border-color: var(--daily-accent-border);"><span>➔ 本周期日常可支配总额：</span><span class="font-num">¥9,500.00</span></div>
+            </div>
+            <button onclick="triggerToast('已确认收入分配并开启新周期'); openInteractiveAt('daily', 'home');" class="w-full py-3 rounded-xl font-bold text-xs" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">确认分配并开启新周期 →</button>
+          </div>
+        `;
+      }
+      if (module === 'daily' && screen === 'calibration') {
+        return `
+          <div class="rounded-t-[28px] p-4 space-y-3.5 max-h-[88%] overflow-y-auto shadow-2xl" style="background-color: var(--bg-card);">
+            <div class="w-9 h-1 rounded-full mx-auto" style="background-color: var(--border-strong);"></div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-extrabold">余额校准 (daily.calibration)</h3>
+              <button onclick="openInteractiveAt('daily', 'home')" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-subtle);">✕</button>
+            </div>
+            <div class="p-3 rounded-xl border text-xs space-y-1" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+              <div class="font-bold">📌 校准口径说明</div>
+              <p class="text-[11px]" style="color: var(--text-secondary);">可校准余额 = 周期日常剩余 (¥2,682) + 缓冲金 (¥1,500) + 固定预留 (¥3,200)，<strong>不含储备金 (¥18,500)</strong>。</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="p-3 rounded-xl border" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">当前账面可消费余额</div>
+                <div class="font-num text-base font-extrabold mt-0.5">¥7,382.00</div>
+              </div>
+              <div class="p-3 rounded-xl border" style="background-color: var(--daily-accent-soft); border-color: var(--daily-accent-border);">
+                <div class="text-[10px]" style="color: var(--daily-accent);">输入实际卡内可用</div>
+                <div class="font-num text-base font-extrabold mt-0.5">¥7,350.00</div>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl text-[11px] font-medium" style="background-color: var(--warn-soft); color: var(--warn);">
+              差额 -¥32.00：将自动生成一笔「余额校准修正」记录。
+            </div>
+            <button onclick="triggerToast('已完成余额校准 (-¥32.00)'); openInteractiveAt('daily', 'home');" class="w-full py-3 rounded-xl font-bold text-xs" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">完成校准 →</button>
+          </div>
+        `;
+      }
+      if (module === 'daily' && screen === 'fixed') {
+        return `
+          <div class="rounded-t-[28px] p-4 space-y-3.5 max-h-[88%] overflow-y-auto shadow-2xl" style="background-color: var(--bg-card);">
+            <div class="w-9 h-1 rounded-full mx-auto" style="background-color: var(--border-strong);"></div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-extrabold">固定支出管理 (daily.fixed)</h3>
+              <button onclick="openInteractiveAt('daily', 'home')" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-subtle);">✕</button>
+            </div>
+            <div class="p-3 rounded-xl border flex items-center justify-between" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+              <div>
+                <div class="text-[11px]" style="color: var(--text-secondary);">固定预留目标金额</div>
+                <div class="font-num text-base font-extrabold">¥3,200.00</div>
+              </div>
+              <button onclick="triggerToast('已保存固定预留目标')" class="px-3 py-1.5 rounded-lg text-xs font-bold" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">保存预留</button>
+            </div>
+            <div class="space-y-2">
+              ${state.dailyData.fixedItems.map(item => `
+                <div class="p-3 rounded-xl border flex items-center justify-between" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                  <div>
+                    <div class="text-xs font-bold">${item.name}</div>
+                    <div class="text-[10px]" style="color: var(--text-secondary);">每月 ${item.dueDay} 日到期 · ¥${item.amount}</div>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    ${item.paid ? `
+                      <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold opacity-60" style="background-color: var(--bg-card);">本期已付</span>
+                    ` : `
+                      <button onclick="triggerToast('已确认扣款：${item.name}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold" style="background-color: var(--daily-accent); color: var(--daily-on-accent);">标记已付</button>
+                    `}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+      if (module === 'copper' && (screen === 'sale' || screen === 'purchase')) {
+        const isSale = screen === 'sale';
+        return `
+          <div class="rounded-t-[28px] p-4 space-y-3.5 max-h-[88%] overflow-y-auto shadow-2xl" style="background-color: var(--bg-card);">
+            <div class="w-9 h-1 rounded-full mx-auto" style="background-color: var(--border-strong);"></div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-extrabold">${isSale ? '记销售 (copper.sale)' : '记进货 (copper.purchase)'}</h3>
+              <button onclick="openInteractiveAt('copper', 'home')" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-subtle);">✕</button>
+            </div>
+            <div class="p-3.5 rounded-2xl border" style="background-color: var(--bg-subtle); border-color: var(--copper-accent-border);">
+              <div class="text-[11px] font-semibold" style="color: var(--text-secondary);">${isSale ? '销售金额' : '进货总金额'}</div>
+              <div class="font-num text-2xl font-extrabold mt-0.5" style="color: var(--copper-accent);">¥ ${isSale ? '1,280.00' : '2,400.00'}</div>
+            </div>
+            ${isSale ? `
+              <div class="grid grid-cols-2 gap-2">
+                <div class="p-2.5 rounded-xl border" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                  <div class="text-[10px]" style="color: var(--text-secondary);">销售成本 (扣减库存)</div>
+                  <div class="font-num text-sm font-bold mt-0.5">¥ 780.00</div>
+                </div>
+                <div class="p-2.5 rounded-xl border" style="background-color: var(--copper-accent-soft); border-color: var(--copper-accent-border);">
+                  <div class="text-[10px]" style="color: var(--copper-accent);">本单毛利 (7:3分润)</div>
+                  <div class="font-num text-sm font-extrabold mt-0.5" style="color: var(--copper-accent);">+¥ 500.00</div>
+                </div>
+              </div>
+              <div class="p-3 rounded-xl border flex items-center justify-between text-xs" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                <div>
+                  <div class="font-bold">待确认销售 (默认开启)</div>
+                  <div class="text-[10px]" style="color: var(--text-secondary);">立即入账现金与扣减库存，10天后自动转确认</div>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="background-color: var(--copper-accent); color: #fff;">已开启</span>
+              </div>
+            ` : `
+              <div class="p-3 rounded-xl border text-xs" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                进货将扣减流动库现金，并等额增加「库存成本」。
+              </div>
+            `}
+            <button onclick="triggerToast('已记录${isSale ? '销售' : '进货'}流水'); openInteractiveAt('copper', 'home');" class="w-full py-3 rounded-xl font-bold text-xs" style="background-color: var(--copper-accent); color: var(--copper-on-accent);">
+              确认记录${isSale ? '销售' : '进货'} →
+            </button>
+          </div>
+        `;
+      }
+      return '';
+    }
+
+    function renderFullPageScreenHTML(module, screen) {
+      if (module === 'daily' && screen === 'flow') {
+        return renderFlowDetailHTML(false);
+      }
+      if (module === 'daily' && screen === 'cycle') {
+        return `
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="openInteractiveAt('daily', 'home')" class="w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">←</button>
+            <h2 class="text-sm font-extrabold">周期详情 (daily.cycle)</h2>
+            <span class="w-8"></span>
+          </div>
+          <div class="surface-card p-4 space-y-3">
+            <div class="text-xs font-bold" style="color: var(--daily-accent);">全部资金总览 (含储备金)</div>
+            <div class="font-num text-2xl font-extrabold">¥25,882.00</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">可动用余额 (日常+缓冲+预留)</div>
+                <div class="font-num font-bold mt-0.5">¥7,382.00</div>
+              </div>
+              <div class="p-2.5 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">长期储备金 (目标 30,000)</div>
+                <div class="font-num font-bold mt-0.5">¥18,500.00 (62%)</div>
+              </div>
+            </div>
+          </div>
+          <div class="surface-card p-4 space-y-2">
+            <div class="text-xs font-bold">提前支付清单 (#prepaid-list)</div>
+            <div class="p-2.5 rounded-xl border flex justify-between items-center text-xs" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+              <div>
+                <div class="font-bold">下周音乐会早鸟票</div>
+                <div class="text-[10px]" style="color: var(--text-secondary);">10.13 付款 → 归属 W2 (10.19–10.25)</div>
+              </div>
+              <span class="font-num font-bold" style="color: var(--warn);">-¥120.00</span>
+            </div>
+          </div>
+        `;
+      }
+      if (module === 'daily' && screen === 'history') {
+        return `
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="openInteractiveAt('daily', 'home')" class="w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">←</button>
+            <h2 class="text-sm font-extrabold">历史流水 (daily.history)</h2>
+            <span class="w-8"></span>
+          </div>
+          <div class="surface-card p-3.5 space-y-2">
+            <div class="text-[11px]" style="color: var(--text-secondary);">每页加载 20 条 · 点击行体查看资金流向</div>
+            ${state.dailyData.recentEvents.map(ev => `
+              <button onclick="openInteractiveAt('daily', 'flow')" class="w-full p-2.5 rounded-xl border flex items-center justify-between text-left" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">
+                <div>
+                  <div class="text-xs font-bold">${ev.title}</div>
+                  <div class="text-[10px]" style="color: var(--text-secondary);">${ev.date} · ${ev.catLabel}</div>
+                </div>
+                <div class="font-num text-xs font-bold" style="color: var(--danger);">${ev.amount.toFixed(2)} ›</div>
+              </button>
+            `).join('')}
+          </div>
+        `;
+      }
+      if (screen === 'settings') {
+        return `
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="openInteractiveAt('${module}', 'home')" class="w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">←</button>
+            <h2 class="text-sm font-extrabold">${module === 'daily' ? '预算设置与备份' : '铜钱配置与盘点'}</h2>
+            <span class="w-8"></span>
+          </div>
+          <div class="surface-card p-4 space-y-3">
+            <div class="text-xs font-bold">参数配置</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">${module === 'daily' ? '预计发薪日 (只读)' : '流动库分润比例'}</div>
+                <div class="font-bold mt-0.5">${module === 'daily' ? '每月15日(遇周末提前)' : '70%'}</div>
+              </div>
+              <div class="p-2.5 rounded-xl" style="background-color: var(--bg-subtle);">
+                <div class="text-[10px]" style="color: var(--text-secondary);">${module === 'daily' ? '最低每周生活线' : '存储库分润比例'}</div>
+                <div class="font-bold mt-0.5">${module === 'daily' ? '¥600.00' : '30%'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="surface-card p-4 space-y-2.5">
+            <div class="text-xs font-bold">📦 BackupSection · 数据与整站备份</div>
+            <p class="text-[11px]" style="color: var(--text-secondary);">数据保存在当前浏览器 localStorage。支持整站 JSON 备份恢复与单模块 Excel 导入导出。</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="triggerToast('已导出整站 JSON 备份')" class="py-2 rounded-xl border text-xs font-bold" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">导出整站 JSON</button>
+              <button onclick="triggerToast('已导出本模块 Excel')" class="py-2 rounded-xl border text-xs font-bold" style="background-color: var(--bg-subtle); border-color: var(--border-hairline);">导出模块 Excel</button>
+            </div>
+          </div>
+        `;
+      }
+      if (module === 'copper' && screen === 'monthly') {
+        return `
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="openInteractiveAt('copper', 'home')" class="w-8 h-8 rounded-xl border flex items-center justify-center text-xs font-bold" style="background-color: var(--bg-card); border-color: var(--border-hairline);">←</button>
+            <h2 class="text-sm font-extrabold">月度经营汇总 (copper.monthly)</h2>
+            <span class="w-8"></span>
+          </div>
+          <div class="surface-card p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-extrabold">2026年 10月</span>
+              <span class="text-xs font-bold" style="color: var(--success);">毛利 +¥2,460.00</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center text-xs">
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);"><div class="text-[10px]" style="color: var(--text-secondary);">销售收入</div><div class="font-num font-bold">¥8,620</div></div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);"><div class="text-[10px]" style="color: var(--text-secondary);">销售成本</div><div class="font-num font-bold">¥6,160</div></div>
+              <div class="p-2 rounded-xl" style="background-color: var(--bg-subtle);"><div class="text-[10px]" style="color: var(--text-secondary);">本期进货</div><div class="font-num font-bold">¥2,400</div></div>
+            </div>
+          </div>
+        `;
+      }
+      return '';
+    }
+
+    // =========================================================================
+    // RENDER & INTERACTION CONTROLLERS
+    // =========================================================================
+    function renderAll() {
+      // 1. Top Workbench Nav Buttons
+      ['board', 'interactive', 'components', 'audit'].forEach(v => {
+        const btn = document.getElementById('tab-' + v);
+        const sec = document.getElementById('view-' + v);
+        if (state.workbenchView === v) {
+          btn.style.backgroundColor = 'var(--bg-card)';
+          btn.style.color = 'var(--text-main)';
+          btn.style.boxShadow = 'var(--shadow-card)';
+          sec.classList.remove('hidden');
+        } else {
+          btn.style.backgroundColor = 'transparent';
+          btn.style.color = 'var(--text-secondary)';
+          btn.style.boxShadow = 'none';
+          sec.classList.add('hidden');
+        }
+      });
+
+      // 2. Board Demo State Buttons
+      const bNorm = document.getElementById('board-state-normal');
+      const bOver = document.getElementById('board-state-overspent');
+      if (bNorm && bOver) {
+        bNorm.style.backgroundColor = state.boardDemoState === 'normal' ? 'var(--daily-accent)' : 'var(--bg-card)';
+        bNorm.style.color = state.boardDemoState === 'normal' ? 'var(--daily-on-accent)' : 'var(--text-secondary)';
+        bOver.style.backgroundColor = state.boardDemoState === 'overspent' ? 'var(--danger)' : 'var(--bg-card)';
+        bOver.style.color = state.boardDemoState === 'overspent' ? '#fff' : 'var(--text-secondary)';
+      }
+
+      // 3. Populate 4-Screen Board
+      document.getElementById('board-daily-home-content').innerHTML = renderDailyHomeHTML(true);
+      document.getElementById('board-expense-sheet-content').innerHTML = renderExpenseSheetHTML();
+      document.getElementById('board-flow-content').innerHTML = renderFlowDetailHTML(true);
+      document.getElementById('board-copper-content').innerHTML = renderCopperHomeHTML();
+
+      // 4. Populate Interactive Prototype
+      const isSheet = ['expense', 'income', 'calibration', 'fixed', 'sale', 'purchase'].includes(state.activeScreen);
+      const isFullOverlay = ['flow', 'cycle', 'history', 'settings', 'monthly'].includes(state.activeScreen);
+
+      const bodyEl = document.getElementById('interactive-body');
+      const overlayEl = document.getElementById('interactive-overlay');
+
+      if (isFullOverlay) {
+        bodyEl.innerHTML = renderFullPageScreenHTML(state.activeModule, state.activeScreen);
+        overlayEl.classList.add('hidden');
+      } else {
+        bodyEl.innerHTML = state.activeModule === 'daily' ? renderDailyHomeHTML(false) : renderCopperHomeHTML();
+        if (isSheet) {
+          overlayEl.classList.remove('hidden');
+          overlayEl.innerHTML = renderAdditionalOverlayHTML(state.activeModule, state.activeScreen);
+        } else {
+          overlayEl.classList.add('hidden');
+        }
+      }
+
+      // Update Interactive Bottom Tabbar
+      const tDaily = document.getElementById('interactive-tab-daily');
+      const tCopper = document.getElementById('interactive-tab-copper');
+      if (state.activeModule === 'daily') {
+        tDaily.style.backgroundColor = 'var(--daily-accent)';
+        tDaily.style.color = 'var(--daily-on-accent)';
+        tCopper.style.backgroundColor = 'transparent';
+        tCopper.style.color = 'var(--text-secondary)';
+      } else {
+        tCopper.style.backgroundColor = 'var(--copper-accent)';
+        tCopper.style.color = 'var(--copper-on-accent)';
+        tDaily.style.backgroundColor = 'transparent';
+        tDaily.style.color = 'var(--text-secondary)';
+      }
+
+      // Highlight left tree button
+      document.querySelectorAll('[data-nav]').forEach(btn => {
+        const key = `${state.activeModule}-${state.activeScreen}`;
+        if (btn.getAttribute('data-nav') === key) {
+          btn.style.borderColor = state.activeModule === 'daily' ? 'var(--daily-accent)' : 'var(--copper-accent)';
+          btn.style.backgroundColor = state.activeModule === 'daily' ? 'var(--daily-accent-soft)' : 'var(--copper-accent-soft)';
+          btn.style.fontWeight = '700';
+        } else {
+          btn.style.borderColor = 'var(--border-hairline)';
+          btn.style.backgroundColor = 'var(--bg-card)';
+          btn.style.fontWeight = '500';
+        }
+      });
+
+      // Render Right Rationale Card
+      renderRationaleCard();
+    }
+
+    function renderRationaleCard() {
+      const el = document.getElementById('screen-rationale-card');
+      const key = `${state.activeModule}.${state.activeScreen}`;
+      const notes = {
+        'daily.home': {
+          title: '01 · 生活预算首页 (daily.home) 重构亮点',
+          bullets: [
+            '<strong>消除口径混淆</strong>：将「周期日常剩余 ¥2,682」与「缓冲金 ¥1,500」设计为本周主卡的下挂联动底座，直观表达「周额度从属于周期池，缓冲金负责兜底」。',
+            '<strong>双栏状态直读</strong>：不再将「固定预留」藏在极易被忽略的圆点滑动卡后，改为带数字角标的清晰分段看板。',
+            '<strong>微缩周时间轴</strong>：每周消耗槽补齐周次（W1–W4）、起始日、预付斜纹与剩余金额，一眼掌控全月节奏。'
+          ]
+        },
+        'daily.expense': {
+          title: '02 · 快速记支出 (daily.expense) 重构亮点',
+          bullets: [
+            '<strong>类别与扣款规则绑定</strong>：点击「计划外」或「大额」时，金额框右上角实时提示该类别的扣款优先级（如优先动用缓冲/储备）。',
+            '<strong>单屏免滚动</strong>：付款日期与备注合并为紧凑双列，配合底部的实时进度条预览，单手大拇指即可完成录入。'
+          ]
+        },
+        'daily.flow': {
+          title: '03 · 资金流向详情 (daily.flow) 重构亮点',
+          bullets: [
+            '<strong>级联瀑布流（Waterfall）</strong>：用带序号的纵向连接线替代原先孤立的灰框，清晰展示 ¥800 支出如何先扣空「本周预算 (-¥682)」，再由「缓冲金 (-¥118)」自动补齐。',
+            '<strong>完整兼容降级态</strong>：可在左侧切换测试「未覆盖资金缺口」与「早期缺快照记录」的降级展示。'
+          ]
+        },
+        'copper.home': {
+          title: '04 · 铜钱生意首页 (copper.home) 重构亮点',
+          bullets: [
+            '<strong>树状资产恒等式</strong>：顶部增加「现金 65% : 库存 35%」比例条，并将「流动库 (70%) + 存储库 (30%)」直接作为现金合计的下属分支，无需心算即可看懂 ¥12,920 + ¥5,540 = ¥18,460。',
+            '<strong>待确认销售闭环</strong>：在流水行内直接高亮自动确认倒计时与「确认入账 / 取消回滚」双动作。'
+          ]
+        }
+      };
+      const cur = notes[key] || {
+        title: `当前视图：${key}`,
+        bullets: [
+          '严格保留 <code>current-ui-manifest.json</code> 中的所有表单字段、只读约束与确认回滚逻辑。',
+          '采用统一的 20px 卡片圆角、1px 精细边框与 Tabular 等宽数字排版。'
+        ]
+      };
+
+      el.innerHTML = `
+        <div class="text-xs font-bold uppercase tracking-wider" style="color: var(--daily-accent);">DESIGN RATIONALE</div>
+        <h4 class="text-base font-extrabold">${cur.title}</h4>
+        <ul class="space-y-2.5 text-xs leading-relaxed" style="color: var(--text-secondary);">
+          ${cur.bullets.map(b => `<li class="flex items-start gap-2"><span style="color: var(--daily-accent);">●</span><span>${b}</span></li>`).join('')}
+        </ul>
+        <div class="pt-3 border-t flex items-center justify-between text-xs" style="border-color: var(--border-hairline);">
+          <span style="color: var(--text-secondary);">想要直接应用到代码？</span>
+          <button onclick="switchWorkbenchView('audit')" class="font-bold hover:underline" style="color: var(--daily-accent);">查看 CSS Tokens 与 Codex 指令 →</button>
+        </div>
+      `;
+    }
+
+    // Actions
+    function switchWorkbenchView(view) {
+      state.workbenchView = view;
+      renderAll();
+    }
+
+    function toggleTheme() {
+      state.theme = state.theme === 'light' ? 'dark' : 'light';
+      if (state.theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.getElementById('theme-icon').textContent = '☀️';
+        document.getElementById('theme-label').textContent = '切换亮色';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.getElementById('theme-icon').textContent = '🌙';
+        document.getElementById('theme-label').textContent = '切换暗色';
+      }
+      renderAll();
+    }
+
+    function changePalette(val) {
+      state.palette = val;
+      if (val === 'nordic') {
+        document.documentElement.removeAttribute('data-palette');
+      } else {
+        document.documentElement.setAttribute('data-palette', val);
+      }
+      renderAll();
+    }
+
+    function setBoardDemoState(mode) {
+      state.boardDemoState = mode;
+      renderAll();
+    }
+
+    function openInteractiveAt(module, screen) {
+      state.activeModule = module;
+      state.activeScreen = screen;
+      state.workbenchView = 'interactive';
+      renderAll();
+    }
+
+    function switchSummaryTab(tab) {
+      state.summaryTab = tab;
+      renderAll();
+    }
+
+    function switchCopperTrend(tab) {
+      state.copperTrendTab = tab;
+      renderAll();
+    }
+
+    function toggleCancelledSales() {
+      state.showCancelledSales = !state.showCancelledSales;
+      renderAll();
+    }
+
+    function selectExpenseCategory(catId) {
+      state.expenseForm.category = catId;
+      renderAll();
+    }
+
+    function updateExpenseAmount(val) {
+      state.expenseForm.amount = val;
+      renderAll();
+    }
+
+    function togglePrepaidSwitch() {
+      state.expenseForm.isPrepaid = !state.expenseForm.isPrepaid;
+      renderAll();
+    }
+
+    function submitDemoExpense() {
+      const amt = parseFloat(state.expenseForm.amount) || 0;
+      if (amt <= 0) return;
+      state.dailyData.weekSpent += amt;
+      state.dailyData.weekRemaining = Math.max(0, state.dailyData.weekAllowance - state.dailyData.weekSpent);
+      state.dailyData.recentEvents.unshift({
+        id: 'ev-' + Date.now(),
+        type: state.expenseForm.category,
+        catLabel: { daily: '日常', dining: '外食', other: '其他', unplanned: '计划外', large: '大额' }[state.expenseForm.category],
+        title: state.expenseForm.note || '新增支出',
+        date: '刚刚',
+        amount: -amt,
+        pockets: [`本周预算 ¥${amt.toFixed(0)}`],
+        isPrepaid: state.expenseForm.isPrepaid,
+        effectiveDate: state.expenseForm.effectiveDate
+      });
+      state.activeScreen = 'home';
+      renderAll();
+      triggerToast(`已记录支出 ¥${amt.toFixed(2)}，本周剩余已更新`);
+    }
+
+    function confirmPendingSale(id) {
+      const item = state.copperData.transactions.find(t => t.id === id);
+      if (item) item.status = 'confirmed';
+      renderAll();
+      triggerToast('已确认销售入账');
+    }
+
+    function cancelPendingSale(id) {
+      const item = state.copperData.transactions.find(t => t.id === id);
+      if (item) item.status = 'cancelled';
+      renderAll();
+      triggerToast('已取消该笔销售并回滚库存与现金');
+    }
+
+    function setSimState(key, val) {
+      state[key] = val;
+      if (key === 'cycleMode') state.activeScreen = 'home';
+      if (key === 'flowMode') {
+        state.activeModule = 'daily';
+        state.activeScreen = 'flow';
+      }
+      renderAll();
+    }
+
+    let toastTimer = null;
+    function triggerToast(msg) {
+      const toast = document.getElementById('interactive-toast');
+      const text = document.getElementById('interactive-toast-text');
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.remove('hidden');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2600);
+    }
+
+    function copyCodeBlock(id) {
+      const text = document.getElementById(id)?.innerText || '';
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        alertToast('已复制到剪贴板！可直接发给 AI Codex。');
+      } catch (e) {}
+      document.body.removeChild(ta);
+    }
+
+    function alertToast(msg) {
+      const btn = document.getElementById('theme-label');
+      const orig = btn.textContent;
+      btn.textContent = '✓ ' + msg;
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
+
+
+    // Component Lab Interactive State & Functions
+    state.labHistoryFilter = 'all';
+    state.labConfirmDeleteId = null;
+
+    function evalLabSmartInput() {
+      const raw = document.getElementById('lab-smart-input')?.value || '';
+      const cleaned = raw.replace(/[^0-9.+\-]/g, '');
+      let total = 0;
+      try {
+        const parts = cleaned.match(/[+\-]?\d+(\.\d+)?/g);
+        if (parts) {
+          total = parts.reduce((acc, n) => acc + parseFloat(n), 0);
+        }
+      } catch (e) {}
+      const preview = document.getElementById('lab-expr-preview');
+      if (preview) {
+        preview.textContent = '= ¥' + Math.max(0, total).toFixed(2);
+      }
+      return Math.max(0, total);
+    }
+
+    function applyLabExpr() {
+      const val = evalLabSmartInput();
+      const inp = document.getElementById('lab-smart-input');
+      if (inp) inp.value = val.toFixed(2);
+      evalLabSmartInput();
+    }
+
+    function appendLabChip(expr) {
+      const inp = document.getElementById('lab-smart-input');
+      if (!inp) return;
+      inp.value = (inp.value || '0') + expr;
+      evalLabSmartInput();
+    }
+
+    function updateLabRatio(liquidVal) {
+      const liq = parseInt(liquidVal, 10) || 0;
+      const res = 100 - liq;
+      const slider = document.getElementById('lab-ratio-slider');
+      if (slider) slider.value = liq;
+      const liqEl = document.getElementById('lab-ratio-liquid');
+      const resEl = document.getElementById('lab-ratio-reserve');
+      const simEl = document.getElementById('lab-ratio-sim');
+      if (liqEl) liqEl.textContent = liq + '%';
+      if (resEl) resEl.textContent = res + '%';
+      if (simEl) simEl.textContent = `每 ¥1,000 毛利：流动库 +¥${liq * 10} · 存储库 +¥${res * 10}`;
+    }
+
+    function setLabHistoryFilter(flt) {
+      state.labHistoryFilter = flt;
+      state.labConfirmDeleteId = null;
+      renderLabHistoryList();
+    }
+
+    function toggleLabDeleteConfirm(id) {
+      state.labConfirmDeleteId = state.labConfirmDeleteId === id ? null : id;
+      renderLabHistoryList();
+    }
+
+    function renderLabHistoryList() {
+      const listEl = document.getElementById('lab-history-list');
+      if (!listEl) return;
+      ['all', 'buffer', 'prepaid'].forEach(k => {
+        const b = document.getElementById('lab-flt-' + k);
+        if (b) {
+          b.style.backgroundColor = state.labHistoryFilter === k ? 'var(--daily-accent)' : 'var(--bg-card)';
+          b.style.color = state.labHistoryFilter === k ? 'var(--daily-on-accent)' : 'var(--text-secondary)';
+          b.style.borderColor = state.labHistoryFilter === k ? 'var(--daily-accent)' : 'var(--border-hairline)';
+        }
+      });
+
+      const filtered = state.dailyData.recentEvents.filter(ev => {
+        if (state.labHistoryFilter === 'buffer') return ev.pockets.some(p => p.includes('缓冲'));
+        if (state.labHistoryFilter === 'prepaid') return ev.isPrepaid;
+        return true;
+      });
+
+      listEl.innerHTML = filtered.map(ev => `
+        <div class="p-2.5 rounded-xl border flex items-center justify-between gap-2" style="background-color: var(--bg-card); border-color: var(--border-hairline);">
+          <div class="min-w-0">
+            <div class="text-xs font-bold truncate">${ev.title} <span class="text-[10px] font-normal" style="color: var(--text-secondary);">(${ev.pockets.join(' + ')})</span></div>
+            <div class="text-[10px]" style="color: var(--text-secondary);">${ev.date}</div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="font-num text-xs font-bold" style="color: var(--danger);">${ev.amount.toFixed(2)}</span>
+            ${state.labConfirmDeleteId === ev.id ? `
+              <button onclick="alertToast('已安全回滚并删除该记录'); state.labConfirmDeleteId=null; renderLabHistoryList();" class="px-2 py-1 rounded-lg text-[10px] font-bold" style="background-color: var(--danger); color: #fff;">确认回滚?</button>
+              <button onclick="toggleLabDeleteConfirm('${ev.id}')" class="px-1.5 py-1 rounded-lg text-[10px]" style="background-color: var(--bg-subtle);">取消</button>
+            ` : `
+              <button onclick="toggleLabDeleteConfirm('${ev.id}')" class="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style="background-color: var(--bg-subtle); color: var(--text-secondary);" title="展开二次确认">⋯</button>
+            `}
+          </div>
+        </div>
+      `).join('');
+    }
+
+
+    const EMBEDDED_SPEC_MD = "# Daily Ledger 全量 UI 与组件功能重构交接规范 (Codex Execution Spec v2.1)\n\n> **适用代码基线**：`bf84e20` (`main`)\n> **选定视觉主题**：**配色 B · 竹青宣纸（Kyoto Washi Paper）** —— 轻盈雅致宣纸白底（`#F9F8F6`）+ 纯白卡片（`#FFFFFF`）+ 竹青生活强调色（`#1F5E4B`）+ 赤陶生意强调色（`#B4532A`）+ `1px` 精细描边与现代瑞士网格排版。\n> **核心原则**：100% 保留 `current-ui-manifest.json` 中的全部业务契约（`businessContracts`）与计算函数（`lib/daily.ts`、`lib/copper.ts`、`lib/appData.ts`），仅重构视觉 Token、信息架构层级以及 6 个核心交互组件。\n\n---\n\n## 一、给 AI Codex 的一键启动指令（复制此段作为对话首句）\n\n```text\n请读取项目中的 `codex-refactor-spec.md` 与 `redesign-ui-manifest.json`（结合现有的 `current-ui-manifest.json` 业务契约），按以下 4 个阶段执行 UI 与组件功能重构，不要破坏 `lib/daily.ts`、`lib/copper.ts` 和 `lib/appData.ts` 的任何账目计算与存储结构：\n1. 第一阶段：更新 `index.css`，替换为「配色 B：竹青宣纸（Kyoto Washi）」亮/暗色 Token，移除厚重的拟物凹凸阴影（sunken/raise），统一改为 20px 圆角卡片与 1px 精细边框。\n2. 第二阶段：重构 `components/ui/Ui.tsx` 与 `App.tsx`，落地声明式 `Overlay`（支持下拉手势关闭与 `popstate` 手机返回键拦截）、`LedgerApp` 双模块 Keep-Alive 保活切换、以及带导入前差异预检（Dry-Run Diff）的 `BackupSection`。\n3. 第三阶段：重构 `components/DailyLedger.tsx`，落地 `SmartMoneyInput`（支持加减算式求值与快捷筹码）、双层联动 `weekHero` 主卡、双栏直读状态看板、带周次标签的微缩时间轴、多维筛选与两段式防误触删除的历史流水、以及级联瀑布流样式的 `TransactionFlowDetail`。\n4. 第四阶段：重构 `components/CopperShop.tsx`，落地树状资产恒等式总览卡（总资产 = 现金合计[流动库+存储库] + 库存成本）、`RatioSplitControl`（100% 恒等双向联动滑块）、以及销售毛利/库存上限实时校验。\n每完成一个阶段请运行类型检查（tsc / build），确保零编译错误。\n```\n\n---\n\n## 二、视觉 Token 规范（直接替换 `index.css`）\n\n请将 `index.css` 中的颜色、圆角和阴影变量替换为以下 **配色 B：竹青宣纸（Kyoto Washi）** 定义：\n\n```css\n:root {\n  --bg: #F9F8F6;\n  --card: #FFFFFF;\n  --subtle: #F0EFEA;\n  --text: #1C1917;\n  --muted: #57534E;\n  --accent: #1F5E4B;\n  --accent-hi: #17493A;\n  --on-accent: #FFFFFF;\n  --accent-soft: #EBF5F0;\n  --accent-border: #B6DFD0;\n  --warn: #D97706;\n  --warn-soft: #FEF3C7;\n  --warn-border: #FDE68A;\n  --neg: #DC2626;\n  --neg-soft: #FEF2F2;\n  --neg-border: #FECACA;\n  --pos: #16A34A;\n  --pos-soft: #F0FDF4;\n  --line: #E7E5E4;\n  --track: #E7E5E4;\n  --scrim: rgba(28, 25, 23, 0.48);\n  --raise: 0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px -2px rgba(28, 25, 23, 0.03);\n  --sunken: inset 0 0 0 1px #E7E5E4;\n  --r-card: 20px;\n  --r-control: 14px;\n  --r-key: 14px;\n  --r-sheet: 28px;\n  --r-pill: 999px;\n  --hit: 44px;\n}\n\n/* 铜钱生意模块亮色覆盖 */\n[data-module=\"copper\"], .module-copper {\n  --accent: #B4532A;\n  --accent-hi: #96421E;\n  --on-accent: #FFFFFF;\n  --accent-soft: #FDF3EE;\n  --accent-border: #F5CBB8;\n}\n\n/* 暗色模式覆盖 */\n[data-theme=\"dark\"], .theme-dark {\n  --bg: #171615;\n  --card: #21201E;\n  --subtle: #2B2927;\n  --text: #F5F5F4;\n  --muted: #A8A29E;\n  --accent: #4ADE80;\n  --accent-hi: #86EFAC;\n  --on-accent: #072617;\n  --accent-soft: rgba(74, 222, 128, 0.12);\n  --accent-border: rgba(74, 222, 128, 0.28);\n  --warn: #FBBF24;\n  --warn-soft: rgba(251, 191, 36, 0.14);\n  --warn-border: rgba(251, 191, 36, 0.3);\n  --neg: #F87171;\n  --neg-soft: rgba(248, 113, 113, 0.14);\n  --neg-border: rgba(248, 113, 113, 0.3);\n  --pos: #4ADE80;\n  --pos-soft: rgba(74, 222, 128, 0.14);\n  --line: #33302E;\n  --track: #33302E;\n  --scrim: rgba(0, 0, 0, 0.65);\n  --raise: 0 2px 10px rgba(0, 0, 0, 0.4);\n  --sunken: inset 0 0 0 1px #33302E;\n}\n\n/* 暗色模式 + 铜钱生意覆盖 */\n[data-theme=\"dark\"][data-module=\"copper\"], .theme-dark .module-copper {\n  --accent: #FB923C;\n  --accent-hi: #FDBA74;\n  --on-accent: #271204;\n  --accent-soft: rgba(251, 146, 60, 0.13);\n  --accent-border: rgba(251, 146, 60, 0.28);\n}\n```\n\n---\n\n## 三、6 个核心组件的功能重构规范（逐文件落实）\n\n### 1. `App.tsx` —— 双模块保活（Keep-Alive）与跨模块分红桥接\n- **现状问题**：切换底部 `app-tabs`（生活预算 / 铜钱生意）会直接卸载前一个模块组件，导致未提交的表单草稿、展开的预算周、滚动条位置全部丢失。\n- **重构要求**：\n  1. 在 `LedgerApp` 中同时挂载 `<DailyLedger />` 与 `<CopperShop />`，通过外层 `<div className={activeModule === 'daily' ? 'block' : 'hidden'} aria-hidden={activeModule !== 'daily'}>` 控制显隐，保留各自的局部表单与滚动状态。\n  2. **跨模块分红预填（可选快捷动作）**：在 `LedgerApp` 提供 `onTransferDividendToDaily(amount: number, note: string)` 回调传给 `CopperShop`；当用户在铜钱生意点击「提取利润至生活预算」时，自动切换到 `daily` 模块并打开 `daily.income` 弹层，预填金额与备注（不篡改底层 `lib` 逻辑，由用户点击「确认分配」完成入账）。\n\n### 2. `components/ui/Ui.tsx` + `BottomSheet` —— 声明式弹层、下滑手势与返回栈拦截\n- **现状问题**：\n  - `DailyLedger.tsx` 中的 `BottomSheet` 靠匹配中文标题字符串决定 `sheet` 或 `page`，并遍历 `children` 强行抽取 `SubmitButton`；\n  - `Overlay` 顶部的拖拽条只是装饰，不支持下拉关闭，且手机物理返回键会直接退出网页。\n- **重构要求**：\n  1. **显式 Props**：`Overlay` 与 `BottomSheet` 统一支持显式属性 `variant?: 'sheet' | 'page' | 'confirm'` 与 `footer?: React.ReactNode`（同时向后兼容旧调用方式）。\n  2. **下拉手势关闭（Drag-to-Dismiss）**：在 `variant === 'sheet'` 的顶部拖拽条区域绑定 `onPointerDown` / `onPointerMove` / `onPointerUp`，当向下拖拽距离 `deltaY > 90px` 时触发 `requestClose()`（自动走现有的 `dirty` 未保存确认保护）。\n  3. **浏览器返回栈同步（`popstate`）**：当最顶层 `Overlay` 打开时，调用 `window.history.pushState({ overlayOpen: true }, '')` 并监听 `popstate` 事件；用户按手机左滑返回键时调用 `requestClose()` 拦截返回动作。\n\n### 3. `components/ui/Ui.tsx` (`BackupSection`) —— 备份健康度提醒与导入前差异预检（Dry-Run Diff）\n- **现状问题**：全站无云同步，但用户不知道距离上次导出备份过了多久；恢复 JSON 或导入 Excel 时直接覆盖，选错旧备份会冲掉近期记录。\n- **重构要求**：\n  1. **备份健康度时间戳**：每次执行 `exportJson`、`daily.exportExcel`、`copper.exportExcel` 时，在 `localStorage` 记录 `daily_ledger_last_backup_at = Date.now()`。若距离当前超过 7 天（或从未备份），在首页右上角设置按钮上显示一个温和的琥珀色小圆点，并在 `BackupSection` 顶部显示「距离上次备份已 X 天」。\n  2. **导入前差异预检（Dry-Run Preview）**：用户选择 JSON 或 Excel 文件后，先解析出文件中的记录条数与最新记录日期，在 `confirm` 弹窗中对比展示：\n     - `当前浏览器账本：生活 X 笔 / 生意 Y 笔（最新日期：YYYY-MM-DD）`\n     - `待导入备份文件：生活 A 笔 / 生意 B 笔（最新日期：YYYY-MM-DD）`\n     - 若待导入文件的记录数少于当前账本或最新日期早于当前账本，高亮黄色警告，并提供「先自动导出当前备份，再执行恢复」选项。\n\n### 4. `SmartMoneyInput`（升级 `NumberField`）—— 行内算式求值 + 快捷筹码 + 铜钱毛利实时预览\n- **现状问题**：大号金额框只支持纯数字输入，遇到聚餐凑单扣减（`128-15`）或多件商品累加（`38+16.5`）需切出 App 按计算器。\n- **重构要求**：\n  1. 将 `daily.expense`、`daily.income`、`copper.sale`、`copper.purchase` 的主金额输入升级为 `SmartMoneyInput`：\n     - 允许输入数字与 `+`、`-`、`.` 运算符（如 `38+12-5`）；\n     - 当输入包含 `+` 或 `-` 时，在输入框右侧实时显示徽章 `= ¥45.00`，失焦（`onBlur`）或点击提交时自动将算式规约为最终数值字符串。\n     - 输入框下方提供一行紧凑的快捷累加筹码：`+¥10`、`+¥50`、`+¥100`、`-¥5`，点击即在当前金额上增减。\n  2. 在 `copper.sale`（记销售）中：当用户输入「销售金额」和「销售成本」时，在表单中部实时渲染一张**「毛利与分润预览卡」**：\n     - 显示 `本单毛利：¥(amount - cost)` 与 `毛利率：((profit / amount) * 100).toFixed(1)%`；\n     - 若 `profit > 0`，实时显示 `流动库 +¥(profit * liquidRatio%) / 存储库 +¥(profit * reserveRatio%)`；\n     - 若 `cost > currentInventoryCost`，立即在输入框下方显示红色行内提示「销售成本超过当前库存成本（¥xxx），无法提交」。\n\n### 5. `RatioSplitControl`（重构 `copper.settings` 分润比例）—— 100% 恒等联动滑块\n- **现状问题**：`copper.settings` 用两个独立输入框分别输入「流动库%」和「存储库%」，要求手动凑够 100%。\n- **重构要求**：\n  1. 替换为双向恒等联动组件 `RatioSplitControl`：\n     - 包含一个 `0–100`（步长 `5`）的滑块 + 两个联动数字框 + 三个快捷预设按钮（`70:30 常规`、`50:50 稳健`、`100:0 全回流`）；\n     - 修改 `liquidRatio` 为 `X` 时，自动设置 `reserveRatio = 100 - X`；修改 `reserveRatio` 为 `Y` 时，自动设置 `liquidRatio = 100 - Y`，永远保证总和等于 `100%`。\n     - 下方附带一行动态试算文案：`每产生 ¥1,000 毛利：流动库分得 ¥${liquidRatio * 10} · 存储库沉淀 ¥${reserveRatio * 10}`。\n\n### 6. `TransactionEventRow` & `daily.history` —— 多维口袋筛选 + 两段式防误触删除\n- **现状问题**：`daily.history` 只能翻页加载，无法筛选哪些支出动用了缓冲金或属于提前支付；每行右侧常驻裸露的删除图标易误触。\n- **重构要求**：\n  1. 在 `daily.history` 顶部增加轻量筛选栏：\n     - 筛选胶囊：`全部`、`动用缓冲/储备`（过滤 `allocation` 中含 `buffer` 或 `reserve` 的记录）、`提前支付`（过滤 `isPrepaid === true`）、`大额/计划外`；\n     - 关键词搜索框：按备注（`desc`）或类别名称实时过滤。\n  2. **两段式行内删除**：将 `TransactionEventRow` 右侧的独立删除按钮改为收起态图标 `⋯`（或轻度弱化的删除图标），第一次点击时在行内右侧滑出 `「确认回滚删除」 | 「取消」` 两个紧凑按钮，或调用 `useUi().confirm` 弹窗并明确列出将回滚到哪些口袋的具体金额。\n\n---\n\n## 四、四大核心界面的布局与信息架构重构规范\n\n### 1. 生活预算首页 (`daily.home` in `components/DailyLedger.tsx`)\n- **区块 1：双层联动主卡 (`weekHero`)**\n  - **上半层（聚焦本周）**：左侧「本周剩余可用」状态圆点 + 标签，右侧当前周日期胶囊（如 `W1 · 10.12 – 10.18`）；中部左侧超大等宽数字 `¥682.00`（超支时变红色并显示 `已超支 ¥xxx`），右侧显示 `已用 ¥318 / 额度 ¥1,000`；下方为圆角进度槽 + `本周消耗进度 X%` 与 `日均可用 ¥X/天`。\n  - **下半层（内嵌式所属周期资金池底座，背景 `--subtle`，顶部分割线 `--line`）**：\n    - 标题行：`↳ 所属周期资金池 (10.12 – 11.12)` + 右侧 `周期详情 →` 按钮（打开 `daily.cycle`）；\n    - 双列子卡：左卡「周期日常剩余（含本周） `¥2,682.00`」，右卡「安全缓冲金（兜底池） `¥1,500.00`」；\n    - 底部栏：若有提前支付，左侧显示琥珀色胶囊 `⏳ 未来周提前支付 ¥120 · 查看清单 →`（打开 `daily.cycle` 并定位 `#prepaid-list`），右侧显示 `可动用总计 ¥7,382`。\n- **区块 2：一体化操作台 (`recordAndSummary` + `quickActions`)**\n  - 采用 12 列网格（`grid-cols-12 gap-2`）：\n    - 左侧 5 列（`col-span-5`）：竹青主色大按钮 `＋ 记一笔（日常 / 预付 / 大额）`，打开 `daily.expense`；\n    - 右侧 7 列（`col-span-7 grid-cols-3`）：3 张纯白快捷操作卡 `💰 收入分配`、`⚖️ 余额校准`、`🏦 固定支出`（若有待确认固定项，右上角显示琥珀色数字角标）。\n- **区块 3：透明直读状态看板（替代原先需盲滑圆点的小卡片）**\n  - 顶部左侧分段切换按钮：`待处理事项 (N)` | `固定预留池 (¥3,200)`，右侧 `管理 →`；\n  - 下方 3 列网格（`grid-cols-3 gap-2`）展示对应指标（固定待付笔数、账面校准提示、储备缺口 / 预留余额、本期固定项数、待确认扣款额）。\n- **区块 4：带周次与金额的微缩周时间轴 (`weeklyConsumption`)**\n  - 将原先无文字的灰色凹槽改为水平网格/滚动卡片序列（`W1`、`W2`、`W3`、`W4`…）：\n  - 每张周卡片包含：顶部周次 `W1` + `本周` 高亮徽章、次行起始日期、中部垂直堆叠柱（实心竹青代表已花、琥珀斜纹 `.bg-prepaid-stripe` 代表提前支付）、底部该周剩余金额 `¥682`。\n\n### 2. 快速记支出弹层 (`daily.expense` in `components/DailyLedger.tsx`)\n- **金额框**：使用 `SmartMoneyInput`，右侧联动展示当前选中类别及其扣款规则徽章（如 `外食 · 扣本周`、`计划外 · 超支动用缓冲`、`大额 · 优先缓冲/储备`）。\n- **日期与备注双列同行**：将「付款日期」与「备注·可选」排为 `grid-cols-2 gap-2`，减少纵向高度，确保手机一屏免滚动。\n- **底部实时扣款预览条**：除显示 `本周剩余 ¥682 → ¥644` 文字外，附带一条实时变化的微型进度条预览。\n\n### 3. 资金流向详情 (`TransactionFlowDetail` / `daily.flow` in `components/DailyLedger.tsx`)\n- **顶部收据摘要卡**：居中展示类别徽章、标题、大号金额、日期与记录时间。\n- **级联瀑布流（Waterfall Allocation）**：\n  - 当具备完整前后快照时，左侧绘制一条贯穿式的纵向连接线（`border-l-2`），每个扣款口袋前放置序号圆标 `1`、`2`；\n  - 每个口袋卡片展示：口袋名称 + 扣款角色标签（如 `优先扣减` / `自动补足差额`）+ 本次扣减金额 `-¥682.00`；\n  - 下方内嵌 3 列等式条：`扣款前余额 ¥682.00` ➔ `-682.00` ➔ `= ¥0.00 (扣款后新余额)`。\n  - **严格保留现有降级规则**：缺任一快照时隐藏计算等式条并标注旧记录；单项分配与快照不等式时写「记录后」不写等号；未覆盖差额独立展示为红色「未覆盖资金缺口」卡片；内部转账隐藏删除按钮。\n\n### 4. 铜钱生意首页 (`copper.home` in `components/CopperShop.tsx`)\n- **树状资产恒等式总览卡（合并原 `assets` 与 `cashPockets` 的割裂感）**：\n  - **上半层（总资产）**：展示 `生意总资产 ¥28,460.00` + 一条双色比例进度条（赤陶色代表现金合计占比，中性灰代表库存成本占比），下方左右标注 `● 现金合计 ¥18,460 (65%)` 与 `● 库存成本 ¥10,000 (35%)`。\n  - **下半层（内嵌现金两库拆解，背景 `--subtle`）**：标题注明 `↳ 现金合计拆解`，下方并排展示 `💳 流动库 ¥12,920 (利润 70%)` 与 `🔒 存储库 ¥5,540 (利润 30%)`，让 `流动库 + 存储库 = 现金合计`、`现金合计 + 库存成本 = 总资产` 的层级关系无需心算即可一目了然。\n";
+    const EMBEDDED_MANIFEST_JSON = "{\n  \"schemaVersion\": \"2.1-kyoto-redesign\",\n  \"product\": \"Daily Ledger\",\n  \"extractedAt\": \"2026-10-16\",\n  \"sourceCommit\": \"bf84e20b24d2e3cf20c4fd48bb43fae566f5e1bc\",\n  \"evidence\": \"Current source inspection only; no new browser execution or screenshot in this extraction\",\n  \"locale\": \"zh-CN\",\n  \"currency\": \"CNY\",\n  \"platform\": \"responsive_web\",\n  \"intent\": \"Target UI & Component Refactoring Specification (Concept 02 - Kyoto Washi Palette B)\",\n  \"identifiersAreUrls\": false,\n  \"shell\": {\n    \"defaultScreen\": \"daily.home\",\n    \"stateBasedNavigation\": true,\n    \"router\": null,\n    \"rootComponentTree\": [\n      \"App\",\n      \"AppErrorBoundary\",\n      \"UiProvider\",\n      \"app-shell\",\n      \"LedgerApp\",\n      \"app-main + app-tabs\"\n    ],\n    \"moduleDestinations\": [\n      {\n        \"id\": \"daily.home\",\n        \"label\": \"生活预算\"\n      },\n      {\n        \"id\": \"copper.home\",\n        \"label\": \"铜钱生意\"\n      }\n    ],\n    \"navigationPresentation\": \"floating bottom tabs on mobile and desktop; no sidebar\",\n    \"mainMaxWidthPx\": 896,\n    \"mainPaddingXPx\": {\n      \"mobile\": 16,\n      \"desktopAt768\": 32\n    },\n    \"tabBar\": {\n      \"maxWidthPx\": 480,\n      \"sideOffsetPx\": 14,\n      \"bottom\": \"18px + env(safe-area-inset-bottom)\",\n      \"radiusPx\": 34\n    },\n    \"moduleSwitch\": \"Unmounts previous feature component; feature-local panel/form states are not persisted ledger data\"\n  },\n  \"storage\": {\n    \"kind\": \"browser_localStorage\",\n    \"authentication\": false,\n    \"cloudSync\": false\n  },\n  \"screens\": [\n    {\n      \"id\": \"daily.home\",\n      \"label\": \"生活预算\",\n      \"presentation\": \"root\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 1099\n      },\n      \"sectionsInOrder\": [\n        {\n          \"id\": \"header\",\n          \"content\": [\n            \"日期与星期\",\n            \"生活预算\"\n          ],\n          \"actions\": [\n            {\n              \"label\": \"设置\",\n              \"target\": \"daily.settings\"\n            }\n          ]\n        },\n        {\n          \"id\": \"initializationNotice\",\n          \"visibleWhen\": \"budget.initialized == false\",\n          \"content\": [\n            \"先建立生活预算\",\n            \"旧流水保留\"\n          ],\n          \"actions\": [\n            {\n              \"label\": \"初始设置\",\n              \"target\": \"daily.settings\"\n            }\n          ]\n        },\n        {\n          \"id\": \"weekHero\",\n          \"visibleWhen\": \"currentCycle exists\",\n          \"content\": [\n            \"本周剩余\",\n            \"预算周日期\",\n            \"消耗进度\",\n            \"本周已用\",\n            \"本周额度\",\n            \"超支金额（条件）\",\n            \"周期日常剩余\",\n            \"缓冲金\"\n          ],\n          \"actions\": [\n            {\n              \"label\": \"周期日期与状态 pill\",\n              \"target\": \"daily.cycle\"\n            },\n            {\n              \"label\": \"提前支付 pill（有金额时）\",\n              \"target\": \"daily.cycle\",\n              \"anchor\": \"prepaid-list\"\n            }\n          ]\n        },\n        {\n          \"id\": \"noCycleHero\",\n          \"visibleWhen\": \"no currentCycle\",\n          \"content\": [\n            \"开始你的第一个预算周期\",\n            \"收入分配说明\"\n          ],\n          \"actions\": [\n            {\n              \"label\": \"收入分配\",\n              \"target\": \"daily.income\"\n            }\n          ]\n        },\n        {\n          \"id\": \"recordAndSummary\",\n          \"layout\": \"128px primary entry + remaining-width summary; 112px primary at <=370px\",\n          \"actions\": [\n            {\n              \"label\": \"记一笔\",\n              \"target\": \"daily.expense\"\n            }\n          ],\n          \"summaryTabs\": {\n            \"labels\": [\n              \"待处理\",\n              \"固定预留\"\n            ],\n            \"interaction\": [\n              \"click tabs\",\n              \"horizontal swipe\"\n            ],\n            \"pendingFields\": [\n              \"固定支出笔数\",\n              \"余额校准提示\",\n              \"储备缺口\"\n            ],\n            \"fixedFields\": [\n              \"固定预留金额\",\n              \"本期固定项数\",\n              \"待确认数\"\n            ]\n          }\n        },\n        {\n          \"id\": \"quickActions\",\n          \"actions\": [\n            {\n              \"label\": \"收入分配\",\n              \"target\": \"daily.income\"\n            },\n            {\n              \"label\": \"余额校准\",\n              \"target\": \"daily.calibration\"\n            },\n            {\n              \"label\": \"固定支出\",\n              \"target\": \"daily.fixed\"\n            }\n          ]\n        },\n        {\n          \"id\": \"weeklyConsumption\",\n          \"content\": [\n            \"每周凹陷轨道\",\n            \"已花填充\",\n            \"未来提前支付斜纹\",\n            \"预算或剩余\",\n            \"过去/当前/未来状态\"\n          ],\n          \"overflow\": \"horizontal when needed\",\n          \"emptyState\": \"收入分配后显示周期节奏\",\n          \"target\": \"daily.cycle\"\n        },\n        {\n          \"id\": \"recentEvents\",\n          \"limit\": 3,\n          \"component\": \"TransactionEventRow\",\n          \"actions\": [\n            {\n              \"label\": \"查看全部\",\n              \"target\": \"daily.history\"\n            },\n            {\n              \"label\": \"点击事件行体\",\n              \"target\": \"daily.flow\"\n            },\n            {\n              \"label\": \"独立删除按钮\",\n              \"effect\": \"confirm and rollback; no delete for transfers\"\n            }\n          ]\n        }\n      ],\n      \"states\": [\n        \"uninitialized\",\n        \"initialized_without_cycle\",\n        \"active\",\n        \"extended\",\n        \"overspent\",\n        \"low_buffer\",\n        \"reserve_gap\",\n        \"prepaid\",\n        \"empty_events\"\n      ]\n    },\n    {\n      \"id\": \"daily.settings\",\n      \"label\": \"初始设置 / 预算设置\",\n      \"presentation\": \"page_overlay\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 1721\n      },\n      \"fields\": [\n        {\n          \"id\": \"spendable\",\n          \"label\": \"当前可消费余额\",\n          \"type\": \"money\",\n          \"visibleWhen\": \"uninitialized\"\n        },\n        {\n          \"id\": \"buffer\",\n          \"label\": \"当前缓冲金\",\n          \"type\": \"money\",\n          \"visibleWhen\": \"uninitialized\"\n        },\n        {\n          \"id\": \"reserve\",\n          \"label\": \"当前储备金\",\n          \"type\": \"money\",\n          \"visibleWhen\": \"uninitialized\"\n        },\n        {\n          \"id\": \"expectedPayday\",\n          \"label\": \"预计发薪日\",\n          \"type\": \"read_only\",\n          \"value\": \"每月15日，遇周末提前\"\n        },\n        {\n          \"id\": \"reserveFixedAmount\",\n          \"label\": \"储备固定金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"bufferFixedAmount\",\n          \"label\": \"缓冲固定金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"fixedReserved\",\n          \"label\": \"当前固定预留\",\n          \"type\": \"read_only_money\"\n        },\n        {\n          \"id\": \"reserveGoal\",\n          \"label\": \"储备金目标\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"bufferCap\",\n          \"label\": \"缓冲金上限\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"minimumWeeklyLiving\",\n          \"label\": \"最低每周生活线\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"reserveMinimumOverride\",\n          \"label\": \"储备金最低线覆盖\",\n          \"type\": \"optional_money\",\n          \"emptyMeaning\": \"自动计算\"\n        }\n      ],\n      \"summary\": [\n        \"储备余额/目标\",\n        \"目标进度\",\n        \"最低线\",\n        \"缺口\"\n      ],\n      \"footerActions\": [\n        \"保存生活预算设置\"\n      ],\n      \"contentComponents\": [\n        \"BackupSection\"\n      ],\n      \"states\": [\n        \"initial_setup\",\n        \"initialized\",\n        \"dirty\",\n        \"saved\",\n        \"inline_error\"\n      ],\n      \"notes\": [\n        \"Automatically opens on first use\",\n        \"Settings draft including reserveMinimumOverride commits on Save\",\n        \"Saving initialized settings does not automatically close the page\",\n        \"Payday rule and fixedReserved are read-only\"\n      ]\n    },\n    {\n      \"id\": \"daily.income\",\n      \"label\": \"收入分配\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 1935\n      },\n      \"fields\": [\n        {\n          \"id\": \"incomeKind\",\n          \"type\": \"segmented_choice\",\n          \"options\": [\n            {\n              \"value\": \"main\",\n              \"label\": \"主要收入\"\n            },\n            {\n              \"value\": \"casual\",\n              \"label\": \"零散收入\"\n            },\n            {\n              \"value\": \"refund\",\n              \"label\": \"退款报销\"\n            }\n          ]\n        },\n        {\n          \"id\": \"amount\",\n          \"label\": \"金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"date\",\n          \"label\": \"日期\",\n          \"type\": \"date\"\n        },\n        {\n          \"id\": \"desc\",\n          \"label\": \"备注\",\n          \"type\": \"text\"\n        }\n      ],\n      \"conditionalContent\": [\n        \"Main income opens a new cycle and shows fixed-reserve shortfall or already-covered explanation\"\n      ],\n      \"footerActions\": [\n        \"确认分配\"\n      ],\n      \"protectEdits\": true\n    },\n    {\n      \"id\": \"daily.expense\",\n      \"label\": \"记支出\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 1996\n      },\n      \"fields\": [\n        {\n          \"id\": \"category\",\n          \"type\": \"category_choice\",\n          \"options\": [\n            {\n              \"value\": \"daily\",\n              \"label\": \"日常\"\n            },\n            {\n              \"value\": \"dining\",\n              \"label\": \"外食\"\n            },\n            {\n              \"value\": \"other\",\n              \"label\": \"其他\"\n            },\n            {\n              \"value\": \"unplanned\",\n              \"label\": \"计划外\"\n            },\n            {\n              \"value\": \"large\",\n              \"label\": \"大额\"\n            }\n          ]\n        },\n        {\n          \"id\": \"amount\",\n          \"label\": \"金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"date\",\n          \"label\": \"日期/付款日期\",\n          \"type\": \"date\"\n        },\n        {\n          \"id\": \"desc\",\n          \"label\": \"备注\",\n          \"type\": \"optional_text\"\n        },\n        {\n          \"id\": \"isPrepaid\",\n          \"label\": \"未来开销\",\n          \"type\": \"toggle\"\n        },\n        {\n          \"id\": \"effectiveDate\",\n          \"label\": \"归属日期\",\n          \"type\": \"date\",\n          \"visibleWhen\": \"isPrepaid\"\n        }\n      ],\n      \"contentOrder\": [\n        \"large amount input\",\n        \"five category keys\",\n        \"date and optional note\",\n        \"future-expense switch\",\n        \"effective date and funding explanation when prepaid\",\n        \"large-expense warning when applicable\",\n        \"normal-spend before/after preview or large-expense funding hint\"\n      ],\n      \"validation\": [\n        \"positive amount\",\n        \"effectiveDate later than payment date\",\n        \"effectiveDate outside payment budget week when both weeks exist\"\n      ],\n      \"footerActions\": [\n        \"记录支出\"\n      ],\n      \"protectEdits\": true,\n      \"notes\": [\n        \"Amount uses 52px numeric input and inputmode=decimal\",\n        \"Preview runs existing helper on an in-memory copy without persisting\",\n        \"Prepaid funding uses buffer then reserve then available daily money; preserve payment/effective dates\"\n      ]\n    },\n    {\n      \"id\": \"daily.calibration\",\n      \"label\": \"余额校准\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2145\n      },\n      \"fields\": [\n        {\n          \"id\": \"amount\",\n          \"label\": \"当前可消费余额\",\n          \"type\": \"money\"\n        }\n      ],\n      \"content\": [\n        \"当前账面可消费余额\",\n        \"可校准余额包含日常资金、缓冲金、固定预留，排除储备金\",\n        \"差额可能产生未记录支出或余额修正\"\n      ],\n      \"footerActions\": [\n        \"完成校准\"\n      ],\n      \"protectEdits\": true\n    },\n    {\n      \"id\": \"daily.fixed\",\n      \"label\": \"固定支出\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2174\n      },\n      \"fields\": [\n        {\n          \"id\": \"fixedReservedAmount\",\n          \"label\": \"固定预留目标金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"name\",\n          \"label\": \"名称\",\n          \"type\": \"text\"\n        },\n        {\n          \"id\": \"amount\",\n          \"label\": \"金额\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"dueDay\",\n          \"label\": \"每月到期日\",\n          \"type\": \"day_of_month\"\n        }\n      ],\n      \"content\": [\n        \"固定支出预留\",\n        \"主要收入补足缺口说明\",\n        \"固定支出列表\"\n      ],\n      \"rowContent\": [\n        \"名称\",\n        \"金额\",\n        \"每月到期日\",\n        \"当前周期支付状态\"\n      ],\n      \"inlineActions\": [\n        \"保存预留\",\n        \"添加固定支出\",\n        \"标记已付（确认实际扣款）\",\n        \"删除固定支出\"\n      ],\n      \"footerActions\": [],\n      \"protectEdits\": true,\n      \"states\": [\n        \"empty\",\n        \"pending\",\n        \"paid_disabled\",\n        \"reserve_shortfall\"\n      ],\n      \"notes\": [\n        \"No dedicated fixed action footer; management actions remain in scrollable content\",\n        \"Paid action is disabled for the current cycle\"\n      ]\n    },\n    {\n      \"id\": \"daily.cycle\",\n      \"label\": \"周期详情\",\n      \"presentation\": \"page_overlay\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 1378\n      },\n      \"content\": [\n        \"总金额\",\n        \"可动用余额\",\n        \"储备余额/目标/进度\",\n        \"本周期日常剩余\",\n        \"缓冲金\",\n        \"固定预留\",\n        \"本周日期/额度/已花/剩余\",\n        \"周期日期/状态\",\n        \"主要收入+其他收入\",\n        \"日常预算\",\n        \"储备增长\",\n        \"可展开预算周列表\",\n        \"提前支付清单\",\n        \"最近周期摘要\"\n      ],\n      \"actions\": [\n        \"展开/收起预算周\",\n        \"返回\"\n      ],\n      \"states\": [\n        \"no_cycle\",\n        \"active\",\n        \"extended\",\n        \"prepaid_present\",\n        \"recent_archived_cycles\"\n      ],\n      \"anchors\": [\n        \"prepaid-list\"\n      ]\n    },\n    {\n      \"id\": \"daily.history\",\n      \"label\": \"历史流水\",\n      \"presentation\": \"page_overlay\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2362\n      },\n      \"component\": \"TransactionEventRow\",\n      \"pagination\": {\n        \"initial\": 20,\n        \"increment\": 20\n      },\n      \"actions\": [\n        {\n          \"label\": \"点击事件行体\",\n          \"target\": \"daily.flow\"\n        },\n        {\n          \"label\": \"加载更多\",\n          \"effect\": \"append 20 visible rows\"\n        },\n        {\n          \"label\": \"独立删除\",\n          \"effect\": \"confirm rollback; transfers excluded\"\n        }\n      ],\n      \"states\": [\n        \"empty\",\n        \"has_more\",\n        \"all_loaded\"\n      ]\n    },\n    {\n      \"id\": \"daily.flow\",\n      \"label\": \"资金流向\",\n      \"presentation\": \"nested_page_overlay\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2403\n      },\n      \"component\": \"TransactionFlowDetail\",\n      \"entryPoints\": [\n        \"daily.home recent event\",\n        \"daily.history event\"\n      ],\n      \"content\": [\n        \"类型/备注/金额摘要\",\n        \"日期与创建时间（有数据时）\",\n        \"提前支付付款与归属日期（条件）\",\n        \"allocation对应真实来源或去向\",\n        \"前后余额快照计算条（完整时）\",\n        \"资金缺口（条件）\",\n        \"分配总额校验（非转账）\"\n      ],\n      \"actions\": [\n        \"返回原上下文\",\n        \"删除并回滚（非转账，需确认）\"\n      ],\n      \"states\": [\n        \"income\",\n        \"expense\",\n        \"internal_transfer\",\n        \"funding_gap\",\n        \"missing_allocation\",\n        \"missing_snapshots\",\n        \"snapshot_not_an_equation\"\n      ],\n      \"fallbacks\": {\n        \"missingAllocation\": \"Show record metadata and explanation only\",\n        \"missingEitherSnapshot\": \"Show allocation amounts, omit entire calculation bars, show old-record notice\",\n        \"nonReconcilingSavedPair\": \"Use 记录后 instead of an incorrect equals sign; never reconstruct balances\"\n      },\n      \"notes\": [\n        \"Large/prepaid advance uses saved spendable snapshot\",\n        \"No delete action for internal transfers\"\n      ]\n    },\n    {\n      \"id\": \"copper.home\",\n      \"label\": \"铜钱生意\",\n      \"presentation\": \"root\",\n      \"source\": {\n        \"path\": \"components/CopperShop.tsx\",\n        \"line\": 425\n      },\n      \"sectionsInOrder\": [\n        {\n          \"id\": \"header\",\n          \"content\": [\n            \"本地保存于此浏览器\",\n            \"铜钱生意\"\n          ],\n          \"actions\": [\n            {\n              \"label\": \"配置\",\n              \"target\": \"copper.settings\"\n            }\n          ]\n        },\n        {\n          \"id\": \"legacyWarning\",\n          \"visibleWhen\": \"lockedLegacyCount > 0\",\n          \"content\": [\n            \"旧版流水缺少精确资金明细，保留展示但不可删除\"\n          ]\n        },\n        {\n          \"id\": \"assets\",\n          \"content\": [\n            \"总资产\",\n            \"现金合计\",\n            \"库存成本\"\n          ],\n          \"layout\": \"one combined card\"\n        },\n        {\n          \"id\": \"cashPockets\",\n          \"content\": [\n            \"流动库余额与利润比例\",\n            \"存储库余额与利润比例\"\n          ],\n          \"layout\": \"two parallel cards\"\n        },\n        {\n          \"id\": \"entryKeys\",\n          \"actions\": [\n            {\n              \"label\": \"记销售\",\n              \"target\": \"copper.sale\"\n            },\n            {\n              \"label\": \"记进货\",\n              \"target\": \"copper.purchase\"\n            }\n          ]\n        },\n        {\n          \"id\": \"trends\",\n          \"visibleWhen\": \"chartData.length > 0\",\n          \"content\": [\n            \"近30天收入\",\n            \"近30天毛利\",\n            \"库存变化\",\n            \"文字摘要\",\n            \"收入柱与利润均线或库存曲线\",\n            \"最高毛利日\"\n          ],\n          \"actions\": [\n            \"收利/库存切换\",\n            \"click or touch chart for values\"\n          ]\n        },\n        {\n          \"id\": \"monthlyEntry\",\n          \"visibleWhen\": \"monthlyStats.length > 0\",\n          \"actions\": [\n            {\n              \"label\": \"月度经营汇总 · 查看全部\",\n              \"target\": \"copper.monthly\"\n            }\n          ],\n          \"note\": \"Root shows an entry button, not month cards\"\n        },\n        {\n          \"id\": \"recentTransactions\",\n          \"limit\": 10,\n          \"content\": [\n            \"备注\",\n            \"日期\",\n            \"类型\",\n            \"金额\",\n            \"销售成本/利润\",\n            \"已确认/已取消/历史锁定标签\"\n          ],\n          \"actions\": [\n            \"显示/隐藏已取消\",\n            \"确认待确认销售（确认弹窗）\",\n            \"取消并回滚（确认弹窗）\",\n            \"删除非锁定普通或已取消记录（确认弹窗）\"\n          ],\n          \"pendingContent\": [\n            \"待确认\",\n            \"n天后自动确认\",\n            \"款与库存已入账\"\n          ],\n          \"emptyState\": \"暂无记录；提示记销售/记进货\"\n        }\n      ],\n      \"states\": [\n        \"empty\",\n        \"normal_sale\",\n        \"loss_sale\",\n        \"purchase\",\n        \"inventory_adjustment\",\n        \"pending\",\n        \"confirmed\",\n        \"cancelled\",\n        \"legacy_locked\"\n      ]\n    },\n    {\n      \"id\": \"copper.sale\",\n      \"label\": \"记销售\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/CopperShop.tsx\",\n        \"line\": 626\n      },\n      \"template\": \"shared copper entry form\",\n      \"fields\": [\n        {\n          \"id\": \"amount\",\n          \"label\": \"销售金额\",\n          \"type\": \"money\",\n          \"presentation\": \"large_numeric_input\"\n        },\n        {\n          \"id\": \"cost\",\n          \"label\": \"销售成本\",\n          \"type\": \"money\"\n        },\n        {\n          \"id\": \"date\",\n          \"label\": \"日期\",\n          \"type\": \"date\"\n        },\n        {\n          \"id\": \"desc\",\n          \"label\": \"备注\",\n          \"type\": \"optional_text\"\n        },\n        {\n          \"id\": \"isPending\",\n          \"label\": \"待确认销售\",\n          \"type\": \"checkbox_switch\",\n          \"valueWhenOpeningSale\": true\n        }\n      ],\n      \"footerActions\": [\n        \"记录销售\"\n      ],\n      \"protectEdits\": true,\n      \"notes\": [\n        \"Pending sale immediately books cash/inventory; app processing confirms after 10 natural days\",\n        \"Cost cannot exceed inventory cost; negative profit is supported\"\n      ]\n    },\n    {\n      \"id\": \"copper.purchase\",\n      \"label\": \"记进货\",\n      \"presentation\": \"bottom_sheet\",\n      \"source\": {\n        \"path\": \"components/CopperShop.tsx\",\n        \"line\": 626\n      },\n      \"template\": \"shared copper entry form\",\n      \"fields\": [\n        {\n          \"id\": \"amount\",\n          \"label\": \"进货金额\",\n          \"type\": \"money\",\n          \"presentation\": \"large_numeric_input\"\n        },\n        {\n          \"id\": \"date\",\n          \"label\": \"日期\",\n          \"type\": \"date\"\n        },\n        {\n          \"id\": \"desc\",\n          \"label\": \"备注\",\n          \"type\": \"optional_text\"\n        }\n      ],\n      \"footerActions\": [\n        \"记录进货\"\n      ],\n      \"protectEdits\": true,\n      \"notes\": [\n        \"No sale cost or pending switch\",\n        \"Purchase decreases cash and increases inventory cost\"\n      ]\n    },\n    {\n      \"id\": \"copper.settings\",\n      \"label\": \"铜钱配置\",\n      \"presentation\": \"page_overlay\",\n      \"source\": {\n        \"path\": \"components/CopperShop.tsx\",\n        \"line\": 442\n      },\n      \"groups\": [\n        {\n          \"id\": \"ratios\",\n          \"fields\": [\n            \"流动库%\",\n            \"存储库%\"\n          ],\n          \"validation\": \"sum equals 100\",\n          \"actions\": [\n            \"保存比例\"\n          ]\n        },\n        {\n          \"id\": \"inventoryEntry\",\n          \"fields\": [\n            \"本笔库存成本\",\n            \"备注\"\n          ],\n          \"actions\": [\n            \"补录库存\"\n          ]\n        },\n        {\n          \"id\": \"inventoryTotal\",\n          \"fields\": [\n            \"库存成本总额\",\n            \"备注\"\n          ],\n          \"actions\": [\n            \"记录调整\"\n          ]\n        }\n      ],\n      \"contentComponents\": [\n        \"BackupSection\"\n      ],\n      \"protectEdits\": true,\n      \"notes\": [\n        \"Inventory supplementation/stocktake are inventory adjustments, not purchase payments\",\n        \"Ratio sum must equal 100\",\n        \"Management actions remain in scrollable content\"\n      ]\n    },\n    {\n      \"id\": \"copper.monthly\",\n      \"label\": \"月度经营汇总\",\n      \"presentation\": \"page_overlay\",\n      \"source\": {\n        \"path\": \"components/CopperShop.tsx\",\n        \"line\": 931\n      },\n      \"rowTemplate\": {\n        \"container\": \"month card\",\n        \"fields\": [\n          \"月份\",\n          \"收入\",\n          \"销售成本\",\n          \"毛利润\",\n          \"待确认笔数/金额\",\n          \"进货\",\n          \"现金变化\"\n        ]\n      },\n      \"actions\": [\n        \"返回\"\n      ]\n    }\n  ],\n  \"globalOverlays\": [\n    {\n      \"id\": \"global.confirm\",\n      \"presentation\": \"centered_confirmation\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 31\n      },\n      \"fields\": [\n        \"title\",\n        \"body\",\n        \"cancel button\",\n        \"confirm button\"\n      ],\n      \"variants\": [\n        \"normal\",\n        \"danger\"\n      ],\n      \"uses\": [\n        \"discard unsaved input\",\n        \"large-expense question\",\n        \"insufficient-money continuation\",\n        \"record deletion and rollback\",\n        \"fixed payment\",\n        \"pending sale confirm/cancel\",\n        \"JSON restore\",\n        \"Excel overwrite\"\n      ]\n    },\n    {\n      \"id\": \"global.toast\",\n      \"presentation\": \"bottom_status_toast\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 99\n      },\n      \"role\": \"status\"\n    },\n    {\n      \"id\": \"global.error\",\n      \"presentation\": \"inline_error_in_active_view\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 334\n      },\n      \"role\": \"alert\"\n    },\n    {\n      \"id\": \"global.loadFailure\",\n      \"presentation\": \"error_boundary_fallback\",\n      \"source\": {\n        \"path\": \"App.tsx\",\n        \"line\": 29\n      },\n      \"content\": [\n        \"页面加载失败\",\n        \"刷新及备份说明\"\n      ]\n    }\n  ],\n  \"components\": [\n    {\n      \"name\": \"UiProvider / useUi\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 25\n      },\n      \"responsibility\": [\n        \"Promise confirmations\",\n        \"completion toast\",\n        \"portal appearance classes\"\n      ]\n    },\n    {\n      \"name\": \"Overlay\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 115\n      },\n      \"variants\": [\n        \"sheet\",\n        \"page\",\n        \"confirm\"\n      ],\n      \"anatomy\": [\n        \"decorative handle for sheet\",\n        \"title and close/back\",\n        \"independently scrolling body\",\n        \"optional fixed footer\"\n      ],\n      \"behaviors\": [\n        \"Portal into document.body\",\n        \"theme and module classes copied to portal\",\n        \"root inert and background scroll lock\",\n        \"topmost Escape and focus trap\",\n        \"restore prior focus\",\n        \"visualViewport resize and offset handling\",\n        \"dirty-edit discard confirmation\",\n        \"successful save clears dirty flag\",\n        \"file upload excluded from dirty flag\"\n      ],\n      \"notImplemented\": [\n        \"handle drag gesture\",\n        \"URL-based navigation\"\n      ]\n    },\n    {\n      \"name\": \"BackupSection\",\n      \"source\": {\n        \"path\": \"components/ui/Ui.tsx\",\n        \"line\": 341\n      },\n      \"anatomy\": [\n        \"本地保存说明\",\n        \"整站JSON及主题切换/导出/恢复控件\",\n        \"本模块Excel导出/导入\"\n      ],\n      \"usedBy\": [\n        \"daily.settings\",\n        \"copper.settings\"\n      ]\n    },\n    {\n      \"name\": \"BottomSheet\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 384\n      },\n      \"responsibility\": \"Daily wrapper choosing page/sheet and extracting primary submit footer\"\n    },\n    {\n      \"name\": \"SectionShell\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 376\n      },\n      \"responsibility\": \"Daily card section\"\n    },\n    {\n      \"name\": \"TransactionEventRow\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 550\n      },\n      \"responsibility\": \"Event detail action and independent non-transfer delete action\"\n    },\n    {\n      \"name\": \"TransactionFlowDetail\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 427\n      },\n      \"responsibility\": \"Recorded allocation and snapshot rendering\"\n    },\n    {\n      \"name\": \"NumberField / DateField / TextField\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2441\n      },\n      \"responsibility\": \"Labeled inputs\"\n    },\n    {\n      \"name\": \"SegmentedChoices / SubmitButton\",\n      \"source\": {\n        \"path\": \"components/DailyLedger.tsx\",\n        \"line\": 2493\n      },\n      \"responsibility\": \"Income-kind selection and primary submit\"\n    }\n  ],\n  \"designTokens\": {\n    \"source\": \"index.css\",\n    \"base\": {\n      \"bg\": \"#F9F8F6\",\n      \"card\": \"#FFFFFF\",\n      \"text\": \"#1C1917\",\n      \"muted\": \"#57534E\",\n      \"accent\": \"#1F5E4B\",\n      \"accent-hi\": \"#17493A\",\n      \"on-accent\": \"#FFFFFF\",\n      \"accent-soft\": \"#EBF5F0\",\n      \"warn\": \"#D97706\",\n      \"warn-soft\": \"#FEF3C7\",\n      \"neg\": \"#DC2626\",\n      \"pos\": \"#16A34A\",\n      \"line\": \"#E7E5E4\",\n      \"track\": \"#E7E5E4\",\n      \"scrim\": \"rgba(28, 25, 23, 0.48)\",\n      \"raise\": \"0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px -2px rgba(28, 25, 23, 0.03)\",\n      \"sunken\": \"inset 0 0 0 1px #E7E5E4\",\n      \"font-sans\": \"\\\"Noto Sans SC\\\", \\\"PingFang SC\\\", \\\"HarmonyOS Sans SC\\\", system-ui, sans-serif\",\n      \"font-num\": \"\\\"SF Pro Rounded\\\", \\\"Arial Rounded MT Bold\\\", \\\"Noto Sans SC\\\", system-ui, sans-serif\",\n      \"r-card\": \"20px\",\n      \"r-control\": \"14px\",\n      \"r-key\": \"14px\",\n      \"r-sheet\": \"28px\",\n      \"r-pill\": \"999px\",\n      \"hit\": \"44px\",\n      \"ease-sheet\": \"cubic-bezier(0.2, 0.8, 0.2, 1.1)\",\n      \"subtle\": \"#F0EFEA\",\n      \"accent-border\": \"#B6DFD0\"\n    },\n    \"lightBusinessOverrides\": {\n      \"accent\": \"#B4532A\",\n      \"accent-hi\": \"#96421E\",\n      \"accent-soft\": \"#FDF3EE\",\n      \"on-accent\": \"#FFFFFF\",\n      \"accent-border\": \"#F5CBB8\"\n    },\n    \"darkOverrides\": {\n      \"bg\": \"#171615\",\n      \"card\": \"#21201E\",\n      \"text\": \"#F5F5F4\",\n      \"muted\": \"#A8A29E\",\n      \"accent\": \"#4ADE80\",\n      \"accent-hi\": \"#86EFAC\",\n      \"on-accent\": \"#072617\",\n      \"accent-soft\": \"rgba(74, 222, 128, 0.12)\",\n      \"warn\": \"#FBBF24\",\n      \"warn-soft\": \"rgba(251, 191, 36, 0.14)\",\n      \"neg\": \"#F87171\",\n      \"pos\": \"#4ADE80\",\n      \"line\": \"#33302E\",\n      \"track\": \"#33302E\",\n      \"scrim\": \"rgba(0, 0, 0, 0.65)\",\n      \"raise\": \"0 2px 10px rgba(0, 0, 0, 0.4)\",\n      \"sunken\": \"inset 0 0 0 1px #33302E\",\n      \"subtle\": \"#2B2927\"\n    },\n    \"darkBusinessOverrides\": {\n      \"accent\": \"#FB923C\",\n      \"accent-hi\": \"#FDBA74\",\n      \"accent-soft\": \"rgba(251, 146, 60, 0.13)\",\n      \"on-accent\": \"#271204\"\n    },\n    \"typographyPx\": {\n      \"body\": 15,\n      \"auxiliary\": 12,\n      \"title\": [\n        20,\n        22\n      ],\n      \"weekHero\": 46,\n      \"largeAmountInput\": 52\n    },\n    \"breakpointsPx\": {\n      \"desktop\": 768,\n      \"compact\": 370\n    },\n    \"icons\": \"lucide-react\",\n    \"charts\": \"recharts\",\n    \"styling\": \"Global semantic CSS and Tailwind utilities\",\n    \"fontLoading\": \"Existing Noto Sans SC Google Fonts link in index.html; local/system fallbacks in CSS\",\n    \"tailwindLoading\": \"Existing CDN script in index.html\"\n  },\n  \"backupActions\": [\n    {\n      \"id\": \"backup.exportJson\",\n      \"scope\": \"both modules\",\n      \"format\": \"json\"\n    },\n    {\n      \"id\": \"backup.restoreJson\",\n      \"scope\": \"replace both modules\",\n      \"format\": \"json\",\n      \"confirmation\": true\n    },\n    {\n      \"id\": \"daily.exportExcel\",\n      \"scope\": \"daily full state\",\n      \"format\": \"xlsx\"\n    },\n    {\n      \"id\": \"daily.importExcel\",\n      \"scope\": \"daily module\",\n      \"format\": \"xlsx/xls\",\n      \"confirmation\": true\n    },\n    {\n      \"id\": \"copper.exportExcel\",\n      \"scope\": \"copper module\",\n      \"format\": \"xlsx\"\n    },\n    {\n      \"id\": \"copper.importExcel\",\n      \"scope\": \"replace copper module\",\n      \"format\": \"xlsx/xls\",\n      \"confirmation\": true\n    }\n  ],\n  \"businessContracts\": {\n    \"daily\": [\n      \"Budget weeks follow income cycles, not necessarily calendar weeks or months\",\n      \"Each main income starts a new cycle, even before the previous cycle ends\",\n      \"Payday rule is monthly day 15, moved to preceding weekday if weekend\",\n      \"Cycle spendable = pockets.spendable\",\n      \"Usable balance = spendable + buffer + fixedReserved\",\n      \"Total cycle money = usable balance + reserve\",\n      \"Main income fills only the fixed-reserve shortfall\",\n      \"Main-income UI uses fixed reserve/buffer amounts, not legacy savingsRate/bufferRate controls\",\n      \"Weekly rollover: 60% buffer, 40% reserve, subject to buffer cap\",\n      \"Cycle rollover moves 40% of existing buffer to reserve\",\n      \"Prepaid payment deducts now and reports on effectiveDate; preserve both dates\",\n      \"Transfers are internal and do not count as income or expense\",\n      \"Historical balance snapshots are immutable; missing snapshots omit calculation process\",\n      \"Show uncovered expenses as funding gaps, not fabricated pocket deductions\"\n    ],\n    \"copper\": [\n      \"Cash total = liquid + reserve; total assets = cash total + inventory cost\",\n      \"Profit = sale amount - sale cost; negative profit is valid\",\n      \"Positive-profit sale: cost returns to liquid; profit splits by configured ratios\",\n      \"Non-positive-profit sale: sale cash enters liquid\",\n      \"Purchase reduces cash and increases inventory cost\",\n      \"Sale cost must not exceed inventory cost; purchase must not exceed available cash\",\n      \"Pending sale already affects cash and inventory when created\",\n      \"Confirmation only changes status; auto-confirm after 10 natural days when app processes it\",\n      \"Cancellation rolls back cash/inventory and excludes the sale from stats/charts\",\n      \"Deleting an already-cancelled sale does not roll back a second time\",\n      \"Legacy locked records cannot be deleted\",\n      \"Inventory supplementation/stocktake is not a cash purchase\"\n    ],\n    \"displayClarifications\": [\n      \"Calibratable balance includes spendable + buffer + fixedReserved, excludes reserve\",\n      \"weekRemaining is clamped at zero; show overage separately from weekSpent and allowance\",\n      \"Large/prepaid allocation.advance may use the entire spendable pocket, not only future-week balance\"\n    ]\n  },\n  \"historicalDocuments\": [\n    \"design-brief.md\",\n    \"ui-manifest.json\",\n    \"design-prompt.md\"\n  ],\n  \"currentDocuments\": [\n    \"current-ui-structure.md\",\n    \"current-ui-manifest.json\"\n  ],\n  \"existingVisualReference\": {\n    \"path\": \"docs/mobile-ui-handoff/implemented-preview.png\",\n    \"note\": \"Previously generated implementation screenshots with fabricated data, not newly captured\"\n  },\n  \"sourceFiles\": [\n    \"App.tsx\",\n    \"components/DailyLedger.tsx\",\n    \"components/CopperShop.tsx\",\n    \"components/ui/Ui.tsx\",\n    \"index.css\",\n    \"types.ts\",\n    \"lib/daily.ts\",\n    \"lib/copper.ts\",\n    \"lib/appData.ts\",\n    \"index.html\"\n  ],\n  \"selectedPalette\": {\n    \"id\": \"kyoto\",\n    \"name\": \"配色 B：竹青宣纸 · 轻盈雅致 (Kyoto Washi)\",\n    \"rationale\": \"High-contrast warm alabaster paper (#F9F8F6) with pure white cards (#FFFFFF), 1px hairline borders (#E7E5E4), bamboo-pine green (#1F5E4B) for Daily Ledger, and terracotta persimmon (#B4532A) for Copper Business.\"\n  },\n  \"componentUpgrades\": [\n    {\n      \"id\": \"upgrade.smartMoneyInput\",\n      \"target\": \"NumberField in DailyLedger.tsx & CopperShop.tsx\",\n      \"features\": [\n        \"Inline arithmetic expression evaluation (e.g. '38+12-5' -> '45.00')\",\n        \"Quick-add amount chips (+10, +50, +100, -5)\",\n        \"Real-time gross profit, margin %, and 7:3 split preview in copper.sale\",\n        \"Inline warning when sale cost exceeds current inventory cost\"\n      ]\n    },\n    {\n      \"id\": \"upgrade.ratioSplitControl\",\n      \"target\": \"copper.settings ratio inputs in CopperShop.tsx\",\n      \"features\": [\n        \"Linked slider and inputs that always sum to 100% (liquidRatio + reserveRatio === 100)\",\n        \"One-tap ratio presets (70:30, 50:50, 100:0)\",\n        \"Live per-1000-CNY profit split preview\"\n      ]\n    },\n    {\n      \"id\": \"upgrade.historyFilterAndSafeDelete\",\n      \"target\": \"daily.history & TransactionEventRow in DailyLedger.tsx\",\n      \"features\": [\n        \"Pocket/type filter pills (All, Used Buffer/Reserve, Prepaid, Large/Unplanned) + keyword search\",\n        \"Two-stage inline delete/rollback confirmation to prevent accidental taps while scrolling\"\n      ]\n    },\n    {\n      \"id\": \"upgrade.safeBackupGuard\",\n      \"target\": \"BackupSection in components/ui/Ui.tsx\",\n      \"features\": [\n        \"Track lastBackupAt timestamp in localStorage with >7 days gentle indicator on settings icon\",\n        \"Dry-run diff preview before JSON restore or Excel import showing record counts and latest date comparison\",\n        \"One-click 'Export current snapshot first, then restore' safety action\"\n      ]\n    },\n    {\n      \"id\": \"upgrade.declarativeOverlayAndGestures\",\n      \"target\": \"Overlay in components/ui/Ui.tsx & BottomSheet in DailyLedger.tsx\",\n      \"features\": [\n        \"Explicit variant ('sheet' | 'page' | 'confirm') and footer prop instead of title string matching\",\n        \"Pointer-events drag-to-dismiss gesture on sheet handle\",\n        \"History pushState / popstate synchronization so mobile back gesture closes active overlay\"\n      ]\n    },\n    {\n      \"id\": \"upgrade.keepAliveModuleSwitch\",\n      \"target\": \"LedgerApp in App.tsx\",\n      \"features\": [\n        \"Keep-alive mounting (CSS hidden toggle) so switching between Daily and Copper preserves form drafts and scroll position\",\n        \"Optional quick bridge to pre-fill Copper reserve dividend into Daily income sheet\"\n      ]\n    }\n  ]\n}";
+
+    function downloadHandoffFile(kind) {
+      const isSpec = kind === 'spec';
+      const content = isSpec ? EMBEDDED_SPEC_MD : EMBEDDED_MANIFEST_JSON;
+      const filename = isSpec ? 'codex-refactor-spec.md' : 'redesign-ui-manifest.json';
+      const mime = isSpec ? 'text/markdown;charset=utf-8' : 'application/json;charset=utf-8';
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      alertToast('已下载 ' + filename);
+    }
+
+    window.onload = () => {
+      renderAll();
+      renderLabHistoryList();
+      evalLabSmartInput();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+/* ============================================================================
+   Daily Ledger · Concept 02 重构视觉变量 (配色 B：竹青宣纸 · 轻盈雅致 / Kyoto Washi)
+   可直接替换 index.css 中的 :root 与暗色/模块覆盖变量
+   ============================================================================ */
+
+:root {
+  /* 基础表面：温润极浅宣纸白 + 纯白卡片 + 1px 精细描边（告别原本暗沉发黄的 #ECE7DF） */
+  --bg: #F9F8F6;
+  --bg-canvas: #F3F2EE;
+  --card: #FFFFFF;
+  --subtle: #F0EFEA;
+  --text: #1C1917;
+  --muted: #57534E;
+  --text-faint: #A8A29E;
+
+  /* 生活预算模块强调色（竹青 / 深松绿） */
+  --accent: #1F5E4B;
+  --accent-hi: #17493A;
+  --on-accent: #FFFFFF;
+  --accent-soft: #EBF5F0;
+  --accent-border: #B6DFD0;
+
+  /* 语义状态色 */
+  --warn: #D97706;
+  --warn-soft: #FEF3C7;
+  --warn-border: #FDE68A;
+  --neg: #DC2626;
+  --neg-soft: #FEF2F2;
+  --neg-border: #FECACA;
+  --pos: #16A34A;
+  --pos-soft: #F0FDF4;
+
+  /* 边框、轨道与去拟物化阴影（移除旧版厚重内阴影凹槽） */
+  --line: #E7E5E4;
+  --line-strong: #D6D3D1;
+  --track: #E7E5E4;
+  --scrim: rgba(28, 25, 23, 0.48);
+  --raise: 0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px -2px rgba(28, 25, 23, 0.03);
+  --sunken: inset 0 0 0 1px #E7E5E4;
+
+  /* 字体与圆角尺度 */
+  --font-sans: "Inter", "Noto Sans SC", "PingFang SC", "HarmonyOS Sans SC", system-ui, sans-serif;
+  --font-num: "Inter", "JetBrains Mono", "SF Pro Rounded", "Noto Sans SC", system-ui, sans-serif;
+  --r-card: 20px;
+  --r-control: 14px;
+  --r-key: 14px;
+  --r-sheet: 28px;
+  --r-pill: 999px;
+  --hit: 44px;
+  --ease-sheet: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 铜钱生意模块覆盖（亮色：赤陶柿红） */
+[data-module="copper"],
+.module-copper {
+  --accent: #B4532A;
+  --accent-hi: #96421E;
+  --on-accent: #FFFFFF;
+  --accent-soft: #FDF3EE;
+  --accent-border: #F5CBB8;
+}
+
+/* 暗色模式覆盖（玄墨宣纸 Dark） */
+[data-theme="dark"],
+.theme-dark {
+  --bg: #171615;
+  --bg-canvas: #111110;
+  --card: #21201E;
+  --subtle: #2B2927;
+  --text: #F5F5F4;
+  --muted: #A8A29E;
+  --text-faint: #78716C;
+
+  --accent: #4ADE80;
+  --accent-hi: #86EFAC;
+  --on-accent: #072617;
+  --accent-soft: rgba(74, 222, 128, 0.12);
+  --accent-border: rgba(74, 222, 128, 0.28);
+
+  --warn: #FBBF24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --warn-border: rgba(251, 191, 36, 0.3);
+  --neg: #F87171;
+  --neg-soft: rgba(248, 113, 113, 0.14);
+  --neg-border: rgba(248, 113, 113, 0.3);
+  --pos: #4ADE80;
+  --pos-soft: rgba(74, 222, 128, 0.14);
+
+  --line: #33302E;
+  --line-strong: #44403C;
+  --track: #33302E;
+  --scrim: rgba(0, 0, 0, 0.65);
+  --raise: 0 2px 10px rgba(0, 0, 0, 0.4);
+  --sunken: inset 0 0 0 1px #33302E;
+}
+
+/* 暗色模式 + 铜钱生意覆盖 */
+[data-theme="dark"][data-module="copper"],
+.theme-dark .module-copper {
+  --accent: #FB923C;
+  --accent-hi: #FDBA74;
+  --on-accent: #271204;
+  --accent-soft: rgba(251, 146, 60, 0.13);
+  --accent-border: rgba(251, 146, 60, 0.28);
+}
+
+/* 提前支付斜纹进度条通用工具类 */
+.bg-prepaid-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--warn),
+    var(--warn) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}

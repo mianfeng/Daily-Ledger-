@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "Restricted decimal calculator handles arithmetic, cents and invalid input without eval",
+    "Expression preview is non-mutating and submit records the evaluated amount",
+    "Quick chips, invalid-expression guard, module draft and scroll keep-alive",
+    "Browser back closes nested views and dirty cancellation preserves both history and input",
+    "Pointer drag dismisses clean sheets and routes dirty sheets through confirmation",
+    "History filters/search and two-stage allocation-aware rollback deletion",
+    "Ratio slider, paired fields and presets keep the 100% invariant",
+    "Sale math/profit split preview and live inventory bound use unchanged financial helpers",
+    "Purchase and income principal amount fields accept arithmetic too",
+    "Backup freshness, parse-before-confirm, stale-file warning and safety snapshot precede restore",
+    "Overdue backup indicator, dark themes, 360/390/430 layouts and short viewport remain usable",
+    "No runtime exceptions, native dialogs or inactive-module portals"
+  ],
+  "errors": []
+}
