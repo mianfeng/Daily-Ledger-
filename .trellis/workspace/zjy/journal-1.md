@@ -372,3 +372,37 @@ Implemented approved mobile UI with jade/copper light and dark themes, accessibl
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Kyoto UI and safe interaction upgrade
+
+**Date**: 2026-10-16
+**Task**: Kyoto UI and safe interaction upgrade
+**Branch**: `main`
+
+### Summary
+
+Implemented Kyoto Washi palette, module keep-alive, explicit overlays with drag/back protection, arithmetic money entry, linked ratios, safe backup previews/reminders, history filtering and waterfall details. Passed 22 regression checks, 12 interaction groups, 82 contrast pairs, typecheck and build. Financial/storage formats unchanged. User authorized commit and remote push after verification. Physical device checks remain.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f3f9efd` | (see git log) |
+| `5c46608` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
