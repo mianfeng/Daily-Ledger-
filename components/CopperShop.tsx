@@ -24,11 +24,16 @@ import {
   YAxis,
 } from "recharts";
 import { BackupSection, InlineError, Overlay, useUi } from "./ui/Ui";
+import { BackupDot, BackupHealth, useBackup } from "./ui/Backup";
+import { SmartMoneyInput } from "./ui/SmartMoneyInput";
+import { RatioSplitControl } from "./ui/RatioSplitControl";
+import { moneyValue } from "./ui/money";
 import * as XLSX from "xlsx";
 import { DEFAULT_COPPER_DATA } from "../lib/appData";
 import {
   autoConfirmCopperPendingTransactions,
   applyCopperTransaction,
+  buildIncomeCashAllocation,
   cancelCopperPendingTransaction,
   confirmCopperPendingTransaction,
   createCopperExpenseTransaction,
@@ -81,6 +86,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({
   appControls,
 }) => {
   const { confirm, notify } = useUi();
+  const { markBackup, reviewImport } = useBackup();
   const [formError, setFormError] = useState("");
   const [showEntry, setShowEntry] = useState(false);
   const [showMonthly, setShowMonthly] = useState(false);
@@ -205,8 +211,29 @@ export const CopperShop: React.FC<CopperShopProps> = ({
     padding: "12px",
   };
 
+  const saleAmount = moneyValue(form.amount);
+  const saleCost = Number(form.cost);
+  const previewValid =
+    Number.isFinite(saleAmount) &&
+    saleAmount > 0 &&
+    Number.isFinite(saleCost) &&
+    saleCost >= 0;
+  const saleProfit = previewValid
+    ? Math.round((saleAmount - saleCost) * 100) / 100
+    : 0;
+  const saleAllocation = previewValid
+    ? buildIncomeCashAllocation(saleAmount, saleCost, data.ratios)
+    : null;
+  const costTooHigh =
+    form.type === "income" &&
+    Number.isFinite(saleCost) &&
+    saleCost > data.inventoryCost;
+  const cashShare =
+    totalAssets > 0
+      ? Math.max(0, Math.min(100, (cashTotal / totalAssets) * 100))
+      : 0;
   const handleAddTransaction = () => {
-    const amount = Number(form.amount);
+    const amount = moneyValue(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
       setFormError("请输入有效金额");
       return;
@@ -386,36 +413,27 @@ export const CopperShop: React.FC<CopperShopProps> = ({
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const input = event.target;
-    if (!file) {
-      return;
-    }
-
-    if (
-      !(await confirm(
-        "确定用导入文件覆盖当前铜钱分账数据吗？余额、比例、库存成本和流水都会被替换。",
-      ))
-    ) {
+    if (!file) return;
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      if (
+        !workbook.SheetNames.some((name) =>
+          ["资产状态", "配置比例", "铜钱流水"].includes(name),
+        )
+      )
+        throw new Error("Unknown workbook");
+      const importedData = parseCopperImportWorkbook(
+        workbook,
+        DEFAULT_COPPER_DATA,
+      );
+      if (!(await reviewImport({ copper: importedData }, "copper"))) return;
+      setData(importedData);
+      notify(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
+    } catch {
+      setFormError("导入失败，未识别到铜钱备份，当前数据未替换。");
+    } finally {
       input.value = "";
-      return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      try {
-        const workbook = XLSX.read(loadEvent.target?.result, { type: "array" });
-        const importedData = parseCopperImportWorkbook(
-          workbook,
-          DEFAULT_COPPER_DATA,
-        );
-        setData(importedData);
-        notify(`导入成功，共恢复 ${importedData.transactions.length} 条流水`);
-      } catch {
-        setFormError("导入失败，格式不正确");
-      } finally {
-        input.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -436,6 +454,7 @@ export const CopperShop: React.FC<CopperShopProps> = ({
           aria-label="铜钱配置"
         >
           <Settings size={20} />
+          <BackupDot />
         </button>
       </header>
       {!showSettings && !showEntry && <InlineError message={formError} />}
@@ -450,43 +469,8 @@ export const CopperShop: React.FC<CopperShopProps> = ({
         >
           <div className="space-y-4">
             <div className="ui-card">
-              <h3 className="font-bold text-sm mb-3">
-                利润分配比例 (总和须为100)
-              </h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs text-[var(--muted)] mb-1">
-                    流动库 %
-                  </label>
-                  <input
-                    type="number"
-                    value={ratioDraft.liquid}
-                    onChange={(event) =>
-                      setRatioDraft((prev) => ({
-                        ...prev,
-                        liquid: Number(event.target.value) || 0,
-                      }))
-                    }
-                    className="w-full p-1.5 border rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[var(--muted)] mb-1">
-                    存储库 %
-                  </label>
-                  <input
-                    type="number"
-                    value={ratioDraft.reserve}
-                    onChange={(event) =>
-                      setRatioDraft((prev) => ({
-                        ...prev,
-                        reserve: Number(event.target.value) || 0,
-                      }))
-                    }
-                    className="w-full p-1.5 border rounded text-sm"
-                  />
-                </div>
-              </div>
+              <h3 className="font-bold text-sm mb-3">利润分配比例</h3>
+              <RatioSplitControl value={ratioDraft} onChange={setRatioDraft} />
               <button onClick={handleSaveSettings} className="ui-key w-full">
                 保存比例
               </button>
@@ -551,8 +535,12 @@ export const CopperShop: React.FC<CopperShopProps> = ({
             <p className="ui-help">库存补录与盘点是库存调整，不是进货付款。</p>
             <BackupSection
               moduleName="铜钱生意"
+              health={<BackupHealth />}
               appControls={appControls}
-              onExport={() => exportCopperToExcel(data)}
+              onExport={() => {
+                exportCopperToExcel(data);
+                markBackup();
+              }}
               onImport={handleImport}
             />
           </div>
@@ -566,37 +554,63 @@ export const CopperShop: React.FC<CopperShopProps> = ({
         </div>
       )}
 
-      <section className="business-assets">
-        <div className="flex items-center justify-between ui-muted text-sm">
-          <b>总资产</b>
-          <Briefcase size={20} />
+      <section className="business-assets kyoto-hero">
+        <div className="business-total">
+          <div className="hero-eyebrow">
+            <span>生意总资产</span>
+            <Briefcase size={20} />
+          </div>
+          <div className="ui-num">{formatMoney(totalAssets)}</div>
+          <div
+            className="asset-ratio"
+            role="img"
+            aria-label={`现金合计占比${cashShare.toFixed(1)}%，库存成本占比${(100 - cashShare).toFixed(1)}%`}
+          >
+            <span style={{ width: `${cashShare}%` }} />
+          </div>
+          <div className="asset-equation">
+            <div>
+              <span>
+                <i />
+                现金合计
+              </span>
+              <b className="ui-num">{formatMoney(cashTotal)}</b>
+              <small>{cashShare.toFixed(0)}%</small>
+            </div>
+            <b>＋</b>
+            <div>
+              <span>
+                <i />
+                库存成本
+              </span>
+              <b className="ui-num">{formatMoney(data.inventoryCost)}</b>
+              <small>{(100 - cashShare).toFixed(0)}%</small>
+            </div>
+          </div>
         </div>
-        <div className="ui-num">{formatMoney(totalAssets)}</div>
-        <div className="life-balances">
-          <div>
-            现金合计<b>{formatMoney(cashTotal)}</b>
+        <div className="cash-base">
+          <div className="cycle-base-header">
+            <span>↳ 现金合计拆解</span>
+            <small>流动库 + 存储库 = 现金合计</small>
           </div>
-          <div>
-            库存成本<b>{formatMoney(data.inventoryCost)}</b>
+          <div className="cash-pockets">
+            <div>
+              <span>
+                <Wallet size={16} />
+                流动库
+              </span>
+              <b className="ui-num">{formatMoney(data.balances.liquid)}</b>
+              <small>利润分配 {data.ratios.liquid}%</small>
+            </div>
+            <div>
+              <span>
+                <Lock size={16} />
+                存储库
+              </span>
+              <b className="ui-num">{formatMoney(data.balances.reserve)}</b>
+              <small>利润分配 {data.ratios.reserve}%</small>
+            </div>
           </div>
-        </div>
-      </section>
-      <section className="business-pockets">
-        <div className="ui-card business-pocket">
-          <div className="ui-muted text-xs flex items-center gap-2">
-            <Wallet size={16} />
-            流动库
-          </div>
-          <div className="ui-num">{formatMoney(data.balances.liquid)}</div>
-          <div className="ui-help mb-0">利润分配 {data.ratios.liquid}%</div>
-        </div>
-        <div className="ui-card business-pocket">
-          <div className="ui-muted text-xs flex items-center gap-2">
-            <Lock size={16} />
-            存储库
-          </div>
-          <div className="ui-num">{formatMoney(data.balances.reserve)}</div>
-          <div className="ui-help mb-0">利润分配 {data.ratios.reserve}%</div>
         </div>
       </section>
       <section className="business-entries">
@@ -631,29 +645,21 @@ export const CopperShop: React.FC<CopperShopProps> = ({
           error={formError}
           onClearError={() => setFormError("")}
           footer={
-            <button className="ui-key" onClick={handleAddTransaction}>
+            <button
+              className="ui-key"
+              disabled={costTooHigh}
+              onClick={handleAddTransaction}
+            >
               {form.type === "income" ? "记录销售" : "记录进货"}
               <ArrowRightCircle size={18} />
             </button>
           }
         >
-          <label className="ui-help">
-            {form.type === "income" ? "销售金额" : "进货金额"}
-            <div className="ui-amount-field">
-              <span>¥</span>
-              <input
-                aria-label={form.type === "income" ? "销售金额" : "进货金额"}
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={form.amount}
-                placeholder="0.00"
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, amount: event.target.value }))
-                }
-              />
-            </div>
-          </label>
+          <SmartMoneyInput
+            label={form.type === "income" ? "销售金额" : "进货金额"}
+            value={form.amount}
+            onChange={(amount) => setForm((prev) => ({ ...prev, amount }))}
+          />
           <div className="space-y-4">
             {form.type === "income" && (
               <label className="block ui-help">
@@ -669,6 +675,61 @@ export const CopperShop: React.FC<CopperShopProps> = ({
                   }
                 />
               </label>
+            )}
+            {costTooHigh && (
+              <p className="ui-error" role="alert">
+                销售成本超过当前库存成本（{formatMoney(data.inventoryCost)}
+                ），无法提交。
+              </p>
+            )}
+            {form.type === "income" && previewValid && (
+              <section className="sale-profit-preview">
+                <h3>毛利与分润预览</h3>
+                <div className="sale-profit-main">
+                  <span>
+                    本单毛利{" "}
+                    <b
+                      className={`ui-num ${saleProfit >= 0 ? "ui-positive" : "ui-negative"}`}
+                    >
+                      {saleProfit >= 0 ? "+" : "−"}
+                      {formatMoney(Math.abs(saleProfit))}
+                    </b>
+                  </span>
+                  <span>
+                    毛利率{" "}
+                    <b>{((saleProfit / saleAmount) * 100).toFixed(1)}%</b>
+                  </span>
+                </div>
+                {saleProfit > 0 && saleAllocation && (
+                  <>
+                    <p className="ui-help">利润分配（不含成本回流）</p>
+                    <div className="sale-split">
+                      <span>
+                        流动库{" "}
+                        <b>
+                          +
+                          {formatMoney(
+                            Math.round(
+                              (saleAllocation.liquid - saleCost) * 100,
+                            ) / 100,
+                          )}
+                        </b>
+                      </span>
+                      <span>
+                        存储库 <b>+{formatMoney(saleAllocation.reserve)}</b>
+                      </span>
+                    </div>
+                    <p className="ui-help">
+                      另有销售成本 {formatMoney(saleCost)} 回流至流动库。
+                    </p>
+                  </>
+                )}
+                {saleProfit <= 0 && (
+                  <p className="ui-help">
+                    本单没有正毛利可分配，销售款按现有规则进入流动库。
+                  </p>
+                )}
+              </section>
             )}
             <label className="block ui-help">
               日期

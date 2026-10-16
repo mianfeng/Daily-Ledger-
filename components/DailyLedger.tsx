@@ -7,6 +7,7 @@ import {
   Landmark,
   PiggyBank,
   Plus,
+  MoreHorizontal,
   ReceiptText,
   RefreshCw,
   Settings,
@@ -16,6 +17,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { BackupSection, InlineError, Overlay, useUi } from "./ui/Ui";
+import { BackupDot, BackupHealth, useBackup } from "./ui/Backup";
+import { SmartMoneyInput } from "./ui/SmartMoneyInput";
+import { moneyValue } from "./ui/money";
 import * as XLSX from "xlsx";
 import { DEFAULT_DAILY_DATA } from "../lib/appData";
 import {
@@ -381,48 +385,14 @@ const SectionShell: React.FC<{
   <section className={`life-section ${className}`}>{children}</section>
 );
 
-const BottomSheet: React.FC<{
-  children: React.ReactNode;
-  icon: React.ReactNode;
-  title: string;
-  onClose: () => void;
-  layer?: "default" | "detail";
-  error?: string;
-  onClearError?: () => void;
-  saved?: boolean;
-}> = ({ children, title, onClose, layer, error, onClearError, saved }) => {
-  const nodes = React.Children.toArray(children);
-  const footer = nodes.find(
-    (node) =>
-      React.isValidElement(node) &&
-      (node.type === SubmitButton ||
-        (typeof node.props === "object" &&
-          node.props !== null &&
-          "className" in node.props &&
-          typeof node.props.className === "string" &&
-          node.props.className.includes("life-primary-button"))),
-  );
-  const content = nodes.filter((node) => node !== footer);
-  const isPage =
-    layer === "detail" ||
-    ["周期详情", "历史流水", "预算设置", "初始设置"].includes(title);
-  return (
-    <Overlay
-      title={title}
-      variant={isPage ? "page" : "sheet"}
-      onClose={onClose}
-      saved={saved}
-      protectEdits={!["周期详情", "历史流水", "资金流向"].includes(title)}
-      footer={footer}
-      error={
-        title === "记支出" && error === "请输入支出金额" ? undefined : error
-      }
-      onClearError={onClearError}
-    >
-      {content}
-    </Overlay>
-  );
-};
+const BottomSheet: React.FC<
+  React.ComponentProps<typeof Overlay> & {
+    icon?: React.ReactNode;
+    layer?: "default" | "detail";
+  }
+> = ({ icon, layer, variant = "sheet", ...props }) => (
+  <Overlay {...props} variant={layer === "detail" ? "page" : variant} />
+);
 
 const TransactionFlowDetail: React.FC<{
   transaction: DailyTransaction;
@@ -470,45 +440,65 @@ const TransactionFlowDetail: React.FC<{
                 : "资金来源"}{" "}
             <span className="ui-help">· 真实分配</span>
           </h3>
-          {items.map((item) => (
-            <section
-              className="ui-card life-flow-fund"
-              key={`${item.direction}-${item.key}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <b>{item.label}</b>
-                <b
-                  className={`ui-num ${item.direction === "in" ? "ui-positive" : "ui-negative"}`}
-                >
-                  {item.direction === "in" ? "+" : "−"}
-                  {formatAmount(item.amount)}
-                </b>
-              </div>
-              {hasSnapshots && (
-                <div className="life-flow-calculation ui-num">
-                  <span>{formatAmount(item.balanceBefore ?? 0)}</span>
-                  <span
-                    className={
-                      item.direction === "in" ? "ui-positive" : "ui-negative"
-                    }
+          <div className={hasSnapshots ? "flow-waterfall" : "flow-list"}>
+            {items.map((item, index) => (
+              <section
+                className="ui-card life-flow-fund"
+                key={`${item.direction}-${item.key}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <b>
+                    {hasSnapshots && (
+                      <span className="flow-step">{index + 1}</span>
+                    )}
+                    {item.label}
+                    <small className="flow-role">
+                      {item.direction === "in"
+                        ? "分配入账"
+                        : index === 0
+                          ? "优先扣减"
+                          : "自动补足差额"}
+                    </small>
+                  </b>
+                  <b
+                    className={`ui-num ${item.direction === "in" ? "ui-positive" : "ui-negative"}`}
                   >
-                    {item.direction === "in" ? "+" : "−"}{" "}
+                    {item.direction === "in" ? "+" : "−"}
                     {formatAmount(item.amount)}
-                  </span>
-                  <span>
-                    {Math.abs(
-                      (item.balanceBefore ?? 0) +
-                        (item.direction === "in" ? item.amount : -item.amount) -
-                        (item.balanceAfter ?? 0),
-                    ) < 0.015
-                      ? "="
-                      : "记录后"}{" "}
-                    {formatAmount(item.balanceAfter ?? 0)}
-                  </span>
+                  </b>
                 </div>
-              )}
-            </section>
-          ))}
+                {hasSnapshots && (
+                  <div className="life-flow-calculation ui-num">
+                    <span>
+                      <small>记录前余额</small>
+                      {formatAmount(item.balanceBefore ?? 0)}
+                    </span>
+                    <span
+                      className={
+                        item.direction === "in" ? "ui-positive" : "ui-negative"
+                      }
+                    >
+                      {item.direction === "in" ? "+" : "−"}{" "}
+                      {formatAmount(item.amount)}
+                    </span>
+                    <span>
+                      {Math.abs(
+                        (item.balanceBefore ?? 0) +
+                          (item.direction === "in"
+                            ? item.amount
+                            : -item.amount) -
+                          (item.balanceAfter ?? 0),
+                      ) < 0.015
+                        ? "="
+                        : "记录后"}{" "}
+                      {formatAmount(item.balanceAfter ?? 0)}
+                      <small>记录后余额</small>
+                    </span>
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
           {!hasSnapshots && (
             <div className="ui-warning mt-4">
               <span className="ui-badge ui-badge-warning">旧记录</span>
@@ -520,7 +510,7 @@ const TransactionFlowDetail: React.FC<{
           )}
           {gap > 0 && (
             <div className="life-flow-gap">
-              <b>资金缺口 {formatAmount(gap)}</b>
+              <b>未覆盖资金缺口 {formatAmount(gap)}</b>
               <p className="mt-1">未被任何口袋覆盖，不显示被扣款的口袋。</p>
             </div>
           )}
@@ -584,10 +574,10 @@ const TransactionEventRow: React.FC<{
         type="button"
         onClick={onDelete}
         className="shrink-0 rounded-lg p-1 text-[var(--muted)] transition hover:bg-[var(--card)] hover:text-[var(--neg)]"
-        title="删除"
-        aria-label={`删除 ${transaction.desc}`}
+        title="更多操作"
+        aria-label={`更多操作 ${transaction.desc}`}
       >
-        <Trash2 size={18} />
+        <MoreHorizontal size={18} />
       </button>
     )}
   </li>
@@ -600,6 +590,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   theme,
 }) => {
   const { confirm, notify } = useUi();
+  const { markBackup, reviewImport } = useBackup();
   const [formError, setFormError] = useState("");
   const today = getTodayDate();
   const snapshot = useMemo(() => getBudgetSnapshot(data, today), [data, today]);
@@ -611,13 +602,12 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const [summaryCard, setSummaryCard] = useState<"pending" | "fixed">(
     "pending",
   );
-  const [summaryTouchStart, setSummaryTouchStart] = useState<number | null>(
-    null,
-  );
   const [showCycleWeeks, setShowCycleWeeks] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<DailyTransaction | null>(null);
   const [visibleEventCount, setVisibleEventCount] = useState(20);
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [historySearch, setHistorySearch] = useState("");
 
   const [setupForm, setSetupForm] = useState({
     spendable: String(budget.pockets.spendable || ""),
@@ -674,10 +664,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const actualBookBalance = snapshot.calibratableBalance;
   const shouldRecommendLarge =
     !expenseForm.isPrepaid &&
-    (parseAmount(expenseForm.amount) >=
+    (moneyValue(expenseForm.amount) >=
       budget.settings.largeExpenseAbsoluteThreshold ||
       ((week?.allowance ?? 0) > 0 &&
-        parseAmount(expenseForm.amount) >=
+        moneyValue(expenseForm.amount) >=
           (week?.allowance ?? 0) * budget.settings.largeExpenseWeeklyRate));
   const prepaidHintTotal = snapshot.prepaidInCycle + snapshot.upcomingPrepaid;
   const activeFixedExpenses = budget.fixedExpenses.filter(
@@ -724,7 +714,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
     [data.transactions],
   );
   const recentEvents = allEvents.slice(0, 3);
-  const visibleEvents = allEvents.slice(0, visibleEventCount);
+
   const getTransactionKindLabel = (
     transaction: DailyData["transactions"][number],
   ) =>
@@ -735,9 +725,41 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         : transaction.expenseTiming === "prepaid"
           ? "提前支付"
           : categoryLabels[transaction.category ?? "other"];
+  const filteredEvents = useMemo(
+    () =>
+      allEvents.filter((transaction) => {
+        const matches =
+          historyFilter === "all" ||
+          (historyFilter === "pockets" &&
+            (Math.abs(transaction.allocation?.buffer ?? 0) > 0 ||
+              Math.abs(transaction.allocation?.reserve ?? 0) > 0)) ||
+          (historyFilter === "prepaid" &&
+            transaction.expenseTiming === "prepaid") ||
+          (historyFilter === "large" &&
+            (transaction.category === "large" ||
+              transaction.category === "unplanned"));
+        const query = historySearch.trim().toLocaleLowerCase();
+        const label =
+          transaction.type === "transfer"
+            ? "系统结转"
+            : transaction.type === "income"
+              ? incomeKindLabels[transaction.incomeKind ?? "casual"]
+              : categoryLabels[transaction.category ?? "other"];
+        return (
+          matches &&
+          (!query ||
+            `${transaction.desc} ${label} ${transaction.expenseTiming === "prepaid" ? "提前支付" : ""}`
+              .toLocaleLowerCase()
+              .includes(query))
+        );
+      }),
+    [allEvents, historyFilter, historySearch],
+  );
+  const visibleEvents = filteredEvents.slice(0, visibleEventCount);
   const expensePreview = useMemo(() => {
-    const amount = parseAmount(expenseForm.amount);
+    const amount = moneyValue(expenseForm.amount);
     if (
+      !Number.isFinite(amount) ||
       amount <= 0 ||
       expenseForm.isPrepaid ||
       expenseForm.category === "large"
@@ -840,8 +862,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
   const handleIncomeSubmit = async () => {
     setFormError("");
-    const amount = parseAmount(incomeForm.amount);
-    if (amount <= 0) {
+    const amount = moneyValue(incomeForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       setFormError("请输入收入金额");
       return;
     }
@@ -869,8 +891,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
   const handleExpenseSubmit = async () => {
     setFormError("");
-    const amount = parseAmount(expenseForm.amount);
-    if (amount <= 0) {
+    const amount = moneyValue(expenseForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       setFormError("请输入支出金额");
       return;
     }
@@ -1014,46 +1036,49 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const input = event.target;
-    if (!file) {
-      return;
-    }
-
-    if (
-      !(await confirm(
-        "确定用导入文件覆盖当前生活预算数据吗？旧流水和预算状态都会被替换。",
-      ))
-    ) {
+    if (!file) return;
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      if (
+        !workbook.SheetNames.some((name) =>
+          ["完整状态", "设置", "全部记录", "记录", "当月记录"].includes(name),
+        )
+      )
+        throw new Error("Unknown workbook");
+      const importedData = parseDailyImportWorkbook(
+        workbook,
+        DEFAULT_DAILY_DATA,
+      );
+      if (!(await reviewImport({ daily: importedData }, "daily"))) return;
+      setData(importedData);
+      notify(`导入成功，共恢复 ${importedData.transactions.length} 条记录`);
+    } catch {
+      setFormError("导入失败，未识别到生活预算备份，当前数据未替换。");
+    } finally {
       input.value = "";
-      return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      try {
-        const workbook = XLSX.read(loadEvent.target?.result, { type: "array" });
-        const importedData = parseDailyImportWorkbook(
-          workbook,
-          DEFAULT_DAILY_DATA,
-        );
-        setData(importedData);
-        notify(`导入成功，共恢复 ${importedData.transactions.length} 条记录`);
-      } catch {
-        setFormError("导入失败");
-      } finally {
-        input.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
   };
 
   const handleDeleteTransaction = async (transactionId: number) => {
+    const transaction = data.transactions.find(
+      (row) => row.id === transactionId,
+    );
+    if (!transaction || transaction.type === "transfer") return;
+    const flow = getTransactionFlow(transaction);
+    const items =
+      transaction.type === "income" ? flow.destinations : flow.sources;
+    const details = items
+      .map((item) => `${item.label}：${formatAmount(item.amount)}`)
+      .join("；");
     if (
-      !(await confirm(
-        "确定删除这条记录吗？相关余额会按这条记录的分配自动回滚。",
-      ))
-    ) {
+      !(await confirm({
+        title: "确认回滚删除？",
+        body: `删除“${transaction.desc}”会按原记录撤销资金变化。${details ? `涉及口袋：${details}。` : "旧记录未保存分配明细，将沿用原回滚逻辑。"}实际回滚以原记录与周期状态为准。`,
+        danger: true,
+        confirmLabel: "确认",
+      }))
+    )
       return;
-    }
     setData((prev) => deleteDailyTransaction(prev, transactionId));
     return true;
   };
@@ -1116,6 +1141,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           aria-label="预算设置"
         >
           <Settings size={20} />
+          <BackupDot />
         </button>
       </header>
       {!panel && <InlineError message={formError} />}
@@ -1131,79 +1157,137 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           </button>
         </div>
       )}
-      <section className="life-week-card">
+      <section className="life-week-card kyoto-hero">
         {cycle ? (
           <>
-            <div className="life-week-subtitle">
-              <b>本周剩余</b>
-              <span>
-                {week
-                  ? `${formatBudgetDate(week.startDate)} — ${formatBudgetDate(week.endDate)}`
-                  : "暂无预算周"}
-              </span>
-            </div>
-            <div
-              className={`life-week-amount ${weekOverdrawn > 0 ? "is-over" : ""}`}
-            >
-              {formatAmount(snapshot.weekRemaining)}
-            </div>
-            {weekOverdrawn > 0 && (
-              <p className="ui-negative text-sm mb-3">
-                本周超支 {formatAmount(weekOverdrawn)}
-              </p>
-            )}
-            <div
-              className="life-track"
-              role="progressbar"
-              aria-label="本周预算消耗"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.max(0, weekProgress)}
-            >
-              <div
-                className="life-track-fill"
-                style={{ width: `${Math.max(0, weekProgress)}%` }}
-              />
-            </div>
-            <div className="life-week-subtitle mt-2">
-              <span>本周已用 {formatAmount(snapshot.weekSpent)}</span>
-              <span>额度 {formatAmount(week?.allowance ?? 0)}</span>
-            </div>
-            <div className="life-balances">
-              <div>
-                周期日常剩余<b>{formatAmount(cycleDailyRemaining)}</b>
+            <div className="week-focus">
+              <div className="hero-eyebrow">
+                <span>
+                  <i className="status-dot" />
+                  本周剩余可用
+                </span>
+                <span className="date-chip">
+                  W{(week?.index ?? 0) + 1} ·{" "}
+                  {week
+                    ? `${formatBudgetDate(week.startDate)}–${formatBudgetDate(week.endDate)}`
+                    : "暂无预算周"}
+                </span>
               </div>
-              <div>
-                缓冲金<b>{formatAmount(budget.pockets.buffer)}</b>
-              </div>
-            </div>
-            <div className="life-pills">
-              <button
-                className="life-pill"
-                aria-label={`周期 ${formatDisplayDate(cycle.startDate)} 至 ${formatDisplayDate(cycle.plannedEndDate)}，${snapshot.isExtended ? "延长期" : "进行中"}`}
-                onClick={() => openPanel("cycle")}
-              >
-                周期 {formatBudgetDate(cycle.startDate)}–
-                {formatBudgetDate(cycle.plannedEndDate)} ·{" "}
-                {snapshot.isExtended ? "延长期" : "进行中"} ›
-              </button>
-              {prepaidHintTotal > 0 && (
-                <button
-                  className="life-pill life-pill-warning"
-                  onClick={() => {
-                    openPanel("cycle");
-                    window.setTimeout(
-                      () =>
-                        document
-                          .getElementById("prepaid-list")
-                          ?.scrollIntoView({ block: "start" }),
-                      50,
-                    );
-                  }}
+              <div className="week-focus-values">
+                <div
+                  className={`life-week-amount ${weekOverdrawn > 0 ? "is-over" : ""}`}
                 >
-                  提前支付 {formatAmount(prepaidHintTotal)} ›
-                </button>
+                  {formatAmount(snapshot.weekRemaining)}
+                </div>
+                <div className="week-spending">
+                  <span>
+                    已用 <b>{formatAmount(snapshot.weekSpent)}</b>
+                  </span>
+                  <span>
+                    额度 <b>{formatAmount(week?.allowance ?? 0)}</b>
+                  </span>
+                </div>
+              </div>
+              {weekOverdrawn > 0 && (
+                <p className="ui-negative text-sm mb-3">
+                  本周超支 {formatAmount(weekOverdrawn)}
+                </p>
               )}
+              <div
+                className="life-track"
+                role="progressbar"
+                aria-label="本周预算消耗"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.max(0, weekProgress)}
+              >
+                <div
+                  className="life-track-fill"
+                  style={{ width: `${Math.max(0, weekProgress)}%` }}
+                />
+              </div>
+              <div className="life-week-subtitle mt-2">
+                <span>本周消耗进度 {Math.max(0, weekProgress)}%</span>
+                <span>
+                  日均可用{" "}
+                  {formatAmount(
+                    snapshot.weekRemaining /
+                      Math.max(
+                        1,
+                        week
+                          ? Math.round(
+                              (new Date(`${week.endDate}T12:00:00`).getTime() -
+                                new Date(`${today}T12:00:00`).getTime()) /
+                                86400000,
+                            ) + 1
+                          : 1,
+                      ),
+                  )}
+                  /天
+                </span>
+              </div>
+            </div>
+            <div className="cycle-base">
+              <div className="cycle-base-header">
+                <span>
+                  ↳ 所属周期资金池{" "}
+                  <small>
+                    ({formatBudgetDate(cycle.startDate)}–
+                    {formatBudgetDate(cycle.plannedEndDate)})
+                  </small>
+                </span>
+                <button
+                  aria-label={`周期 ${formatDisplayDate(cycle.startDate)} 至 ${formatDisplayDate(cycle.plannedEndDate)}，${snapshot.isExtended ? "延长期" : "进行中"}`}
+                  onClick={() => openPanel("cycle")}
+                >
+                  周期详情 →
+                </button>
+              </div>
+              <div className="cycle-pool-grid">
+                <div>
+                  <span>
+                    周期日常剩余 <small>含本周</small>
+                  </span>
+                  <b className="ui-num">{formatAmount(cycleDailyRemaining)}</b>
+                </div>
+                <div>
+                  <span>
+                    安全缓冲金 <small>兜底池</small>
+                  </span>
+                  <b className="ui-num">
+                    {formatAmount(budget.pockets.buffer)}
+                  </b>
+                </div>
+              </div>
+              <div className="cycle-base-footer">
+                {prepaidHintTotal > 0 ? (
+                  <button
+                    className="prepaid-link"
+                    onClick={() => {
+                      openPanel("cycle");
+                      window.setTimeout(
+                        () =>
+                          document
+                            .getElementById("prepaid-list")
+                            ?.scrollIntoView({ block: "start" }),
+                        80,
+                      );
+                    }}
+                  >
+                    未来周提前支付 {formatAmount(prepaidHintTotal)} · 查看清单 →
+                  </button>
+                ) : (
+                  <span className="ui-muted text-xs">
+                    {snapshot.isExtended
+                      ? "延长期 · 等待下次主要收入"
+                      : "进行中 · 周期资金独立管理"}
+                  </span>
+                )}
+                <span>
+                  可动用总计{" "}
+                  <b className="ui-num">{formatAmount(cycleUsableBalance)}</b>
+                </span>
+              </div>
             </div>
           </>
         ) : (
@@ -1216,156 +1300,164 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           </div>
         )}
       </section>
-      <section className="life-record-row">
+      <section className="action-desk">
         <button
+          aria-label="记一笔"
           className="life-primary-entry"
           onClick={() => openPanel("expense")}
         >
-          <Plus size={30} />
-          记一笔
+          <Plus size={28} />
+          <strong>记一笔</strong>
+          <span>日常 / 预付 / 大额</span>
         </button>
-        <div className="ui-card life-summary">
-          <div className="life-summary-tabs">
+        <div className="desk-shortcuts">
+          <button onClick={() => openPanel("income")}>
+            <CircleDollarSign size={20} />
+            <span>收入分配</span>
+          </button>
+          <button onClick={() => openPanel("calibration")}>
+            <RefreshCw size={20} />
+            <span>余额校准</span>
+          </button>
+          <button aria-label="固定支出" onClick={() => openPanel("fixed")}>
+            <Landmark size={20} />
+            <span>固定支出</span>
+            {snapshot.pendingFixed.length > 0 && (
+              <b className="count-dot">{snapshot.pendingFixed.length}</b>
+            )}
+          </button>
+        </div>
+      </section>
+      <section className="ui-card status-dashboard">
+        <div className="status-dashboard-header">
+          <div className="ui-segmented">
             <button
               aria-pressed={summaryCard === "pending"}
               onClick={() => setSummaryCard("pending")}
             >
-              待处理
+              待处理事项 ({snapshot.pendingFixed.length})
             </button>
             <button
               aria-pressed={summaryCard === "fixed"}
               onClick={() => setSummaryCard("fixed")}
             >
-              固定预留
+              固定预留池{" "}
+              <span>{formatAmount(budget.pockets.fixedReserved)}</span>
             </button>
           </div>
-          <div
-            onTouchStart={(event) =>
-              setSummaryTouchStart(event.touches[0]?.clientX ?? null)
-            }
-            onTouchEnd={(event) => {
-              if (summaryTouchStart !== null) {
-                const delta =
-                  (event.changedTouches[0]?.clientX ?? summaryTouchStart) -
-                  summaryTouchStart;
-                if (Math.abs(delta) > 28)
-                  setSummaryCard(delta < 0 ? "fixed" : "pending");
-              }
-              setSummaryTouchStart(null);
-            }}
+          <button
+            className="dashboard-manage"
+            onClick={() => openPanel("fixed")}
           >
-            {summaryCard === "pending" ? (
-              <>
-                <div className="life-summary-row">
-                  <span>固定支出</span>
-                  <b>{snapshot.pendingFixed.length} 笔</b>
-                </div>
-                <div className="life-summary-row">
-                  <span>余额校准</span>
-                  <b>{snapshot.needsCalibration ? "可做" : "无需"}</b>
-                </div>
-                <div className="life-summary-row">
-                  <span>储备缺口</span>
-                  <b>
-                    {snapshot.reserveGap > 0
-                      ? formatAmount(snapshot.reserveGap)
-                      : "无"}
-                  </b>
-                </div>
-              </>
-            ) : (
-              <>
-                <b className="ui-num text-xl">
-                  {formatAmount(budget.pockets.fixedReserved)}
-                </b>
-                <div className="life-summary-row">
-                  <span>本期固定项</span>
-                  <b>{activeFixedExpenses.length}</b>
-                </div>
-                <div className="life-summary-row">
-                  <span>待确认</span>
-                  <b>{snapshot.pendingFixed.length}</b>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="life-summary-dots">
-            <span className={summaryCard === "pending" ? "selected" : ""} />
-            <span className={summaryCard === "fixed" ? "selected" : ""} />
-          </div>
+            管理 →
+          </button>
         </div>
-      </section>
-      <section className="life-quick-actions">
-        <button
-          className="life-action-button"
-          onClick={() => openPanel("income")}
-        >
-          <CircleDollarSign />
-          收入分配
-        </button>
-        <button
-          className="life-action-button"
-          onClick={() => openPanel("calibration")}
-        >
-          <RefreshCw />
-          余额校准
-        </button>
-        <button
-          className="life-action-button"
-          onClick={() => openPanel("fixed")}
-        >
-          <Landmark />
-          固定支出
-        </button>
+        <div className="status-dashboard-grid">
+          {summaryCard === "pending" ? (
+            <>
+              <button onClick={() => openPanel("fixed")}>
+                <span>固定待付</span>
+                <b>{snapshot.pendingFixed.length} 笔</b>
+              </button>
+              <button onClick={() => openPanel("calibration")}>
+                <span>账面校准</span>
+                <b>{snapshot.needsCalibration ? "可做" : "无需"}</b>
+              </button>
+              <button onClick={() => openPanel("settings")}>
+                <span>储备缺口</span>
+                <b className={snapshot.reserveGap > 0 ? "ui-negative" : ""}>
+                  {snapshot.reserveGap > 0
+                    ? formatAmount(snapshot.reserveGap)
+                    : "无"}
+                </b>
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => openPanel("fixed")}>
+                <span>预留余额</span>
+                <b>{formatAmount(budget.pockets.fixedReserved)}</b>
+              </button>
+              <button onClick={() => openPanel("fixed")}>
+                <span>本期固定项</span>
+                <b>{activeFixedExpenses.length} 项</b>
+              </button>
+              <button onClick={() => openPanel("fixed")}>
+                <span>待确认扣款额</span>
+                <b>
+                  {formatAmount(
+                    snapshot.pendingFixed.reduce(
+                      (total, item) => total + item.amount,
+                      0,
+                    ),
+                  )}
+                </b>
+              </button>
+            </>
+          )}
+        </div>
       </section>
       <SectionShell>
         <div className="flex justify-between items-center gap-2">
           <h3>每周预算消耗</h3>
-          <span className="ui-help">本周期</span>
+          <span className="ui-help">实心已花 · 斜纹预付</span>
         </div>
-        <div className="ui-help">已花 · 未来周斜纹表示提前支付</div>
         {(currentCycleSummary?.weeks.length ?? 0) > 0 ? (
           <div
-            className="life-weekly-chart"
+            className="life-weekly-chart week-timeline"
             role="group"
             aria-label="每周预算与提前支付"
           >
             {(currentCycleSummary?.weeks ?? []).map((item) => {
               const status = getWeekStatus(item.startDate, item.endDate);
+              const prepaid = item.prepaidSpent;
               const spent =
-                status === "future" ? item.prepaidSpent : item.spent;
-              const percent = Math.min(
+                status === "future" ? 0 : Math.max(0, item.spent - prepaid);
+              const spentRatio = Math.min(
                 100,
                 Math.max(0, (spent / Math.max(1, item.allowance)) * 100),
               );
+              const prepaidRatio = Math.min(
+                100 - spentRatio,
+                (prepaid / Math.max(1, item.allowance)) * 100,
+              );
               return (
                 <button
-                  className={`life-week-column ${status}`}
+                  className={`life-week-column week-tile ${status}`}
                   key={item.index}
                   onClick={() => openPanel("cycle")}
-                  aria-label={`第${item.index + 1}周，预算${formatAmount(item.allowance)}，${status === "future" ? "提前支付" : "已花"}${formatAmount(spent)}`}
+                  aria-label={`第${item.index + 1}周，预算${formatAmount(item.allowance)}，已花${formatAmount(item.spent)}，提前支付${formatAmount(prepaid)}`}
                 >
-                  <div className="life-week-well">
-                    <div
-                      className={`life-week-fill ${status === "future" && spent > 0 ? "prepaid" : ""}`}
-                      style={{ height: `${percent}%` }}
-                    />
+                  <div className="week-tile-heading">
+                    <b>W{item.index + 1}</b>
+                    {status === "current" && <span>本周</span>}
                   </div>
-                  {status === "current" ? "本周" : `第${item.index + 1}周`}
-                  <b>
-                    {status === "future"
-                      ? spent > 0
-                        ? `提前 ${formatAmount(spent)}`
-                        : `预算 ${formatAmount(item.allowance)}`
-                      : `剩 ${formatAmount(item.remaining)}`}
-                  </b>
-                  <span>
-                    {status === "past"
-                      ? "已结束"
-                      : status === "future"
-                        ? "未来"
-                        : "当前"}
-                  </span>
+                  <small>{formatBudgetDate(item.startDate)}</small>
+                  <div className="week-tile-track">
+                    <div
+                      className="week-tile-spent"
+                      style={{ height: `${spentRatio}%` }}
+                    />
+                    {prepaid > 0 && (
+                      <div
+                        className="bg-prepaid-stripe"
+                        style={{ height: `${prepaidRatio}%` }}
+                      />
+                    )}
+                  </div>
+                  <small>剩余</small>
+                  <strong className="ui-num">
+                    {formatAmount(item.remaining)}
+                  </strong>
+                  <small>
+                    {prepaid > 0
+                      ? `提前 ${formatAmount(prepaid)}`
+                      : status === "past"
+                        ? "已结束"
+                        : status === "future"
+                          ? "未来预算"
+                          : "当前预算"}
+                  </small>
                 </button>
               );
             })}
@@ -1377,6 +1469,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
       {panel === "cycle" && (
         <BottomSheet
+          variant="page"
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -1720,6 +1813,43 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
       {panel === "settings" && (
         <BottomSheet
+          footer={
+            <button
+              onClick={() => {
+                if (!budget.initialized) {
+                  handleInitialize();
+                  return;
+                }
+
+                updateSettings({
+                  reserveFixedAmount:
+                    parseAmount(setupForm.reserveFixedAmount) ||
+                    budget.settings.reserveFixedAmount,
+                  bufferFixedAmount:
+                    parseAmount(setupForm.bufferFixedAmount) ||
+                    budget.settings.bufferFixedAmount,
+                  reserveGoal:
+                    parseAmount(setupForm.reserveGoal) ||
+                    budget.settings.reserveGoal,
+                  bufferCap:
+                    parseAmount(setupForm.bufferCap) ||
+                    budget.settings.bufferCap,
+                  reserveMinimumOverride:
+                    setupForm.reserveMinimumOverride === ""
+                      ? null
+                      : parseAmount(setupForm.reserveMinimumOverride),
+                  minimumWeeklyLiving:
+                    parseAmount(setupForm.minimumWeeklyLiving) ||
+                    budget.settings.minimumWeeklyLiving,
+                });
+              }}
+              className="life-primary-button mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-[var(--on-accent)]"
+            >
+              <Check size={16} /> 保存生活预算设置
+            </button>
+          }
+          variant="page"
+          protectEdits
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -1880,38 +2010,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               设置只影响之后的收入分配和提醒线，已经生成的预算周不会自动重算。
             </div>
           )}
-          <button
-            onClick={() => {
-              if (!budget.initialized) {
-                handleInitialize();
-                return;
-              }
 
-              updateSettings({
-                reserveFixedAmount:
-                  parseAmount(setupForm.reserveFixedAmount) ||
-                  budget.settings.reserveFixedAmount,
-                bufferFixedAmount:
-                  parseAmount(setupForm.bufferFixedAmount) ||
-                  budget.settings.bufferFixedAmount,
-                reserveGoal:
-                  parseAmount(setupForm.reserveGoal) ||
-                  budget.settings.reserveGoal,
-                bufferCap:
-                  parseAmount(setupForm.bufferCap) || budget.settings.bufferCap,
-                reserveMinimumOverride:
-                  setupForm.reserveMinimumOverride === ""
-                    ? null
-                    : parseAmount(setupForm.reserveMinimumOverride),
-                minimumWeeklyLiving:
-                  parseAmount(setupForm.minimumWeeklyLiving) ||
-                  budget.settings.minimumWeeklyLiving,
-              });
-            }}
-            className="life-primary-button mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-[var(--on-accent)]"
-          >
-            <Check size={16} /> 保存生活预算设置
-          </button>
           {settingsSaved && (
             <div className="mt-2 text-center text-xs font-bold text-[var(--pos)]">
               已保存设置
@@ -1919,14 +2018,16 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
           )}
           <BackupSection
             moduleName="生活预算"
+            health={<BackupHealth />}
             appControls={appControls}
-            onExport={() =>
+            onExport={() => {
               exportDailyToExcel(
                 data,
                 new Date().getFullYear(),
                 new Date().getMonth() + 1,
-              )
-            }
+              );
+              markBackup();
+            }}
             onImport={handleImport}
           />
         </BottomSheet>
@@ -1934,6 +2035,11 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
       {panel === "income" && (
         <BottomSheet
+          footer={
+            <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
+          }
+          variant="sheet"
+          protectEdits
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -1960,8 +2066,8 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               }))
             }
           />
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_2fr]">
-            <NumberField
+          <div className="income-fields mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <SmartMoneyInput
               label="金额"
               value={incomeForm.amount}
               onChange={(amount) =>
@@ -1989,13 +2095,17 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                   : "主要收入会开启新的预算周期：剩余自动拆成储备金、本预算周额度和缓冲金。"}
             </div>
           )}
-          <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
         </BottomSheet>
       )}
 
       {panel === "expense" && (
         <BottomSheet
-          error={formError}
+          footer={
+            <SubmitButton onClick={handleExpenseSubmit} label="记录支出" />
+          }
+          variant="sheet"
+          protectEdits
+          error={formError === "请输入支出金额" ? undefined : formError}
           onClearError={() => {
             setFormError("");
             setSettingsSaved(false);
@@ -2007,26 +2117,23 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             setFormError("");
           }}
         >
-          <label className="ui-help">
-            支出金额
-            <div className="ui-amount-field">
-              <span>¥</span>
-              <input
-                aria-label="支出金额"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                value={expenseForm.amount}
-                placeholder="0.00"
-                onChange={(event) =>
-                  setExpenseForm((prev) => ({
-                    ...prev,
-                    amount: event.target.value,
-                  }))
-                }
-              />
-            </div>
-          </label>
+          <SmartMoneyInput
+            label="支出金额"
+            value={expenseForm.amount}
+            onChange={(amount) =>
+              setExpenseForm((prev) => ({ ...prev, amount }))
+            }
+            badge={
+              <span className="ui-badge">
+                {categoryLabels[expenseForm.category]} ·{" "}
+                {expenseForm.isPrepaid
+                  ? "先缓冲/储备"
+                  : expenseForm.category === "large"
+                    ? "缓冲/日常池"
+                    : "优先本周"}
+              </span>
+            }
+          />
           {formError === "请输入支出金额" && (
             <InlineError message={formError} />
           )}
@@ -2058,7 +2165,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               </button>
             ))}
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_2fr]">
+          <div className="expense-fields mt-3 grid grid-cols-2 gap-2">
             <DateField
               label={expenseForm.isPrepaid ? "付款日期" : "日期"}
               value={expenseForm.date}
@@ -2134,16 +2241,33 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                       ? ` → ${formatAmount(expensePreview)}`
                       : ""}
                   </b>
+                  {expensePreview !== null && (
+                    <div
+                      className="preview-progress"
+                      role="img"
+                      aria-label={`支出后本周剩余 ${formatAmount(expensePreview)}`}
+                    >
+                      <span
+                        style={{
+                          width: `${Math.max(0, Math.min(100, (expensePreview / Math.max(1, week?.allowance ?? 1)) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>
           )}
-          <SubmitButton onClick={handleExpenseSubmit} label="记录支出" />
         </BottomSheet>
       )}
 
       {panel === "calibration" && (
         <BottomSheet
+          footer={
+            <SubmitButton onClick={handleCalibrationSubmit} label="完成校准" />
+          }
+          variant="sheet"
+          protectEdits
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -2167,12 +2291,13 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               onChange={setCalibrationAmount}
             />
           </div>
-          <SubmitButton onClick={handleCalibrationSubmit} label="完成校准" />
         </BottomSheet>
       )}
 
       {panel === "fixed" && (
         <BottomSheet
+          variant="sheet"
+          protectEdits
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -2361,6 +2486,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
       {panel === "events" && (
         <BottomSheet
+          variant="page"
           error={formError}
           onClearError={() => {
             setFormError("");
@@ -2373,6 +2499,42 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
             setFormError("");
           }}
         >
+          <div className="history-toolbar">
+            <div className="history-filters">
+              {[
+                ["all", "全部"],
+                ["pockets", "动用缓冲/储备"],
+                ["prepaid", "提前支付"],
+                ["large", "大额/计划外"],
+              ].map(([value, label]) => (
+                <button
+                  className="ui-chip"
+                  type="button"
+                  key={value}
+                  aria-pressed={historyFilter === value}
+                  onClick={() => {
+                    setHistoryFilter(value);
+                    setVisibleEventCount(20);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              aria-label="搜索流水备注或类别"
+              type="search"
+              placeholder="搜索备注或类别"
+              value={historySearch}
+              onChange={(event) => {
+                setHistorySearch(event.target.value);
+                setVisibleEventCount(20);
+              }}
+            />
+            <p className="ui-help" aria-live="polite">
+              共 {filteredEvents.length} 条记录
+            </p>
+          </div>
           <ul className="space-y-2">
             {visibleEvents.map((transaction) => (
               <TransactionEventRow
@@ -2383,19 +2545,19 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                 onDelete={() => handleDeleteTransaction(transaction.id)}
               />
             ))}
-            {allEvents.length === 0 && (
+            {filteredEvents.length === 0 && (
               <li className="rounded-xl bg-[var(--card)] px-3 py-4 text-center text-xs text-[var(--muted)]">
-                暂无记录
+                暂无匹配记录
               </li>
             )}
           </ul>
-          {visibleEventCount < allEvents.length && (
+          {visibleEventCount < filteredEvents.length && (
             <button
               type="button"
               onClick={() => setVisibleEventCount((count) => count + 20)}
               className="mt-3 w-full rounded-xl border-0 bg-[var(--card)] px-3 py-2.5 text-xs font-bold text-[var(--muted)]"
             >
-              加载更多（剩余 {allEvents.length - visibleEventCount} 条）
+              加载更多（剩余 {filteredEvents.length - visibleEventCount} 条）
             </button>
           )}
         </BottomSheet>
@@ -2403,6 +2565,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
 
       {selectedTransaction && (
         <BottomSheet
+          variant="page"
           error={formError}
           onClearError={() => {
             setFormError("");

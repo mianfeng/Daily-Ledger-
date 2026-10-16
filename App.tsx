@@ -1,6 +1,18 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Briefcase, Calendar, Download, Moon, Sun, Upload } from "lucide-react";
-import { UiProvider, useUi, InlineError } from "./components/ui/Ui";
+import {
+  UiProvider,
+  useUi,
+  InlineError,
+  ModuleUiScope,
+} from "./components/ui/Ui";
+import { BackupProvider, useBackup } from "./components/ui/Backup";
 import { CopperShop } from "./components/CopperShop";
 import { DailyLedger } from "./components/DailyLedger";
 import {
@@ -8,16 +20,7 @@ import {
   sanitizeBackup,
   writeLocalLedgerData,
 } from "./lib/appData";
-import {
-  AppBackup,
-  AppLedgerData,
-  CopperData,
-  DailyData,
-  ViewType,
-} from "./types";
-
-const formatBackupTimestamp = (value: Date) =>
-  `${value.getFullYear()}${String(value.getMonth() + 1).padStart(2, "0")}${String(value.getDate()).padStart(2, "0")}_${String(value.getHours()).padStart(2, "0")}${String(value.getMinutes()).padStart(2, "0")}`;
+import { AppLedgerData, CopperData, DailyData, ViewType } from "./types";
 
 const THEME_STORAGE_KEY = "dailyLedgerTheme";
 
@@ -52,22 +55,34 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-const LedgerApp: React.FC<{
+type LedgerProps = {
   theme: AppTheme;
   setTheme: React.Dispatch<React.SetStateAction<AppTheme>>;
   currentView: ViewType;
   setCurrentView: React.Dispatch<React.SetStateAction<ViewType>>;
-}> = ({ theme, setTheme, currentView, setCurrentView }) => {
-  const { confirm, notify } = useUi();
+};
+const LedgerPanels: React.FC<
+  LedgerProps & {
+    ledger: AppLedgerData;
+    setLedger: React.Dispatch<React.SetStateAction<AppLedgerData>>;
+  }
+> = ({ theme, setTheme, currentView, setCurrentView, ledger, setLedger }) => {
+  const { notify } = useUi();
+  const { exportSnapshot, reviewImport } = useBackup();
+  const scrollPositions = useRef({ [ViewType.DAILY]: 0, [ViewType.COPPER]: 0 });
+  const switchView = (next: ViewType) => {
+    if (next === currentView) return;
+    scrollPositions.current[currentView] = window.scrollY;
+    setCurrentView(next);
+  };
+  useLayoutEffect(() => {
+    window.scrollTo({
+      top: scrollPositions.current[currentView],
+      behavior: "instant",
+    });
+  }, [currentView]);
   const [backupError, setBackupError] = useState("");
-  const [ledger, setLedger] = useState<AppLedgerData>(() =>
-    readLocalLedgerData(),
-  );
   const backupInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    writeLocalLedgerData(ledger);
-  }, [ledger]);
 
   useEffect(() => {
     try {
@@ -94,28 +109,6 @@ const LedgerApp: React.FC<{
     }));
   }, []);
 
-  const handleExportBackup = () => {
-    const backup: AppBackup = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      origin: window.location.origin,
-      copper: ledger.copper,
-      daily: ledger.daily,
-    };
-
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `daily-ledger-backup_${formatBackupTimestamp(new Date())}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const handleImportBackup = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -125,21 +118,20 @@ const LedgerApp: React.FC<{
       return;
     }
 
-    if (
-      !(await confirm({
-        title: "恢复整站备份？",
-        body: "生活预算与铜钱生意两个模块当前全部数据都会被覆盖。请确认已保存现有备份。",
-        danger: true,
-        confirmLabel: "覆盖并恢复",
-      }))
-    ) {
-      input.value = "";
-      return;
-    }
-
     try {
       const text = await file.text();
-      const nextData = sanitizeBackup(JSON.parse(text));
+      const raw = JSON.parse(text);
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        !raw.daily ||
+        !raw.copper ||
+        !Array.isArray(raw.daily.transactions) ||
+        !Array.isArray(raw.copper.transactions)
+      )
+        throw new Error("Invalid ledger backup");
+      const nextData = sanitizeBackup(raw);
+      if (!(await reviewImport(nextData, "all"))) return;
       writeLocalLedgerData(nextData);
       setLedger(nextData);
       setBackupError("");
@@ -160,7 +152,7 @@ const LedgerApp: React.FC<{
         {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         {theme === "dark" ? "日间" : "夜间"}
       </button>
-      <button className="ui-button" onClick={handleExportBackup}>
+      <button className="ui-button" onClick={exportSnapshot}>
         <Download size={16} />
         导出整站
       </button>
@@ -181,39 +173,68 @@ const LedgerApp: React.FC<{
   return (
     <>
       <main className="app-main">
-        {currentView === ViewType.COPPER ? (
-          <CopperShop
-            data={ledger.copper}
-            setData={setCopperData}
-            theme={theme}
-            appControls={appControls}
-          />
-        ) : (
-          <DailyLedger
-            data={ledger.daily}
-            setData={setDailyData}
-            theme={theme}
-            appControls={appControls}
-          />
-        )}
+        <div
+          hidden={currentView !== ViewType.DAILY}
+          aria-hidden={currentView !== ViewType.DAILY}
+          className={`warm-ui module-panel ${theme === "dark" ? "theme-dark" : ""}`}
+          data-module="daily"
+        >
+          <ModuleUiScope value={currentView === ViewType.DAILY}>
+            <DailyLedger
+              data={ledger.daily}
+              setData={setDailyData}
+              theme={theme}
+              appControls={appControls}
+            />
+          </ModuleUiScope>
+        </div>
+        <div
+          hidden={currentView !== ViewType.COPPER}
+          aria-hidden={currentView !== ViewType.COPPER}
+          className={`warm-ui module-panel module-business ${theme === "dark" ? "theme-dark" : ""}`}
+          data-module="copper"
+        >
+          <ModuleUiScope value={currentView === ViewType.COPPER}>
+            <CopperShop
+              data={ledger.copper}
+              setData={setCopperData}
+              theme={theme}
+              appControls={appControls}
+            />
+          </ModuleUiScope>
+        </div>
       </main>
       <nav className="app-tabs" aria-label="账本模块">
         <button
           aria-current={currentView === ViewType.DAILY ? "page" : undefined}
-          onClick={() => setCurrentView(ViewType.DAILY)}
+          onClick={() => switchView(ViewType.DAILY)}
         >
           <Calendar size={20} />
           生活预算
         </button>
         <button
           aria-current={currentView === ViewType.COPPER ? "page" : undefined}
-          onClick={() => setCurrentView(ViewType.COPPER)}
+          onClick={() => switchView(ViewType.COPPER)}
         >
           <Briefcase size={20} />
           铜钱生意
         </button>
       </nav>
     </>
+  );
+};
+
+const LedgerApp: React.FC<LedgerProps> = (props) => {
+  const [ledger, setLedger] = useState<AppLedgerData>(() =>
+    readLocalLedgerData(),
+  );
+  useEffect(() => {
+    writeLocalLedgerData(ledger);
+  }, [ledger]);
+  return (
+    <BackupProvider data={ledger}>
+      <LedgerPanels {...props} ledger={ledger} setLedger={setLedger} />
+    </BackupProvider>
   );
 };
 

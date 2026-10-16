@@ -9,10 +9,12 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Check, Download, Upload, X } from "lucide-react";
+import { registerOverlayHistory } from "./overlayHistory";
 
 type ConfirmOptions = {
   title?: string;
   body: string;
+  content?: React.ReactNode;
   danger?: boolean;
   confirmLabel?: string;
 };
@@ -78,6 +80,7 @@ export const UiProvider: React.FC<{
           onClose={() => answer(false)}
         >
           <p className="ui-confirm-copy">{request.body}</p>
+          {request.content}
           <div className="ui-confirm-actions">
             <button
               className="ui-button"
@@ -96,6 +99,7 @@ export const UiProvider: React.FC<{
         </Overlay>
       )}
       {toast &&
+        !request &&
         createPortal(
           <div className={`${appearance} ui-toast`} role="status">
             <Check size={18} />
@@ -112,7 +116,9 @@ const focusableSelector =
 let overlayCount = 0;
 let originalOverflow = "";
 
-export const Overlay: React.FC<{
+const ModuleActiveContext = createContext(true);
+export const ModuleUiScope = ModuleActiveContext.Provider;
+type OverlayProps = {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
@@ -122,7 +128,12 @@ export const Overlay: React.FC<{
   error?: string;
   onClearError?: () => void;
   saved?: boolean;
-}> = ({
+};
+export const Overlay: React.FC<OverlayProps> = (props) => {
+  const active = useContext(ModuleActiveContext);
+  return active ? <ActiveOverlay {...props} /> : null;
+};
+const ActiveOverlay: React.FC<OverlayProps> = ({
   title,
   children,
   onClose,
@@ -140,6 +151,8 @@ export const Overlay: React.FC<{
   closeRef.current = onClose;
   const dirtyRef = useRef(false);
   const closingRef = useRef(false);
+  const dragStart = useRef<number | null>(null);
+  const [dragDistance, setDragDistance] = useState(0);
   const [viewport, setViewport] = useState({
     height: window.visualViewport?.height ?? window.innerHeight,
     top: window.visualViewport?.offsetTop ?? 0,
@@ -161,7 +174,7 @@ export const Overlay: React.FC<{
       !dirtyRef.current ||
       (await confirm({
         title: "放弃未保存输入？",
-        body: "当前输入尚未提交，离开后不会保存。",
+        body: "当前输入尚未记入账本，关闭后不会提交。",
         confirmLabel: "放弃输入",
         danger: true,
       }))
@@ -171,6 +184,13 @@ export const Overlay: React.FC<{
   }, [confirm, protectEdits]);
   const requestCloseRef = useRef(requestClose);
   requestCloseRef.current = requestClose;
+  useEffect(
+    () =>
+      registerOverlayHistory(() => {
+        void requestCloseRef.current();
+      }),
+    [],
+  );
   useEffect(() => {
     const update = () =>
       setViewport({
@@ -281,6 +301,14 @@ export const Overlay: React.FC<{
         aria-labelledby={titleId}
         tabIndex={-1}
         data-overlay-dialog
+        style={
+          variant === "sheet"
+            ? {
+                transform: `translateY(${dragDistance}px)`,
+                transition: dragDistance ? "none" : undefined,
+              }
+            : undefined
+        }
         onChangeCapture={(event) => {
           if (
             event.target instanceof HTMLInputElement &&
@@ -298,7 +326,37 @@ export const Overlay: React.FC<{
             dirtyRef.current = true;
         }}
       >
-        {variant === "sheet" && <div className="ui-handle" />}
+        {variant === "sheet" && (
+          <div
+            className="ui-drag-zone"
+            role="group"
+            aria-label="向下拖动关闭弹层"
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              dragStart.current = event.clientY;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (dragStart.current !== null)
+                setDragDistance(Math.max(0, event.clientY - dragStart.current));
+            }}
+            onPointerCancel={() => {
+              dragStart.current = null;
+              setDragDistance(0);
+            }}
+            onPointerUp={(event) => {
+              const delta =
+                dragStart.current === null
+                  ? 0
+                  : event.clientY - dragStart.current;
+              dragStart.current = null;
+              setDragDistance(0);
+              if (delta > 90) void requestClose();
+            }}
+          >
+            <div className="ui-handle" />
+          </div>
+        )}
         <header className="ui-dialog-header">
           {variant === "page" && (
             <button
@@ -342,10 +400,12 @@ export const BackupSection: React.FC<{
   moduleName: string;
   appControls?: React.ReactNode;
   onExport: () => void;
+  health?: React.ReactNode;
   onImport: (event: React.ChangeEvent<HTMLInputElement>) => void;
-}> = ({ moduleName, appControls, onExport, onImport }) => (
+}> = ({ moduleName, appControls, onExport, onImport, health }) => (
   <section className="ui-backup">
     <h3>数据与备份</h3>
+    {health}
     <p className="ui-help">
       数据保存在当前浏览器，没有登录和云同步。换设备或清理浏览器前，请先导出备份。
     </p>
