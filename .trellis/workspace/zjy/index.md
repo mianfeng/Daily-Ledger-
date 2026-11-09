@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-10-16
+- **Total Sessions**: 13
+- **Last Active**: 2026-11-09
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~408 | Active |
+| `journal-1.md` | ~441 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-11-09 | Daily expense summaries and monthly chart | `1cb882c` | `main` |
 | 12 | 2026-10-16 | Kyoto UI and safe interaction upgrade | `f3f9efd`, `5c46608` | `main` |
 | 11 | 2026-10-14 | Warm tactile mobile UI redesign | `152bc16`, `d074b54` | `main` |
 | 10 | 2026-07-24 | 交易资金过程详情 | `4925d0e` | `main` |

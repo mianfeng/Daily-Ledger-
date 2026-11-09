@@ -406,3 +406,36 @@ Implemented Kyoto Washi palette, module keep-alive, explicit overlays with drag/
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Daily expense summaries and monthly chart
+
+**Date**: 2026-11-09
+**Task**: Daily expense summaries and monthly chart
+**Branch**: `main`
+
+### Summary
+
+Confirmed design with user, implemented payment-date daily summaries and drill-down, monthly/yearly expense chart, retained all-history access and rollback. Passed typecheck, build, contrast, UI smoke, interaction and dedicated expense regression checks. User authorized commit and push.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1cb882c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
