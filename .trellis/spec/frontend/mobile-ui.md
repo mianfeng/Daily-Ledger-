@@ -36,6 +36,12 @@ Read before editing mobile screens, portals, confirmations, themes, or financial
 - Sales previews use the current ratios and `buildIncomeCashAllocation`, separately explaining cost returned to liquid cash. Live inventory violations disable submission; the existing submit-time check remains authoritative.
 - Import handlers parse and normalize before confirmation, compare counts/latest dates only for replaced scopes, and apply only after consent. An optional safety export must finish initiating before mutation; export exceptions cancel the restore. Invalid/unrecognized files never silently become an empty replacement.
 - History filters/search are view state; paginate the filtered list by 20. The first More action opens an allocation-aware confirmation. Transfers have no deletion control.
+- Daily homepage shows seven latest dates with expenses and a separate all-transactions entry.
+  The full daily list browses calendar months and omits empty days; selecting a day mounts
+  a nested page while retaining the underlying month and scroll position. Single-transaction
+  funds-flow detail mounts above the day page. Recompute all totals from transactions after deletion.
+- Monthly expense bars browse calendar years. Tapping reveals an exact amount without navigation;
+  an expandable numeric list provides values for keyboard/screen-reader access and empty months.
 - Recorded `allocation` and immutable snapshots are the only source for historical funding details. Missing allocation omits sources. Missing either snapshot omits all arithmetic bars and shows the old-record explanation.
 - Large/prepaid `allocation.advance` deducts the full `spendable` pocket, so display it as cycle daily money and use saved `snapshot.spendable`; it is not always `futureSpendable`.
 - If a saved pair does not reconcile with an individual allocation, label the after value as recorded rather than displaying a false equals sign. Never rewrite snapshots to make an equation work.
@@ -67,6 +73,9 @@ Read before editing mobile screens, portals, confirmations, themes, or financial
 
 - `npm run typecheck`, `npm run build`, `npm run test:contrast`.
 - `npm run test:interactions` verifies arithmetic/chips, draft and scroll retention, pointer/back dismissal, nested dirty cancellation, filters, paired ratios, profit/inventory validation and backup preflight/safety export.
+- `npm run test:expenses` verifies cent aggregation, payment-date grouping, included expense
+  categories, excluded income/transfers, empty/future months, year boundaries, seven-date summaries,
+  month navigation, nested back/scroll retention, deletion refresh and mobile chart layouts.
 - Contrast checks composite translucent dark theme tokens over both card and page surfaces; comparing raw rgba strings as opaque hex is invalid.
 - `npm run test:ui` against the Vite dev server, with Playwright installed or `PLAYWRIGHT_MODULE` configured; optionally set `BROWSER_EXECUTABLE`.
 - Browser regression assertions cover actual persisted state after async file imports, not merely the presence of an old success toast.

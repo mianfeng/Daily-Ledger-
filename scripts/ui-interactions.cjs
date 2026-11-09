@@ -231,7 +231,7 @@ const pass = (name) => {
   );
 
   // Native back closes the top overlay, including nested pages and dirty prompts.
-  await page.getByRole("button", { name: "查看全部", exact: true }).click();
+  await page.getByRole("button", { name: "全部流水", exact: true }).click();
   await dialog()
     .getByRole("button", { name: /查看.*演示算式记账/ })
     .click();
@@ -296,7 +296,7 @@ const pass = (name) => {
     "Pointer drag dismisses clean sheets and routes dirty sheets through confirmation",
   );
 
-  await page.getByRole("button", { name: "查看全部", exact: true }).click();
+  await page.getByRole("button", { name: "全部流水", exact: true }).click();
   await dialog().getByRole("button", { name: "提前支付", exact: true }).click();
   assert.equal(await dialog().locator(".life-event-row").count(), 1);
   assert.match(await dialog().innerText(), /演示预付交通/);

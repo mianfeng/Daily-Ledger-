@@ -20,6 +20,8 @@ import { BackupSection, InlineError, Overlay, useUi } from "./ui/Ui";
 import { BackupDot, BackupHealth, useBackup } from "./ui/Backup";
 import { SmartMoneyInput } from "./ui/SmartMoneyInput";
 import { moneyValue } from "./ui/money";
+import { DailyExpenses } from "./DailyExpenses";
+import { getExpenseDays } from "../lib/dailyExpenses";
 import * as XLSX from "xlsx";
 import { DEFAULT_DAILY_DATA } from "../lib/appData";
 import {
@@ -713,7 +715,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         .map(({ transaction }) => transaction),
     [data.transactions],
   );
-  const recentEvents = allEvents.slice(0, 3);
+  const expenseDays = useMemo(() => getExpenseDays(allEvents), [allEvents]);
 
   const getTransactionKindLabel = (
     transaction: DailyData["transactions"][number],
@@ -2450,39 +2452,21 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
         </BottomSheet>
       )}
 
-      <SectionShell className="p-3">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => openPanel("events")}
-            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)]"
-          >
-            <ReceiptText size={14} />
-            最近关键事件
-          </button>
-          <button
-            onClick={() => openPanel("events")}
-            className="text-xs font-bold text-[var(--muted)]"
-          >
-            查看全部
-          </button>
-        </div>
-        <ul className="mt-3 space-y-2">
-          {recentEvents.map((transaction) => (
-            <TransactionEventRow
-              key={transaction.id}
-              transaction={transaction}
-              kindLabel={getTransactionKindLabel(transaction)}
-              onOpen={() => setSelectedTransaction(transaction)}
-              onDelete={() => handleDeleteTransaction(transaction.id)}
-            />
-          ))}
-          {recentEvents.length === 0 && (
-            <li className="rounded-xl bg-[var(--card)] px-3 py-4 text-center text-xs text-[var(--muted)]">
-              暂无记录
-            </li>
-          )}
-        </ul>
-      </SectionShell>
+      <DailyExpenses
+        days={expenseDays}
+        today={today}
+        formatAmount={formatAmount}
+        onAllTransactions={() => openPanel("events")}
+        renderTransaction={(transaction) => (
+          <TransactionEventRow
+            key={transaction.id}
+            transaction={transaction}
+            kindLabel={getTransactionKindLabel(transaction)}
+            onOpen={() => setSelectedTransaction(transaction)}
+            onDelete={() => handleDeleteTransaction(transaction.id)}
+          />
+        )}
+      />
 
       {panel === "events" && (
         <BottomSheet

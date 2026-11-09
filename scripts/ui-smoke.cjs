@@ -193,7 +193,7 @@ let activeBrowser;
     "Dirty dismissal confirmation, focus trap and shortened viewport footer",
   );
 
-  await page.getByRole("button", { name: "查看全部", exact: true }).click();
+  await page.getByRole("button", { name: "全部流水", exact: true }).click();
   await dialog()
     .getByRole("button", { name: /查看提前支付/ })
     .first()
@@ -419,7 +419,7 @@ let activeBrowser;
   await page.getByRole("button", { name: "记录支出", exact: true }).click();
   await dialog().getByRole("button", { name: "确认", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "查看全部", exact: true }).click();
+  await page.getByRole("button", { name: "全部流水", exact: true }).click();
   await dialog()
     .getByRole("button", { name: /查看大额/ })
     .first()
@@ -450,7 +450,7 @@ let activeBrowser;
   });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "生活预算", exact: true }).click();
-  await page.getByRole("button", { name: "查看全部", exact: true }).click();
+  await page.getByRole("button", { name: "全部流水", exact: true }).click();
   assert.equal(await dialog().locator(".life-event-row").count(), 20);
   await page.getByRole("button", { name: /加载更多/ }).click();
   assert.equal(await dialog().locator(".life-event-row").count(), 25);

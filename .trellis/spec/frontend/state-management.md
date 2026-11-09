@@ -196,9 +196,20 @@ writeLocalLedgerData(currentData);
   - distribute the remaining weekly pool across the generated budget weeks
   - legacy `savingsRate` / `bufferRate` settings may remain for stored-data compatibility, but must not be the primary UI inputs
 - Prepaid/future expenses keep `date` as the payment date and store
-  `effectiveDate` as the spending/reporting date. Weekly and cycle reports use
+  `effectiveDate` as the budget spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original
   `allocation`.
+- Daily expense summaries and calendar-month/year expense charts are payment-based:
+  - `getExpenseDays(transactions)` in `lib/dailyExpenses.ts` receives display-ordered
+    history, includes only `type === 'expense'`, groups normalized `date` newest first,
+    preserves within-day order, and sums integer cents.
+  - Fixed, large and unrecorded expenses are included; income (including refunds)
+    and internal transfers never change these totals.
+  - `getExpenseMonths(days, year, today)` returns all twelve calendar months. Past/current
+    empty months have amount zero; future empty months have amount null. Future-dated
+    transactions remain visible and included in the annual total.
+  - These summaries are derived view data. Never persist them, change budget reporting
+    to payment dates, or use them as the deletion rollback ledger.
 - Cycle-detail usable balance displays should derive from current pockets:
   - `本周期日常剩余` = `LifeBudgetState.pockets.spendable`
   - `可动用余额` = `spendable + buffer + fixedReserved`
