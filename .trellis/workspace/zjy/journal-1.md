@@ -439,3 +439,36 @@ Confirmed design with user, implemented payment-date daily summaries and drill-d
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: Preserve buffer and support reserve income
+
+**Date**: 2026-11-13
+**Task**: Preserve buffer and support reserve income
+**Branch**: `main`
+
+### Summary
+
+Removed new cycle buffer-to-reserve transfers; added direct reserve income with audit snapshots, rollback and backup compatibility. Typecheck, build, reserve regression and all existing UI/interaction/expense/contrast checks passed. Verified unpaid fixed reserve carries across cycles and only the gap is refilled; monthly arrears are not tracked separately.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8a1d1c0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
