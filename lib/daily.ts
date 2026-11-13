@@ -95,6 +95,7 @@ const normalizeIncomeKind = (value: unknown): DailyIncomeKind | undefined => {
     value === 'main' ||
     value === 'casual' ||
     value === 'refund' ||
+    value === 'reserve' ||
     value === 'correction'
   ) {
     return value;
@@ -1002,6 +1003,14 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
           normalizeDateInput(transaction.date) <= cycle.plannedEndDate,
       )
       .reduce((total, transaction) => total + (transaction.allocation?.reserve ?? 0), 0);
+    const reserveIncome = data.transactions
+      .filter(
+        (transaction) =>
+          transaction.type === 'income' &&
+          transaction.incomeKind === 'reserve' &&
+          isTransactionInCycle(transaction, cycle),
+      )
+      .reduce((total, transaction) => total + (transaction.allocation?.reserve ?? transaction.amount), 0);
     const livingBudget = roundAmount(
       usableIncome ||
         cycle.weeks.reduce((total, week) => total + week.allowance, 0) +
@@ -1019,7 +1028,7 @@ export const getBudgetCycleSummaries = (data: DailyData) => {
       budget: livingBudget,
       prepaidTotal,
       prepaidTransactions,
-      reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery + transferReserveIn),
+      reserveChange: roundAmount(cycle.reserveDeposit + cycle.reserveRecovery + transferReserveIn + reserveIncome),
     };
   });
 };
@@ -1294,13 +1303,30 @@ export const allocateIncome = (
     date: normalizedDate,
     type: 'income',
     amount: safeAmount,
-    desc: desc.trim() || (incomeKind === 'main' ? '主要收入' : incomeKind === 'refund' ? '退款报销' : '零散收入'),
+    desc: desc.trim() || (incomeKind === 'main' ? '主要收入' : incomeKind === 'refund' ? '退款报销' : incomeKind === 'reserve' ? '存入储备金' : '零散收入'),
     incomeKind,
   };
   const fixedReserveTarget = getActiveFixedExpenseTotal(budget);
   const fixedReserveGap = roundAmount(
     Math.max(0, fixedReserveTarget - budget.pockets.fixedReserved),
   );
+
+  if (incomeKind === 'reserve') {
+    return appendTransactionWithAudit(
+      rolloverData,
+      {
+        ...incomeTransaction,
+        allocation: { week: 0, buffer: 0, advance: 0, reserve: safeAmount, fixed: 0 },
+      },
+      {
+        ...budget,
+        pockets: {
+          ...budget.pockets,
+          reserve: roundAmount(budget.pockets.reserve + safeAmount),
+        },
+      },
+    );
+  }
 
   if (incomeKind === 'casual' || incomeKind === 'correction') {
     const bufferAllocation = splitBufferAllocation(
@@ -1369,12 +1395,7 @@ export const allocateIncome = (
   );
   const weeklyPool = roundAmount(Math.max(0, afterReserve - intendedStartingBuffer));
   const weeklyAllowance = roundAmount(weeklyPool / Math.max(1, dayUnits));
-  const previousBufferReserve = budget.currentCycle
-    ? roundAmount(budget.pockets.buffer * budget.settings.weeklyRolloverReserveRate)
-    : 0;
-  const nextCycleBufferCarry = budget.currentCycle
-    ? roundAmount(Math.max(0, budget.pockets.buffer - previousBufferReserve))
-    : 0;
+  const nextCycleBufferCarry = budget.pockets.buffer;
   const startingBufferAllocation = splitBufferAllocation(
     intendedStartingBuffer,
     nextCycleBufferCarry,
@@ -1383,7 +1404,7 @@ export const allocateIncome = (
   const startingBuffer = startingBufferAllocation.buffer;
   const bufferOverflowReserve = startingBufferAllocation.reserveOverflow;
   const totalReserve = roundAmount(
-    reserveDeposit + previousBufferReserve + bufferOverflowReserve,
+    reserveDeposit + bufferOverflowReserve,
   );
   const weeks = buildWeeks(normalizedDate, plannedEndDate, weeklyAllowance);
   const spendable = roundAmount(
@@ -1405,40 +1426,6 @@ export const allocateIncome = (
     rolledOverWeekIndexes: [],
     weeks,
   };
-  const cycleRolloverTransaction: DailyTransaction | null =
-    budget.currentCycle && previousBufferReserve > 0
-      ? {
-          id: createTransactionId(),
-          date: normalizedDate,
-          type: 'transfer',
-          amount: previousBufferReserve,
-          desc: '周期缓冲金结转',
-          transferKind: 'cycleRollover',
-          cycleId: budget.currentCycle.id,
-          allocation: {
-            week: 0,
-            buffer: roundAmount(-previousBufferReserve),
-            advance: 0,
-            reserve: previousBufferReserve,
-            fixed: 0,
-          },
-        }
-      : null;
-  const rolloverBudget: LifeBudgetState = {
-    ...budget,
-    pockets: {
-      ...budget.pockets,
-      buffer: nextCycleBufferCarry,
-      reserve: roundAmount(budget.pockets.reserve + previousBufferReserve),
-    },
-  };
-  const dataAfterCycleRollover = cycleRolloverTransaction
-    ? appendTransactionWithAudit(
-        rolloverData,
-        cycleRolloverTransaction,
-        rolloverBudget,
-      )
-    : rolloverData;
   const incomeAllocation: DailyTransactionAllocation = {
     week: spendable,
     buffer: startingBuffer,
@@ -1466,7 +1453,7 @@ export const allocateIncome = (
     },
   };
   return appendTransactionWithAudit(
-    dataAfterCycleRollover,
+    rolloverData,
     {
       ...incomeTransaction,
       previousCycle: budget.currentCycle,
@@ -1761,7 +1748,11 @@ const getFallbackAllocation = (
       ? transaction.amount
       : 0,
   advance: 0,
-  reserve: transaction.type === 'expense' && transaction.category === 'large' ? transaction.amount : 0,
+  reserve:
+    (transaction.type === 'expense' && transaction.category === 'large') ||
+    (transaction.type === 'income' && transaction.incomeKind === 'reserve')
+      ? transaction.amount
+      : 0,
   fixed: transaction.type === 'expense' && transaction.category === 'fixed' ? transaction.amount : 0,
 });
 

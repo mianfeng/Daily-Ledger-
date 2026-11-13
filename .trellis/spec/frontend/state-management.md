@@ -171,7 +171,7 @@ writeLocalLedgerData(currentData);
   - deleting another historical transaction must not rewrite existing snapshots
   - compound operations that create multiple transactions must snapshot each
     intermediate state in execution order, including multiple weekly rollovers
-    and cycle rollover followed by cycle-opening income
+    and cycle-opening income after due weekly rollovers
 - `DailyTransaction.createdAt` is immutable audit metadata:
   - new transactions store an ISO timestamp
   - old transactions without it remain valid
@@ -180,7 +180,8 @@ writeLocalLedgerData(currentData);
   - it must be visible in history for auditability
   - it must not count as income, expense, week spending, or cycle spending
   - weekly rollover transfers subtract `allocation.week` from spendable and allocate the remainder as 60% buffer / 40% reserve, subject to the buffer cap
-  - cycle rollover transfers move 40% of the existing buffer into reserve and keep 60% in buffer, using a negative `allocation.buffer` for the moved reserve portion
+  - main income no longer generates cycle rollover transfers: carry the entire existing buffer into the next cycle (including initialized buffer before the first cycle)
+  - historical `cycleRollover` transfers remain valid for display, import and deletion of their associated old main income; never remove or rewrite them during normalization
 - Main-income fixed expense reservation keeps money and bill events separate:
   - every `main` income starts a new budget cycle, even when the income date is still inside the current cycle
   - the expected payday is the 15th of each month; when the 15th is a weekend, use the previous weekday as the effective payday
@@ -195,6 +196,12 @@ writeLocalLedgerData(currentData);
   - reserve `settings.bufferFixedAmount` after the minimum weekly living pool, capped by `settings.bufferCap`
   - distribute the remaining weekly pool across the generated budget weeks
   - legacy `savingsRate` / `bufferRate` settings may remain for stored-data compatibility, but must not be the primary UI inputs
+- Direct reserve income uses `DailyIncomeKind === 'reserve'` through `allocateIncome`:
+  - store the entire amount in `allocation.reserve`, with zero week/buffer/advance/fixed allocations
+  - do not open a cycle or change cycle budgets; due weekly rollovers still run through the normal income path
+  - append immutable audit snapshots and delete through the standard allocation rollback
+  - preserve the kind in JSON/Excel normalization and include it in cycle reserve growth, while excluding it from usable daily income
+  - expose it as `存入储备金` in the income form and through read-only cycle details
 - Prepaid/future expenses keep `date` as the payment date and store
   `effectiveDate` as the budget spending/reporting date. Weekly and cycle reports use
   `effectiveDate`, while pocket deduction and rollback still use the original
@@ -262,8 +269,9 @@ writeLocalLedgerData(currentData);
   - new transactions round-trip `createdAt`, `balanceBefore`, and `balanceAfter`
     through full-state backup and readable transaction rows
   - old transactions without audit metadata still sanitize and render
-  - income, expense, fixed payment, weekly rollover, and cycle rollover store the
+  - income (including direct reserve deposits), expense, fixed payment, and weekly rollover store the
     correct pre- and post-transaction snapshots
+  - new main income preserves existing buffer without creating a cycle transfer; legacy cycle transfers still import and render
   - multiple rollovers created in one pass store sequential intermediate balances
   - an expense larger than available money stores only actual allocation and reports the remaining funding gap
 

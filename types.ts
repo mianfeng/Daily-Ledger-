@@ -24,7 +24,7 @@ export type DailyExpenseCategory =
   | 'fixed'
   | 'unrecorded';
 
-export type DailyIncomeKind = 'main' | 'casual' | 'refund' | 'correction';
+export type DailyIncomeKind = 'main' | 'casual' | 'refund' | 'reserve' | 'correction';
 
 export type DailyExpenseTiming = 'prepaid';
 

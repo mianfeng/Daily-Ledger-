@@ -158,7 +158,7 @@
       "Main income fills only the fixed-reserve shortfall",
       "Main-income UI uses fixed reserve/buffer amounts, not legacy savingsRate/bufferRate controls",
       "Weekly rollover: 60% buffer, 40% reserve, subject to buffer cap",
-      "Cycle rollover moves 40% of existing buffer to reserve",
+      "Main income preserves existing buffer; no new cycle rollover transfers",
       "Prepaid payment deducts now and reports on effectiveDate; preserve both dates",
       "Transfers are internal and do not count as income or expense",
       "Historical balance snapshots are immutable; missing snapshots omit calculation process",

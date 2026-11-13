@@ -143,6 +143,7 @@ const incomeKindLabels: Record<DailyIncomeKind, string> = {
   main: "主要收入",
   casual: "零散收入",
   refund: "退款报销",
+  reserve: "存入储备金",
   correction: "余额修正",
 };
 
@@ -1529,6 +1530,16 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
                     <div className="mt-1 text-xs font-bold">
                       目标进度 {reserveProgress}%
                     </div>
+                    <button
+                      type="button"
+                      className="ui-key mt-2 w-full"
+                      onClick={() => {
+                        setIncomeForm((prev) => ({ ...prev, incomeKind: "reserve" }));
+                        openPanel("income");
+                      }}
+                    >
+                      存入储备金
+                    </button>
                   </div>
                 </div>
 
@@ -2038,7 +2049,10 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
       {panel === "income" && (
         <BottomSheet
           footer={
-            <SubmitButton onClick={handleIncomeSubmit} label="确认分配" />
+            <SubmitButton
+              onClick={handleIncomeSubmit}
+              label={incomeForm.incomeKind === "reserve" ? "确认存入" : "确认分配"}
+            />
           }
           variant="sheet"
           protectEdits
@@ -2060,6 +2074,7 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               ["main", "主要收入"],
               ["casual", "零散收入"],
               ["refund", "退款报销"],
+              ["reserve", "存入储备金"],
             ]}
             onChange={(incomeKind) =>
               setIncomeForm((prev) => ({
@@ -2085,9 +2100,14 @@ export const DailyLedger: React.FC<DailyLedgerProps> = ({
               label="备注"
               value={incomeForm.desc}
               onChange={(desc) => setIncomeForm((prev) => ({ ...prev, desc }))}
-              placeholder="如 6月工资、红包、退款"
+              placeholder={incomeForm.incomeKind === "reserve" ? "如 公积金提取、额外储蓄收入" : "如 6月工资、红包、退款"}
             />
           </div>
+          {incomeForm.incomeKind === "reserve" && (
+            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+              金额将全额存入储备金，适合公积金提取等额外收入，不开启新的预算周期。
+            </p>
+          )}
           {incomeForm.incomeKind === "main" && (
             <div className="mt-3 rounded-xl bg-[var(--card)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
               {willAutoReserveFixed
